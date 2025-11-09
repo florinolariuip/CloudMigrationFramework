@@ -1,0 +1,1831 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Cloud Migration Optimizer</title>
+  <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+  <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.plot.ly/plotly-2.27.0.min.js"></script>
+</head>
+<body>
+  <div id="root"></div>
+  <script type="text/babel">
+    const { useState, useEffect } = React;
+
+    // Minimal SVG icons (inline) for no-build setup
+    const Icon = ({ path, viewBox = '0 0 24 24', className = '' }) => (
+      <svg className={className} width="24" height="24" viewBox={viewBox} fill="none" stroke="currentColor" strokeWidth="2">
+        {path}
+      </svg>
+    );
+
+    const Cloud = (props) => <Icon {...props} path={<path d="M17.5 19H9a7 7 0 1 1 6.71-9h1.79a4.5 4.5 0 1 1 0 9Z"/>} />;
+    const Database = (props) => <Icon {...props} path={<><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M3 5v14c0 1.66 4.03 3 9 3s9-1.34 9-3V5"/><path d="M3 12c0 1.66 4.03 3 9 3s9-1.34 9-3"/></>} />;
+    const Server = (props) => <Icon {...props} path={<><rect width="20" height="8" x="2" y="2" rx="2" ry="2"/><rect width="20" height="8" x="2" y="14" rx="2" ry="2"/><line x1="6" x2="6.01" y1="6" y2="6"/><line x1="6" x2="6.01" y1="18" y2="18"/></>} />;
+    const Shield = (props) => <Icon {...props} path={<path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10"/>} />;
+    const Zap = (props) => <Icon {...props} path={<polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/>} />;
+    const TrendingUp = (props) => <Icon {...props} path={<><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/></>} />;
+    const CheckCircle = (props) => <Icon {...props} path={<><circle cx="12" cy="12" r="10"/><path d="m9 12 2 2 4-4"/></>} />;
+    const Settings = (props) => <Icon {...props} path={<><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/></>} />;
+    const Play = (props) => <Icon {...props} path={<polygon points="5 3 19 12 5 21 5 3"/>} />;
+    const Download = (props) => <Icon {...props} path={<><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" x2="12" y1="15" y2="3"/></>} />;
+    const Activity = (props) => <Icon {...props} path={<polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>} />;
+
+    // Sankey Diagram Component
+    const SankeyDiagram = ({ data, title, containerId }) => {
+      useEffect(() => {
+        if (!data || !data.nodes || !data.links) return;
+        
+        const plotData = [{
+          type: "sankey",
+          node: {
+            pad: 15,
+            thickness: 20,
+            line: { color: "white", width: 0.5 },
+            label: data.nodes.map(n => n.name),
+            color: data.nodes.map(n => n.color)
+          },
+          link: {
+            source: data.links.map(l => l.source),
+            target: data.links.map(l => l.target),
+            value: data.links.map(l => l.value),
+            color: data.links.map(l => l.color || 'rgba(0,0,0,0.2)'),
+            label: data.links.map(l => l.label || '')
+          }
+        }];
+        
+        const layout = {
+          title: {
+            text: title,
+            font: { color: 'white', size: 18 }
+          },
+          font: { size: 12, color: 'white' },
+          paper_bgcolor: 'rgba(0,0,0,0)',
+          plot_bgcolor: 'rgba(0,0,0,0)',
+          margin: { l: 20, r: 20, t: 60, b: 20 }
+        };
+        
+        const config = {
+          displayModeBar: true,
+          displaylogo: false,
+          modeBarButtonsToRemove: ['pan2d', 'lasso2d', 'select2d']
+        };
+        
+        Plotly.newPlot(containerId, plotData, layout, config);
+      }, [data, title, containerId]);
+      
+      return <div id={containerId} style={{ width: '100%', height: '500px' }} />;
+    };
+
+    function ComponentMultiSelect({ constraints, setConstraints, serviceData }) {
+      // Get all available components from serviceData (or fallback to static list)
+      var allComponents = serviceData && serviceData.services && serviceData.services.options ? Object.keys(serviceData.services.options) : [
+        "api_gateway", "identity_management", "analytics", "database", "application_server", "storage",
+        "cache", "message_queue", "cdn", "load_balancer", "monitoring", "backup", "encryption", "containers", "serverless_compute"
+      ];
+      // Default to all selected if not set
+      var selected = constraints.selected_components || allComponents;
+
+      function toggleComponent(comp) {
+        var newSelected;
+        if (selected.includes(comp)) {
+          newSelected = selected.filter(function(c) { return c !== comp; });
+        } else {
+          newSelected = selected.concat([comp]);
+        }
+        // Always keep at least one selected
+        if (newSelected.length === 0) return;
+        setConstraints(Object.assign({}, constraints, { selected_components: newSelected }));
+      }
+
+      return (
+        <div className="bg-white/5 rounded-lg p-2 border border-blue-500/20 max-h-40 overflow-y-auto">
+          <div className="flex flex-wrap gap-2">
+            {allComponents.map(function(comp) {
+              return (
+                <button
+                  key={comp}
+                  type="button"
+                  className={"px-2 py-1 rounded text-xs font-semibold transition border " + (selected.includes(comp) ? 'bg-blue-600 text-white border-blue-600' : 'bg-white/10 text-blue-200 border-blue-500/20 hover:bg-blue-500/20')}
+                  onClick={function() { toggleComponent(comp); }}
+                  title={comp.replace(/_/g, ' ')}
+                >
+                  {comp.replace(/_/g, ' ')}
+                </button>
+              );
+            })}
+          </div>
+          <div className="mt-2 text-xs text-blue-300">{selected.length} selected</div>
+        </div>
+      );
+    }
+
+    function CloudMigrationOptimizer() {
+  const [constraints, setConstraints] = useState({ maxBudget: 5000, maxLatency: 12, maxProviders: 2 });
+        // Helper to suggest minimum budget and provider count for feasible solutions
+        function getSuggestion() {
+          if (!serviceData || !serviceData.services || !serviceData.services.costs) return null;
+          const costs = Object.values(serviceData.services.costs).map(Number).filter(x => !isNaN(x));
+          const minCost = Math.min(...costs);
+          const availableProviders = serviceData.services.options ? Object.keys(serviceData.services.options) : [];
+          const minProviders = 1;
+          let suggestion = [];
+          if (constraints.maxBudget < minCost) {
+            suggestion.push(`Increase budget to at least $${minCost} (currently $${constraints.maxBudget})`);
+          }
+          if (constraints.maxProviders < availableProviders.length && availableProviders.length > 1) {
+            suggestion.push(`Increase allowed providers to up to ${availableProviders.length} (currently ${constraints.maxProviders})`);
+          }
+          // Check latency constraint
+          if (serviceData.services.latency) {
+            const latencies = Object.values(serviceData.services.latency).map(Number).filter(x => !isNaN(x));
+            const minLatency = Math.min(...latencies);
+            if (constraints.maxLatency < minLatency) {
+              suggestion.push(`Increase max latency to at least ${minLatency}ms`);
+            }
+          }
+          // Add other constraints if needed (extend here)
+          return suggestion.length ? suggestion.join(' and ') : null;
+        }
+      const [preferences, setPreferences] = useState({ preferredProvider: '', prioritizeCost: false, prioritizePerformance: false });
+      const [results, setResults] = useState(null);
+      const [baselineComparison, setBaselineComparison] = useState(null);
+      const [loading, setLoading] = useState(false);
+      const [loadingBaselines, setLoadingBaselines] = useState(false);
+      const [activeTab, setActiveTab] = useState('configuration');
+      const [serviceData, setServiceData] = useState(null);
+  const [showDocsMenu, setShowDocsMenu] = useState(false);
+  const [showServiceBanner, setShowServiceBanner] = useState(true);
+  // Track if docs dropdown is open by click
+  const [docsMenuClicked, setDocsMenuClicked] = useState(false);
+      const [loadingServices, setLoadingServices] = useState(true);
+      const [serviceError, setServiceError] = useState(null);
+      const [academicConfig, setAcademicConfig] = useState(null);
+
+      const API_BASE = (window.API_BASE || 'http://localhost:5055');
+
+      // Fetch service data and defaults on component mount
+      useEffect(() => {
+        fetchServiceData();
+        fetchDefaults();
+        fetchAcademicConfig();
+      }, []);
+
+      const fetchDefaults = async () => {
+        try {
+          const res = await fetch(`${API_BASE}/api/defaults`);
+          if (!res.ok) throw new Error('Failed to fetch defaults');
+          const data = await res.json();
+          setConstraints(data);
+        } catch (e) {
+          console.error('Failed to fetch defaults:', e);
+          // Keep existing defaults if fetch fails
+        }
+      };
+
+      const fetchAcademicConfig = async () => {
+        try {
+          const res = await fetch(`${API_BASE}/api/config/rules`);
+          if (!res.ok) throw new Error('Failed to fetch config');
+          const data = await res.json();
+          setAcademicConfig(data);
+        } catch (e) {
+          console.error('Failed to fetch academic config:', e);
+        }
+      };
+
+      const saveAcademicConfig = async () => {
+        try {
+          const res = await fetch(`${API_BASE}/api/config/rules`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(academicConfig),
+          });
+          if (res.ok) {
+            alert('✓ Academic configuration saved!');
+          }
+        } catch (e) {
+          alert('Failed to save configuration');
+        }
+      };
+
+      const resetAcademicConfig = async () => {
+        try {
+          const res = await fetch(`${API_BASE}/api/config/reset`, { method: 'POST' });
+          if (res.ok) {
+            await fetchAcademicConfig();
+            alert('✓ Configuration reset to defaults!');
+          }
+        } catch (e) {
+          alert('Failed to reset configuration');
+        }
+      };
+
+      const fetchServiceData = async (forceRefresh = false) => {
+        setLoadingServices(true);
+        setServiceError(null);
+        try {
+          const url = forceRefresh 
+            ? `${API_BASE}/api/services?refresh=true` 
+            : `${API_BASE}/api/services`;
+          const res = await fetch(url);
+          if (!res.ok) throw new Error('Failed to fetch service data');
+          const data = await res.json();
+          setServiceData(data);
+        } catch (e) {
+          console.error('Failed to fetch service data:', e);
+          setServiceError(e.message);
+        } finally {
+          setLoadingServices(false);
+        }
+      };
+
+      const runOptimization = async () => {
+        setLoading(true);
+        try {
+          // Always send selected_components explicitly in constraints
+          const constraintsPayload = { ...constraints };
+          if (!constraintsPayload.selected_components) {
+            constraintsPayload.selected_components = serviceData?.services?.options ? Object.keys(serviceData.services.options) : [
+              "api_gateway", "identity_management", "analytics", "database", "application_server", "storage",
+              "cache", "message_queue", "cdn", "load_balancer", "monitoring", "backup", "encryption", "containers", "serverless_compute"
+            ];
+          }
+          const res = await fetch(`${API_BASE}/api/optimize`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ constraints: constraintsPayload, preferences }),
+          });
+          const data = await res.json();
+          setResults(data);
+          setActiveTab('results');
+        } catch (e) {
+          console.error('Optimization failed:', e);
+          alert('Optimization failed. Ensure the backend is running.');
+        } finally {
+          setLoading(false);
+        }
+      };
+
+      const runBaselineComparison = async () => {
+        setLoadingBaselines(true);
+        try {
+          // Always send selected_components explicitly in constraints
+          const constraintsPayload = { ...constraints };
+          if (!constraintsPayload.selected_components) {
+            constraintsPayload.selected_components = serviceData?.services?.options ? Object.keys(serviceData.services.options) : [
+              "api_gateway", "identity_management", "analytics", "database", "application_server", "storage",
+              "cache", "message_queue", "cdn", "load_balancer", "monitoring", "backup", "encryption", "containers", "serverless_compute"
+            ];
+          }
+          const res = await fetch(`${API_BASE}/api/compare-baselines`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ constraints: constraintsPayload, preferences }),
+          });
+          const data = await res.json();
+          setBaselineComparison(data);
+          setActiveTab('comparison');
+        } catch (e) {
+          console.error('Baseline comparison failed:', e);
+          alert('Baseline comparison failed. Ensure the backend is running.');
+        } finally {
+          setLoadingBaselines(false);
+        }
+      };
+
+      const exportResults = () => {
+        if (!results) return;
+        const dataStr = JSON.stringify(results, null, 2);
+        const url = URL.createObjectURL(new Blob([dataStr], { type: 'application/json' }));
+        const link = document.createElement('a');
+        link.href = url; link.download = 'cloud-migration-results.json'; link.click();
+      };
+
+      return (
+        <div className="min-h-screen bg-gradient-to-br from-slate-900 via-blue-900 to-slate-900">
+          <header className="bg-black/30 backdrop-blur-sm border-b border-blue-500/20">
+            <div className="max-w-7xl mx-auto px-6 py-4">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <Cloud className="w-8 h-8 text-blue-400" />
+                  <div>
+                    <h1 className="text-2xl font-bold text-white">Cloud Migration Optimizer</h1>
+                    <p className="text-sm text-blue-300">CSP + Expert System Hybrid Approach</p>
+                  </div>
+                </div>
+                <div className="flex gap-2">
+                  <button onClick={() => setActiveTab('configuration')} className={`px-4 py-2 rounded-lg transition ${activeTab === 'configuration' ? 'bg-blue-600 text-white' : 'bg-white/10 text-blue-200 hover:bg-white/20'}`}>
+                    <Settings className="w-4 h-4 inline mr-2" /> Configure
+                  </button>
+                  <button onClick={() => setActiveTab('academic')} className={`px-4 py-2 rounded-lg transition ${activeTab === 'academic' ? 'bg-purple-600 text-white' : 'bg-white/10 text-blue-200 hover:bg-white/20'}`}>
+                    🎓 Academic
+                  </button>
+                  <button onClick={() => setActiveTab('results')} disabled={!results} className={`px-4 py-2 rounded-lg transition ${activeTab === 'results' && results ? 'bg-blue-600 text-white' : 'bg-white/10 text-blue-200 hover:bg-white/20 disabled:opacity-50'}`}>
+                    <TrendingUp className="w-4 h-4 inline mr-2" /> Results
+                  </button>
+                  <button onClick={() => setActiveTab('comparison')} disabled={!baselineComparison} className={`px-4 py-2 rounded-lg transition ${activeTab === 'comparison' && baselineComparison ? 'bg-orange-600 text-white' : 'bg-white/10 text-blue-200 hover:bg-white/20 disabled:opacity-50'}`}>
+                    📊 Comparison
+                  </button>
+                  <button onClick={() => setActiveTab('explainability')} disabled={!results || !results.explainability} className={`px-4 py-2 rounded-lg transition ${activeTab === 'explainability' && results && results.explainability ? 'bg-green-600 text-white' : 'bg-white/10 text-blue-200 hover:bg-white/20 disabled:opacity-50'}`}>
+                    🔍 Explainability
+                  </button>
+                  <a href="academic_tests.html" className="px-4 py-2 rounded-lg transition bg-white/10 text-blue-200 hover:bg-white/20 flex items-center gap-2">
+                    📈 Experiments
+                  </a>
+                  <div className="relative z-50">
+                    <a href="docs.html" target="_blank" className="px-4 py-2 rounded-lg transition bg-white/10 text-blue-200 hover:bg-white/20 flex items-center gap-2">
+                      📚 Documentation
+                    </a>
+                  </div>
+                  <a href="figures.html" className="px-4 py-2 rounded-lg transition bg-white/10 text-blue-200 hover:bg-white/20 flex items-center gap-2">
+                    📊 Figures & Tables
+                  </a>
+                </div>
+              </div>
+            </div>
+          </header>
+
+          <main className="max-w-7xl mx-auto px-6 py-8">
+            {loadingServices && (
+              <div className="bg-blue-500/20 backdrop-blur-md rounded-xl p-4 mb-6 border border-blue-500/30 flex items-center gap-3">
+                <div className="w-5 h-5 border-2 border-blue-400/30 border-t-blue-400 rounded-full animate-spin" />
+                <span className="text-blue-200">Loading service data...</span>
+              </div>
+            )}
+
+            {serviceError && (
+              <div className="bg-red-500/20 backdrop-blur-md rounded-xl p-4 mb-6 border border-red-500/30">
+                <div className="flex items-center justify-between">
+                  <span className="text-red-200">⚠️ Error loading service data: {serviceError}</span>
+                  <button onClick={() => fetchServiceData(true)} className="px-3 py-1 bg-red-600 text-white rounded hover:bg-red-700 transition text-sm">
+                    Retry
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {serviceData && !loadingServices && (
+              <div className="bg-green-500/10 backdrop-blur-md rounded-xl mb-6 border border-green-500/20 relative z-40">
+                <div className="flex items-center justify-between p-4 cursor-pointer" onClick={() => setShowServiceBanner(!showServiceBanner)}>
+                  <div className="flex items-center gap-3 flex-1">
+                    <CheckCircle className="w-5 h-5 text-green-400" />
+                    <div className="text-green-200">
+                      <div className="font-semibold">Service data loaded successfully</div>
+                      {!showServiceBanner && serviceData.cache_info.last_updated && (
+                        <div className="text-xs text-green-300 mt-0.5">
+                          Last updated: {new Date(serviceData.cache_info.last_updated).toLocaleTimeString()}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <button 
+                      onClick={(e) => { e.stopPropagation(); fetchServiceData(true); }} 
+                      className="px-3 py-1 bg-green-600 text-white rounded hover:bg-green-700 transition text-sm flex items-center gap-2"
+                    >
+                      <Download className="w-3 h-3" /> Refresh
+                    </button>
+                    <svg className={`w-5 h-5 text-green-400 transition-transform ${showServiceBanner ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                    </svg>
+                  </div>
+                </div>
+                {showServiceBanner && (
+                  <div className="px-4 pb-4 pt-0">
+                    {serviceData.services.pricing_sources ? (
+                      <div className="text-sm space-y-1 text-green-200">
+                        <div>🔸 AWS: <strong>{serviceData.services.pricing_sources.aws}</strong></div>
+                        <div>🔸 Azure: <strong>{serviceData.services.pricing_sources.azure}</strong></div>
+                        <div>🔸 GCP: <strong>{serviceData.services.pricing_sources.gcp}</strong></div>
+                        {serviceData.cache_info.last_updated && (
+                          <div className="text-xs text-green-300 mt-2">
+                            Last updated: {new Date(serviceData.cache_info.last_updated).toLocaleTimeString()}
+                          </div>
+                        )}
+                      </div>
+                    ) : (
+                      <div className="text-green-200">
+                        from <strong>{serviceData.services.source}</strong>
+                        {serviceData.cache_info.last_updated && (
+                          <span className="text-sm ml-2">
+                            (Updated: {new Date(serviceData.cache_info.last_updated).toLocaleTimeString()})
+                          </span>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {activeTab === 'configuration' && (
+              <div className="space-y-6">
+                {/* Two-Phase Approach Explanation */}
+                <div className="bg-gradient-to-r from-purple-500/20 to-blue-500/20 backdrop-blur-md rounded-xl p-6 border border-purple-500/30">
+                  <h2 className="text-2xl font-bold text-white mb-3">🔬 Hybrid CSP + Expert System Approach</h2>
+                  <p className="text-blue-200 mb-4">This optimizer uses a two-phase intelligent decision-making process:</p>
+                  <div className="grid md:grid-cols-2 gap-4">
+                    <div className="bg-white/10 rounded-lg p-4 border border-cyan-500/30">
+                      <div className="flex items-center gap-2 mb-2">
+                        <span className="bg-cyan-500 text-white px-3 py-1 rounded-full text-sm font-bold">PHASE 1</span>
+                        <h3 className="text-lg font-semibold text-cyan-300">CSP Filter</h3>
+                      </div>
+                      <p className="text-blue-200 text-sm mb-2">Constraint Satisfaction Problem</p>
+                      <ul className="text-blue-300 text-sm space-y-1">
+                        <li>✓ Generates all possible configurations</li>
+                        <li>✓ Filters by hard constraints below</li>
+                        <li>✓ Ensures all solutions are feasible</li>
+                      </ul>
+                    </div>
+                    <div className="bg-white/10 rounded-lg p-4 border border-orange-500/30">
+                      <div className="flex items-center gap-2 mb-2">
+                        <span className="bg-orange-500 text-white px-3 py-1 rounded-full text-sm font-bold">PHASE 2</span>
+                        <h3 className="text-lg font-semibold text-orange-300">Expert Rules</h3>
+                      </div>
+                      <p className="text-blue-200 text-sm mb-2">Rule-Based Optimization</p>
+                      <ul className="text-blue-300 text-sm space-y-1">
+                        <li>✓ Applies business rules & expertise</li>
+                        <li>✓ Scores solutions by business value</li>
+                        <li>✓ Ranks best options for your needs</li>
+                      </ul>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="bg-white/10 backdrop-blur-md rounded-xl p-6 border border-blue-500/20">
+                  <div className="flex items-center justify-between mb-4">
+                    <h2 className="text-xl font-semibold text-white flex items-center gap-2">
+                      <Settings className="w-5 h-5 text-blue-400" /> Default Configuration
+                    </h2>
+                    <button 
+                      onClick={async () => {
+                        try {
+                          const res = await fetch(`${API_BASE}/api/defaults`, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify(constraints),
+                          });
+                          if (res.ok) {
+                            alert('✓ Default values saved successfully!');
+                          }
+                        } catch (e) {
+                          alert('Failed to save defaults');
+                        }
+                      }}
+                      className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition text-sm"
+                    >
+                      Save as Defaults
+                    </button>
+                  </div>
+                  <p className="text-blue-200 text-sm mb-4">Configure default starting values for constraints. These will be used when you open the application.</p>
+                </div>
+
+                <div className="bg-white/10 backdrop-blur-md rounded-xl p-6 border border-blue-500/20">
+                  <h2 className="text-xl font-semibold text-white mb-4 flex items-center gap-2">
+                    <Shield className="w-5 h-5 text-cyan-400" /> 
+                    <span className="bg-cyan-500 text-white px-2 py-1 rounded text-xs font-bold mr-2">PHASE 1: CSP</span>
+                    Hard Constraints
+                  </h2>
+                  <p className="text-cyan-200 text-sm mb-4">Define strict limits that all solutions MUST satisfy</p>
+                  <div className="grid md:grid-cols-4 gap-6">
+                    <div>
+                      <label className="block text-sm font-medium text-blue-200 mb-2">Max Budget ($/month)</label>
+                      <input type="number" value={constraints.maxBudget} onChange={(e)=>setConstraints({...constraints, maxBudget: parseInt(e.target.value||'0')})} className="w-full px-4 py-2 bg-white/5 border border-blue-500/30 rounded-lg text-white focus:outline-none focus:border-blue-400" />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-blue-200 mb-2">Max Latency (ms)</label>
+                      <input type="number" value={constraints.maxLatency} onChange={(e)=>setConstraints({...constraints, maxLatency: parseFloat(e.target.value||'0')})} className="w-full px-4 py-2 bg-white/5 border border-blue-500/30 rounded-lg text-white focus:outline-none focus:border-blue-400" />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-blue-200 mb-2">Max Providers</label>
+                      <select value={constraints.maxProviders} onChange={(e)=>setConstraints({...constraints, maxProviders: parseInt(e.target.value)})} className="w-full px-4 py-2 bg-white/5 border border-blue-500/30 rounded-lg text-white focus:outline-none focus:border-blue-400">
+                        <option value={1}>1 Provider</option>
+                        <option value={2}>2 Providers</option>
+                        <option value={3}>3 Providers</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-blue-200 mb-2">Select Components</label>
+                      <ComponentMultiSelect constraints={constraints} setConstraints={setConstraints} serviceData={serviceData} />
+                    </div>
+                  </div>
+
+                </div>
+
+                <div className="bg-white/10 backdrop-blur-md rounded-xl p-6 border border-blue-500/20">
+                  <h2 className="text-xl font-semibold text-white mb-4 flex items-center gap-2">
+                    <Zap className="w-5 h-5 text-orange-400" /> 
+                    <span className="bg-orange-500 text-white px-2 py-1 rounded text-xs font-bold mr-2">PHASE 2: EXPERT SYSTEM</span>
+                    Business Preferences
+                  </h2>
+                  <p className="text-orange-200 text-sm mb-4">Guide the expert rules to optimize for your business goals</p>
+                  <div className="space-y-4">
+                    <div>
+                      <label className="block text-sm font-medium text-blue-200 mb-2">Preferred Cloud Provider</label>
+                      <select value={preferences.preferredProvider} onChange={(e)=>setPreferences({...preferences, preferredProvider: e.target.value})} className="w-full px-4 py-2 bg-white/5 border border-blue-500/30 rounded-lg text-white focus:outline-none focus:border-blue-400">
+                        <option value="">No Preference</option>
+                        <option value="AWS">AWS</option>
+                        <option value="Azure">Azure</option>
+                        <option value="GCP">GCP</option>
+                      </select>
+                    </div>
+                    <div className="flex gap-6">
+                      <label className="flex items-center gap-2 text-blue-200 cursor-pointer">
+                        <input type="checkbox" checked={preferences.prioritizeCost} onChange={(e)=>setPreferences({...preferences, prioritizeCost: e.target.checked})} className="w-4 h-4 rounded border-blue-500/30 bg-white/5" />
+                        <span>Prioritize Cost Efficiency</span>
+                      </label>
+                      <label className="flex items-center gap-2 text-blue-200 cursor-pointer">
+                        <input type="checkbox" checked={preferences.prioritizePerformance} onChange={(e)=>setPreferences({...preferences, prioritizePerformance: e.target.checked})} className="w-4 h-4 rounded border-blue-500/30 bg-white/5" />
+                        <span>Prioritize Performance</span>
+                      </label>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Component Architecture Overview */}
+                <div className="bg-gradient-to-r from-indigo-500/20 to-violet-500/20 backdrop-blur-md rounded-xl p-6 border border-indigo-500/30">
+                  <h2 className="text-xl font-semibold text-white mb-3 flex items-center gap-2">
+                    <Server className="w-5 h-5 text-indigo-400" /> 
+                    Enterprise Architecture Components
+                    <span className="ml-auto text-sm bg-violet-500 text-white px-3 py-1 rounded-full">15 Components × ≥3 Providers = 14M+ baseline combos</span>
+                  </h2>
+                  <p className="text-indigo-200 text-sm mb-4">
+                    The optimizer will select cloud services for each component from AWS, Azure, or GCP to build your complete architecture.
+                  </p>
+                  
+                  <div className="grid md:grid-cols-3 gap-4">
+                    {/* Compute & Application */}
+                    <div className="bg-white/5 rounded-lg p-4 border border-blue-500/30">
+                      <h3 className="text-white font-semibold mb-3 flex items-center gap-2">
+                        <Server className="w-4 h-4 text-blue-400" />
+                        Compute & Application (4)
+                      </h3>
+                      <div className="space-y-2 text-sm">
+                        <div className="text-blue-200">• API Gateway</div>
+                        <div className="text-blue-200">• Application Server</div>
+                        <div className="text-blue-200">• Containers (EKS/AKS/GKE)</div>
+                        <div className="text-blue-200">• Serverless Compute</div>
+                      </div>
+                    </div>
+
+                    {/* Data & Storage */}
+                    <div className="bg-white/5 rounded-lg p-4 border border-purple-500/30">
+                      <h3 className="text-white font-semibold mb-3 flex items-center gap-2">
+                        <Database className="w-4 h-4 text-purple-400" />
+                        Data & Storage (4)
+                      </h3>
+                      <div className="space-y-2 text-sm">
+                        <div className="text-purple-200">• Database</div>
+                        <div className="text-purple-200">• Storage</div>
+                        <div className="text-purple-200">• Cache (Redis/Memcached)</div>
+                        <div className="text-purple-200">• Analytics</div>
+                      </div>
+                    </div>
+
+                    {/* Network & Delivery */}
+                    <div className="bg-white/5 rounded-lg p-4 border border-green-500/30">
+                      <h3 className="text-white font-semibold mb-3 flex items-center gap-2">
+                        <Zap className="w-4 h-4 text-green-400" />
+                        Network & Delivery (3)
+                      </h3>
+                      <div className="space-y-2 text-sm">
+                        <div className="text-green-200">• CDN (Content Delivery)</div>
+                        <div className="text-green-200">• Load Balancer</div>
+                        <div className="text-green-200">• Message Queue</div>
+                      </div>
+                    </div>
+
+                    {/* Security & Compliance */}
+                    <div className="bg-white/5 rounded-lg p-4 border border-red-500/30">
+                      <h3 className="text-white font-semibold mb-3 flex items-center gap-2">
+                        <Shield className="w-4 h-4 text-red-400" />
+                        Security & Compliance (2)
+                      </h3>
+                      <div className="space-y-2 text-sm">
+                        <div className="text-red-200">• Identity Management</div>
+                        <div className="text-red-200">• Encryption (KMS/Key Vault)</div>
+                      </div>
+                    </div>
+
+                    {/* Operations & Management */}
+                    <div className="bg-white/5 rounded-lg p-4 border border-yellow-500/30">
+                      <h3 className="text-white font-semibold mb-3 flex items-center gap-2">
+                        <Activity className="w-4 h-4 text-yellow-400" />
+                        Operations & Management (2)
+                      </h3>
+                      <div className="space-y-2 text-sm">
+                        <div className="text-yellow-200">• Monitoring & Observability</div>
+                        <div className="text-yellow-200">• Backup & Recovery</div>
+                      </div>
+                    </div>
+
+                    {/* Scalability Info */}
+                    <div className="bg-gradient-to-br from-violet-600/20 to-purple-600/20 rounded-lg p-4 border border-violet-500/40">
+                      <h3 className="text-white font-semibold mb-2 flex items-center gap-2">
+                        ⚡ Scalability
+                      </h3>
+                      <div className="space-y-1 text-xs">
+                        <div className="text-violet-200">Search Space: <span className="font-bold text-white">≥ 3^15 ≈ 14,348,907</span> (baseline; actual varies by options)</div>
+                        <div className="text-violet-200">Strategy: <span className="font-bold text-white">Heuristic CSP</span></div>
+                        <div className="text-violet-200">Est. Time: <span className="font-bold text-white">3-5 seconds</span></div>
+                        <div className="text-violet-200 mt-2">
+                          💡 From 6 to <span className="font-bold text-white">15 components</span> demonstrates enterprise-scale optimization!
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <button onClick={runOptimization} disabled={loading} className="w-full bg-gradient-to-r from-blue-600 to-cyan-600 text-white py-4 rounded-xl font-semibold text-lg hover:from-blue-700 hover:to-cyan-700 transition disabled:opacity-50 flex items-center justify-center gap-2">
+                  {loading ? (
+                    <>
+                      <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" /> Running Optimization...
+                    </>
+                  ) : (
+                    <>
+                      <Play className="w-5 h-5" /> 🚀 Run Hybrid CSP + Expert Optimization ({constraints.selected_components ? constraints.selected_components.length : (serviceData?.services?.options ? Object.keys(serviceData.services.options).length : 15)} Components)
+                    </>
+                  )}
+                </button>
+
+                <div className="mt-4 bg-orange-500/20 backdrop-blur-md rounded-xl p-6 border border-orange-500/30">
+                  <h3 className="text-lg font-semibold text-orange-300 mb-2 flex items-center gap-2">
+                    📚 Academic Baseline Comparison
+                  </h3>
+                  <p className="text-orange-200 text-sm mb-4">
+                    Compare CSP+Expert System against 5 baseline algorithms (Random, Greedy-Cost, Greedy-Latency, Genetic Algorithm, Weighted Sum) for journal paper empirical evaluation.
+                  </p>
+                  <button onClick={runBaselineComparison} disabled={loadingBaselines} className="w-full bg-gradient-to-r from-orange-600 to-red-600 text-white py-3 rounded-xl font-semibold hover:from-orange-700 hover:to-red-700 transition disabled:opacity-50 flex items-center justify-center gap-2">
+                    {loadingBaselines ? (<><div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" /> Running Comparison...</>) : '📊 Run Baseline Comparison'}
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {activeTab === 'academic' && academicConfig && (
+              <div className="space-y-6">
+                <div className="bg-gradient-to-r from-purple-500/20 to-pink-500/20 backdrop-blur-md rounded-xl p-6 border border-purple-500/30">
+                  <h2 className="text-2xl font-bold text-white mb-3">🎓 Academic Research Configuration</h2>
+                  <p className="text-purple-200 mb-4">Configure algorithm parameters for experimental research and comparative analysis.</p>
+                  <div className="flex gap-3">
+                    <button onClick={saveAcademicConfig} className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition">
+                      💾 Save Configuration
+                    </button>
+                    <button onClick={resetAcademicConfig} className="px-4 py-2 bg-pink-600 text-white rounded-lg hover:bg-pink-700 transition">
+                      ↻ Reset to Defaults
+                    </button>
+                  </div>
+                </div>
+
+                {/* Scoring Weights */}
+                <div className="bg-white/10 backdrop-blur-md rounded-xl p-6 border border-orange-500/30">
+                  <h3 className="text-xl font-semibold text-white mb-4 flex items-center gap-2">
+                    <span className="bg-orange-500 text-white px-2 py-1 rounded text-xs font-bold">EXPERT SYSTEM</span>
+                    Rule Category Weights
+                  </h3>
+                  <p className="text-orange-200 text-sm mb-4">Adjust the relative importance of each rule category (0.0 = disabled, 2.0 = double weight)</p>
+                  <div className="grid md:grid-cols-2 gap-4">
+                    {Object.entries(academicConfig.weights || {}).map(([key, value]) => (
+                      <div key={key}>
+                        <label className="block text-sm font-medium text-blue-200 mb-2 capitalize">{key.replace('_', ' ')}: {value}</label>
+                        <input 
+                          type="range" 
+                          min="0" 
+                          max="2" 
+                          step="0.1" 
+                          value={value}
+                          onChange={(e) => setAcademicConfig({
+                            ...academicConfig,
+                            weights: { ...academicConfig.weights, [key]: parseFloat(e.target.value) }
+                          })}
+                          className="w-full"
+                        />
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Expert Rules Thresholds */}
+                <div className="bg-white/10 backdrop-blur-md rounded-xl p-6 border border-orange-500/30">
+                  <h3 className="text-xl font-semibold text-white mb-4">Rule Thresholds & Penalties</h3>
+                  <p className="text-orange-200 text-sm mb-4">Fine-tune the thresholds and point values for each expert rule</p>
+                  <div className="grid md:grid-cols-3 gap-4">
+                    {Object.entries(academicConfig.rules || {}).map(([key, value]) => (
+                      <div key={key}>
+                        <label className="block text-sm font-medium text-blue-200 mb-2 capitalize text-xs">{key.replace(/_/g, ' ')}</label>
+                        <input 
+                          type="number" 
+                          value={value}
+                          onChange={(e) => setAcademicConfig({
+                            ...academicConfig,
+                            rules: { ...academicConfig.rules, [key]: parseFloat(e.target.value) }
+                          })}
+                          className="w-full px-3 py-2 bg-white/5 border border-blue-500/30 rounded text-white text-sm focus:outline-none focus:border-blue-400"
+                        />
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* CSP Configuration */}
+                <div className="bg-white/10 backdrop-blur-md rounded-xl p-6 border border-cyan-500/30">
+                  <h3 className="text-xl font-semibold text-white mb-4 flex items-center gap-2">
+                    <span className="bg-cyan-500 text-white px-2 py-1 rounded text-xs font-bold">CSP</span>
+                    Search Strategy Configuration
+                  </h3>
+                  <p className="text-cyan-200 text-sm mb-4">Configure the Constraint Satisfaction Problem search algorithm</p>
+                  <div className="grid md:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm font-medium text-blue-200 mb-2">Search Strategy</label>
+                      <select 
+                        value={academicConfig.csp?.search_strategy || 'exhaustive'}
+                        onChange={(e) => setAcademicConfig({
+                          ...academicConfig,
+                          csp: { ...academicConfig.csp, search_strategy: e.target.value }
+                        })}
+                        className="w-full px-4 py-2 bg-white/5 border border-blue-500/30 rounded-lg text-white focus:outline-none focus:border-blue-400"
+                      >
+                        <option value="exhaustive">Exhaustive Search (complete)</option>
+                        <option value="heuristic">Heuristic Search (faster)</option>
+                        <option value="random_sample">Random Sampling</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-blue-200 mb-2">Sample Size (for random sampling)</label>
+                      <input 
+                        type="number"
+                        value={academicConfig.csp?.sample_size || 1000}
+                        onChange={(e) => setAcademicConfig({
+                          ...academicConfig,
+                          csp: { ...academicConfig.csp, sample_size: parseInt(e.target.value) }
+                        })}
+                        className="w-full px-4 py-2 bg-white/5 border border-blue-500/30 rounded-lg text-white focus:outline-none focus:border-blue-400"
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                {/* Research Documentation */}
+                <div className="bg-white/10 backdrop-blur-md rounded-xl p-6 border border-purple-500/30">
+                  <h3 className="text-xl font-semibold text-white mb-4 flex items-center gap-2">
+                    📚 Research Documentation
+                  </h3>
+                  <p className="text-purple-200 text-sm mb-4">
+                    Detailed implementation guides and academic contributions for journal paper
+                  </p>
+                  <div className="grid md:grid-cols-2 gap-4">
+                    <a 
+                      href="./docs.html?doc=PARETO_IMPLEMENTATION.md" 
+                      target="_blank"
+                      className="block bg-gradient-to-r from-cyan-600/20 to-blue-600/20 hover:from-cyan-600/30 hover:to-blue-600/30 rounded-lg p-4 border border-cyan-500/40 transition"
+                    >
+                      <div className="flex items-start gap-3">
+                        <div className="text-3xl">🎯</div>
+                        <div>
+                          <h4 className="text-white font-semibold mb-1">Pareto Optimization</h4>
+                          <p className="text-cyan-200 text-sm">Multi-objective frontier, hypervolume metrics, extreme solutions</p>
+                          <div className="text-xs text-cyan-400 mt-2">Priority 1 - Section 4</div>
+                        </div>
+                      </div>
+                    </a>
+
+                    <a 
+                      href="./docs.html?doc=BASELINE_IMPLEMENTATION.md" 
+                      target="_blank"
+                      className="block bg-gradient-to-r from-orange-600/20 to-red-600/20 hover:from-orange-600/30 hover:to-red-600/30 rounded-lg p-4 border border-orange-500/40 transition"
+                    >
+                      <div className="flex items-start gap-3">
+                        <div className="text-3xl">📊</div>
+                        <div>
+                          <h4 className="text-white font-semibold mb-1">Baseline Comparison</h4>
+                          <p className="text-orange-200 text-sm">5 algorithms: Random, Greedy, GA, Weighted Sum with empirical results</p>
+                          <div className="text-xs text-orange-400 mt-2">Priority 2 - Section 6</div>
+                        </div>
+                      </div>
+                    </a>
+
+                    <a 
+                      href="./docs.html?doc=EXPLAINABILITY_IMPLEMENTATION.md" 
+                      target="_blank"
+                      className="block bg-gradient-to-r from-green-600/20 to-emerald-600/20 hover:from-green-600/30 hover:to-emerald-600/30 rounded-lg p-4 border border-green-500/40 transition"
+                    >
+                      <div className="flex items-start gap-3">
+                        <div className="text-3xl">🔍</div>
+                        <div>
+                          <h4 className="text-white font-semibold mb-1">Explainability Features</h4>
+                          <p className="text-green-200 text-sm">Constraint proofs, rule traces, decision paths, transparency analysis</p>
+                          <div className="text-xs text-green-400 mt-2">Priority 3 - Section 5</div>
+                        </div>
+                      </div>
+                    </a>
+
+                    <a 
+                      href="./docs.html?doc=SCALABILITY_IMPLEMENTATION.md" 
+                      target="_blank"
+                      className="block bg-gradient-to-r from-indigo-600/20 to-violet-600/20 hover:from-indigo-600/30 hover:to-violet-600/30 rounded-lg p-4 border border-indigo-500/40 transition"
+                    >
+                      <div className="flex items-start gap-3">
+                        <div className="text-3xl">⚡</div>
+                        <div>
+                          <h4 className="text-white font-semibold mb-1">Scalability (15 Components)</h4>
+                          <p className="text-indigo-200 text-sm">Enterprise architecture, 14M+ combinations, performance benchmarks</p>
+                          <div className="text-xs text-indigo-400 mt-2">Priority 4 - Section 7 ✨ NEW</div>
+                        </div>
+                      </div>
+                    </a>
+
+                    <a 
+                      href="./docs.html?doc=EXPLANATION.md" 
+                      target="_blank"
+                      className="block bg-gradient-to-r from-purple-600/20 to-pink-600/20 hover:from-purple-600/30 hover:to-pink-600/30 rounded-lg p-4 border border-purple-500/40 transition"
+                    >
+                      <div className="flex items-start gap-3">
+                        <div className="text-3xl">🏗️</div>
+                        <div>
+                          <h4 className="text-white font-semibold mb-1">System Architecture</h4>
+                          <p className="text-purple-200 text-sm">Backend design, CSP+Expert hybrid, API documentation</p>
+                          <div className="text-xs text-purple-400 mt-2">Technical Overview</div>
+                        </div>
+                      </div>
+                    </a>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {activeTab === 'results' && results && (
+              <div className="space-y-6">
+                {/* Two-Phase Results Summary */}
+                <div className="bg-gradient-to-r from-purple-500/20 to-blue-500/20 backdrop-blur-md rounded-xl p-6 border border-purple-500/30">
+                  <h2 className="text-xl font-bold text-white mb-4">📊 Optimization Pipeline Results</h2>
+                  <div className="grid md:grid-cols-2 gap-4">
+                    <div className="bg-cyan-500/20 rounded-lg p-4 border border-cyan-500/40">
+                      <div className="flex items-center gap-2 mb-3">
+                        <span className="bg-cyan-500 text-white px-3 py-1 rounded-full text-sm font-bold">PHASE 1</span>
+                        <h3 className="text-lg font-semibold text-cyan-300">CSP Filter</h3>
+                      </div>
+                      <div className="space-y-2">
+                        <div className="flex justify-between text-sm">
+                          <span className="text-cyan-200">Total Combinations:</span>
+                          <span className="text-white font-bold">{results.totalCombinations}</span>
+                        </div>
+                        <div className="flex justify-between text-sm">
+                          <span className="text-cyan-200">Feasible Solutions:</span>
+                          <span className="text-white font-bold">{results.feasibleSolutions}</span>
+                        </div>
+                        <div className="flex justify-between text-sm">
+                          <span className="text-cyan-200">Feasibility Rate:</span>
+                          <span className="text-white font-bold">{results.feasibilityRate}%</span>
+                        </div>
+                        <div className="mt-2 pt-2 border-t border-cyan-500/30">
+                          <p className="text-cyan-300 text-xs">✓ All solutions satisfy hard constraints</p>
+                        </div>
+                      </div>
+                    </div>
+                    <div className="bg-orange-500/20 rounded-lg p-4 border border-orange-500/40">
+                      <div className="flex items-center gap-2 mb-3">
+                        <span className="bg-orange-500 text-white px-3 py-1 rounded-full text-sm font-bold">PHASE 2</span>
+                        <h3 className="text-lg font-semibold text-orange-300">Expert Ranking</h3>
+                      </div>
+                      <div className="space-y-2">
+                        <div className="flex justify-between text-sm">
+                          <span className="text-orange-200">Best Score:</span>
+                          <span className="text-white font-bold">{results.topSolution ? results.topSolution.score : '—'} / 150</span>
+                        </div>
+                        <div className="flex justify-between text-sm">
+                          <span className="text-orange-200">Avg Score:</span>
+                          <span className="text-white font-bold">{results.statistics ? results.statistics.score.avg : '—'}</span>
+                        </div>
+                        <div className="flex justify-between text-sm">
+                          <span className="text-orange-200">Rules Applied:</span>
+                          <span className="text-white font-bold">{results.topSolution?.evaluationLog?.length || 0}</span>
+                        </div>
+                        <div className="mt-2 pt-2 border-t border-orange-500/30">
+                          <p className="text-orange-300 text-xs">✓ Optimized by business rules & expertise</p>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="grid md:grid-cols-3 gap-6">
+                  <div className="bg-gradient-to-br from-green-500/20 to-emerald-500/20 backdrop-blur-md rounded-xl p-6 border border-green-500/30">
+                    <div className="flex items-center justify-between mb-2"><span className="text-green-300 text-sm font-medium">Feasible Solutions</span><CheckCircle className="w-5 h-5 text-green-400" /></div>
+                    <div className="text-3xl font-bold text-white">{results.feasibleSolutions}</div>
+                    <div className="text-green-300 text-sm mt-1">{results.feasibilityRate}% of total combinations</div>
+                  </div>
+
+                  <div className="bg-gradient-to-br from-blue-500/20 to-cyan-500/20 backdrop-blur-md rounded-xl p-6 border border-blue-500/30">
+                    <div className="flex items-center justify-between mb-2"><span className="text-blue-300 text-sm font-medium">Best Score</span><TrendingUp className="w-5 h-5 text-blue-400" /></div>
+                    <div className="text-3xl font-bold text-white">{results.topSolution ? results.topSolution.score : '—'}</div>
+                    <div className="text-blue-300 text-sm mt-1">Out of 150 possible points</div>
+                  </div>
+
+                  <div className="bg-gradient-to-br from-purple-500/20 to-pink-500/20 backdrop-blur-md rounded-xl p-6 border border-purple-500/30">
+                    <div className="flex items-center justify-between mb-2"><span className="text-purple-300 text-sm font-medium">Cost Savings</span><Database className="w-5 h-5 text-purple-400" /></div>
+                    <div className="text-3xl font-bold text-white">{results.topSolution && results.statistics ? `$${(results.statistics.cost.max - results.topSolution.cost).toFixed(0)}` : '—'}</div>
+                    <div className="text-purple-300 text-sm mt-1">vs. most expensive option</div>
+                  </div>
+                </div>
+
+                <div className="bg-white/10 backdrop-blur-md rounded-xl p-6 border border-blue-500/20">
+                  <div className="flex items-center justify-between mb-6">
+                    <h2 className="text-xl font-semibold text-white flex items-center gap-2"><CheckCircle className="w-6 h-6 text-green-400" /> Recommended Solution</h2>
+                    <button onClick={exportResults} className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition flex items-center gap-2"><Download className="w-4 h-4" /> Export Results</button>
+                  </div>
+
+                  {!results.topSolution ? (
+                    <div className="p-6 text-center text-blue-200">
+                      <div className="font-semibold text-white">No feasible solutions</div>
+                      <div className="text-sm mt-1">Try relaxing constraints or increasing budget/latency limits.</div>
+                        {getSuggestion() && (
+                          <div className="text-sm mt-2 text-orange-300 font-semibold">Suggestion: {getSuggestion()}</div>
+                        )}
+                    </div>
+                  ) : (
+                    <>
+                      <div className="grid md:grid-cols-3 gap-4 mb-6">
+                        <div className="bg-white/5 rounded-lg p-4"><div className="text-blue-300 text-sm mb-1">Monthly Cost</div><div className="text-2xl font-bold text-white">${results.topSolution.cost}</div></div>
+                        <div className="bg-white/5 rounded-lg p-4"><div className="text-blue-300 text-sm mb-1">Avg Latency</div><div className="text-2xl font-bold text-white">{results.topSolution.latency.toFixed(1)}ms</div></div>
+                        <div className="bg-white/5 rounded-lg p-4"><div className="text-blue-300 text-sm mb-1">Providers</div><div className="text-2xl font-bold text-white">{results.topSolution.providers}</div></div>
+                      </div>
+
+                      <div className="space-y-3">
+                        <div className="flex items-center justify-between mb-4">
+                          <h3 className="text-lg font-semibold text-white">Service Configuration</h3>
+                          <span className="text-sm text-indigo-300 bg-indigo-500/20 px-3 py-1 rounded-full">
+                            {Object.keys(results.topSolution.configuration).length} Components Selected
+                          </span>
+                        </div>
+                        
+                        {/* Group components by category for better organization */}
+                        {(() => {
+                          const config = results.topSolution.configuration;
+                          const serviceCosts = serviceData?.services?.costs || {};
+                          const serviceLatencies = serviceData?.services?.latency || {};
+                          
+                          const categories = {
+                            'Compute & Application': ['api_gateway', 'application_server', 'containers', 'serverless_compute'],
+                            'Data & Storage': ['database', 'storage', 'cache', 'analytics'],
+                            'Network & Delivery': ['cdn', 'load_balancer', 'message_queue'],
+                            'Security & Compliance': ['identity_management', 'encryption'],
+                            'Operations & Management': ['monitoring', 'backup']
+                          };
+                          
+                          const categoryIcons = {
+                            'Compute & Application': '🖥️',
+                            'Data & Storage': '💾',
+                            'Network & Delivery': '🌐',
+                            'Security & Compliance': '🔒',
+                            'Operations & Management': '⚙️'
+                          };
+                          
+                          const getComponentIcon = (component) => {
+                            if (component.includes('database')) return <Database className="w-5 h-5 text-purple-400" />;
+                            if (component.includes('storage')) return <Database className="w-5 h-5 text-yellow-400" />;
+                            if (component.includes('cache')) return <Zap className="w-5 h-5 text-cyan-400" />;
+                            if (component.includes('serverless') || component.includes('function')) return <Zap className="w-5 h-5 text-orange-400" />;
+                            if (component.includes('monitoring')) return <Activity className="w-5 h-5 text-green-400" />;
+                            if (component.includes('security') || component.includes('encryption') || component.includes('identity')) return <Shield className="w-5 h-5 text-red-400" />;
+                            return <Server className="w-5 h-5 text-blue-400" />;
+                          };
+                          
+                          return Object.entries(categories).map(([categoryName, components]) => {
+                            const categoryComponents = components.filter(comp => config[comp]);
+                            if (categoryComponents.length === 0) return null;
+                            
+                            return (
+                              <div key={categoryName} className="mb-4">
+                                <div className="text-sm font-semibold text-indigo-300 mb-2 flex items-center gap-2">
+                                  <span>{categoryIcons[categoryName]}</span>
+                                  {categoryName} ({categoryComponents.length})
+                                </div>
+                                <div className="space-y-2">
+                                  {categoryComponents.map(component => {
+                                    const service = config[component];
+                                    return (
+                                      <div key={component} className="flex items-center justify-between bg-white/5 rounded-lg p-3 border border-white/10">
+                                        <div className="flex items-center gap-3">
+                                          {getComponentIcon(component)}
+                                          <div>
+                                            <div className="text-white font-medium capitalize text-sm">{component.replace(/_/g, ' ')}</div>
+                                            <div className="text-blue-300 text-xs">{service}</div>
+                                          </div>
+                                        </div>
+                                        <div className="text-right">
+                                          <div className="text-white font-semibold text-sm">${serviceCosts[service] || '—'}/mo</div>
+                                          <div className="text-blue-300 text-xs">{serviceLatencies[service] || '—'}ms</div>
+                                        </div>
+                                      </div>
+                                    );
+                                  })}
+                                </div>
+                              </div>
+                            );
+                          });
+                        })()}
+                      </div>
+
+                      <div className="mt-6">
+                        <div className="flex items-center gap-2 mb-3">
+                          <span className="bg-orange-500 text-white px-3 py-1 rounded-full text-sm font-bold">PHASE 2</span>
+                          <h3 className="text-lg font-semibold text-white">Expert System Evaluation</h3>
+                        </div>
+                        <p className="text-orange-200 text-sm mb-3">Rule-based scoring breakdown (starting from 100 points):</p>
+                        <div className="space-y-2">
+                          {results.topSolution.evaluationLog.map((log, idx) => (
+                            <div key={idx} className="flex items-center justify-between bg-white/5 rounded-lg p-3">
+                              <span className="text-blue-200">{log.rule}</span>
+                              <span className={`font-semibold ${log.impact > 0 ? 'text-green-400' : 'text-red-400'}`}>{log.impact > 0 ? '+' : ''}{log.impact} points</span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    </>
+                  )}
+                </div>
+
+                {/* Academic Performance Metrics */}
+                {results.metrics && (
+                  <div className="bg-gradient-to-r from-purple-500/20 to-pink-500/20 backdrop-blur-md rounded-xl p-6 border border-purple-500/30">
+                    <h2 className="text-xl font-bold text-white mb-4">📊 Academic Performance Metrics</h2>
+                    <div className="grid md:grid-cols-3 gap-4">
+                      <div className="bg-white/10 rounded-lg p-4">
+                        <div className="text-purple-300 text-sm mb-1">Total Processing Time</div>
+                        <div className="text-2xl font-bold text-white">{results.metrics.total_time_ms}ms</div>
+                        <div className="text-purple-400 text-xs mt-1">
+                          CSP: {results.metrics.csp_time_ms}ms | Expert: {results.metrics.expert_time_ms}ms | Pareto: {results.metrics.pareto_time_ms}ms
+                        </div>
+                      </div>
+                      <div className="bg-white/10 rounded-lg p-4">
+                        <div className="text-purple-300 text-sm mb-1">Search Space Pruning</div>
+                        <div className="text-2xl font-bold text-white">{results.metrics.pruning_efficiency}%</div>
+                        <div className="text-purple-400 text-xs mt-1">
+                          {results.metrics.search_space_size} → {results.metrics.feasible_space_size} solutions → {results.metrics.pareto_frontier_size} Pareto optimal
+                        </div>
+                      </div>
+                      <div className="bg-white/10 rounded-lg p-4">
+                        <div className="text-purple-300 text-sm mb-1">CSP Strategy Used</div>
+                        <div className="text-xl font-bold text-white capitalize">{results.metrics.config_snapshot.csp_strategy}</div>
+                        <div className="text-purple-400 text-xs mt-1">
+                          {results.metrics.solutions_evaluated} solutions evaluated
+                        </div>
+                      </div>
+                    </div>
+                    <div className="mt-4 bg-white/5 rounded-lg p-4">
+                      <div className="text-sm text-purple-300 mb-2">Rule Weights Applied:</div>
+                      <div className="grid grid-cols-4 gap-2 text-xs">
+                        {Object.entries(results.metrics.config_snapshot.rule_weights).map(([key, value]) => (
+                          <div key={key} className="text-purple-200">
+                            <span className="capitalize">{key.replace('_weight', '')}:</span> <span className="font-bold">{value}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* Pareto Frontier Visualization */}
+                {results.paretoFrontier && results.paretoFrontier.size > 0 && (
+                  <div className="bg-gradient-to-r from-cyan-500/20 to-blue-500/20 backdrop-blur-md rounded-xl p-6 border border-cyan-500/30">
+                    <h2 className="text-xl font-bold text-white mb-4">🎯 Multi-Objective Pareto Frontier</h2>
+                    <p className="text-cyan-200 text-sm mb-4">Trade-off analysis between cost and latency objectives. Points on the frontier represent optimal solutions where improving one objective worsens the other.</p>
+                    
+                    {/* Pareto Metrics */}
+                    <div className="grid md:grid-cols-3 gap-4 mb-6">
+                      <div className="bg-white/10 rounded-lg p-4">
+                        <div className="text-cyan-300 text-sm mb-1">Pareto Solutions</div>
+                        <div className="text-2xl font-bold text-white">{results.paretoFrontier.size}</div>
+                        <div className="text-cyan-400 text-xs mt-1">Non-dominated solutions</div>
+                      </div>
+                      <div className="bg-white/10 rounded-lg p-4">
+                        <div className="text-cyan-300 text-sm mb-1">Hypervolume</div>
+                        <div className="text-2xl font-bold text-white">{results.paretoFrontier.metrics.hypervolume.toFixed(2)}</div>
+                        <div className="text-cyan-400 text-xs mt-1">Quality indicator</div>
+                      </div>
+                      <div className="bg-white/10 rounded-lg p-4">
+                        <div className="text-cyan-300 text-sm mb-1">Coverage Rate</div>
+                        <div className="text-2xl font-bold text-white">{results.paretoFrontier.metrics.coverage_rate}%</div>
+                        <div className="text-cyan-400 text-xs mt-1">Of feasible space</div>
+                      </div>
+                    </div>
+
+                    {/* Extreme Solutions */}
+                    <div className="mb-6">
+                      <h3 className="text-lg font-semibold text-white mb-3">📌 Extreme Solutions</h3>
+                      <div className="grid md:grid-cols-3 gap-4">
+                        {results.paretoFrontier.extremeSolutions.minCost && (
+                          <div className="bg-green-500/20 rounded-lg p-4 border border-green-500/40">
+                            <div className="text-green-300 text-sm mb-2">💰 Minimum Cost</div>
+                            <div className="text-2xl font-bold text-white">\${results.paretoFrontier.extremeSolutions.minCost.cost.toFixed(2)}</div>
+                            <div className="text-green-300 text-xs mt-1">Latency: {results.paretoFrontier.extremeSolutions.minCost.latency.toFixed(1)}ms</div>
+                          </div>
+                        )}
+                        {results.paretoFrontier.extremeSolutions.minLatency && (
+                          <div className="bg-blue-500/20 rounded-lg p-4 border border-blue-500/40">
+                            <div className="text-blue-300 text-sm mb-2">⚡ Minimum Latency</div>
+                            <div className="text-2xl font-bold text-white">{results.paretoFrontier.extremeSolutions.minLatency.latency.toFixed(1)}ms</div>
+                            <div className="text-blue-300 text-xs mt-1">Cost: \${results.paretoFrontier.extremeSolutions.minLatency.cost.toFixed(2)}</div>
+                          </div>
+                        )}
+                        {results.paretoFrontier.extremeSolutions.balanced && (
+                          <div className="bg-purple-500/20 rounded-lg p-4 border border-purple-500/40">
+                            <div className="text-purple-300 text-sm mb-2">⚖️ Balanced</div>
+                            <div className="text-xl font-bold text-white">\${results.paretoFrontier.extremeSolutions.balanced.cost.toFixed(2)}</div>
+                            <div className="text-purple-300 text-xs mt-1">Latency: {results.paretoFrontier.extremeSolutions.balanced.latency.toFixed(1)}ms</div>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Simple SVG Scatter Plot */}
+                    <div className="bg-white/5 rounded-lg p-4">
+                      <h3 className="text-lg font-semibold text-white mb-3">Cost vs Latency Trade-off</h3>
+                      
+                      {/* Debug info */}
+                      {results.paretoFrontier.solutions && results.paretoFrontier.solutions.length > 0 && (
+                        <div className="text-xs mb-2">
+                          <div className="text-blue-300">
+                            Plotting {results.paretoFrontier.solutions.length} solution(s) | 
+                            Cost range: ${Math.min(...results.paretoFrontier.solutions.map(s => s.cost)).toFixed(2)} - ${Math.max(...results.paretoFrontier.solutions.map(s => s.cost)).toFixed(2)} | 
+                            Latency range: {Math.min(...results.paretoFrontier.solutions.map(s => s.latency)).toFixed(1)}ms - {Math.max(...results.paretoFrontier.solutions.map(s => s.latency)).toFixed(1)}ms
+                          </div>
+                          {results.paretoFrontier.solutions.length < 5 && (
+                            <div className="text-yellow-300 mt-1">
+                              💡 Tip: Only {results.paretoFrontier.solutions.length} Pareto-optimal solution(s) found from {results.metrics.feasible_space_size} feasible. 
+                              To get more trade-off options: increase budget/latency constraints, or switch to "exhaustive" search in config.py (CSP_CONFIG).
+                            </div>
+                          )}
+                        </div>
+                      )}
+                      
+                      {results.paretoFrontier.solutions && results.paretoFrontier.solutions.length > 0 ? (
+                        <div>
+                        <svg viewBox="0 0 500 300" className="w-full h-64">
+                          {/* Background grid */}
+                          <defs>
+                            <pattern id="grid" width="50" height="30" patternUnits="userSpaceOnUse">
+                              <path d="M 50 0 L 0 0 0 30" fill="none" stroke="rgba(255,255,255,0.1)" strokeWidth="1"/>
+                            </pattern>
+                          </defs>
+                          <rect width="500" height="300" fill="url(#grid)" />
+                          
+                        {/* Axes */}
+                        <line x1="50" y1="250" x2="480" y2="250" stroke="rgba(255,255,255,0.5)" strokeWidth="2" />
+                        <line x1="50" y1="20" x2="50" y2="250" stroke="rgba(255,255,255,0.5)" strokeWidth="2" />
+                        
+                        {/* Axis labels */}
+                        <text x="250" y="290" fill="white" textAnchor="middle" fontSize="14">Cost ($)</text>
+                        <text x="10" y="135" fill="white" textAnchor="middle" fontSize="14" transform="rotate(-90 10 135)">Latency (ms)</text>
+                        
+                        {/* Axis tick labels */}
+                        {(() => {
+                          if (!results.paretoFrontier.solutions || results.paretoFrontier.solutions.length === 0) return null;
+                          const costs = results.paretoFrontier.solutions.map(s => s.cost);
+                          const latencies = results.paretoFrontier.solutions.map(s => s.latency);
+                          const minCost = Math.min(...costs);
+                          const maxCost = Math.max(...costs);
+                          const minLat = Math.min(...latencies);
+                          const maxLat = Math.max(...latencies);
+                          
+                          return (
+                            <g>
+                              {/* X-axis (Cost) ticks */}
+                              <text x="50" y="270" fill="rgba(255,255,255,0.6)" textAnchor="middle" fontSize="10">${minCost.toFixed(0)}</text>
+                              <text x="265" y="270" fill="rgba(255,255,255,0.6)" textAnchor="middle" fontSize="10">${((minCost + maxCost) / 2).toFixed(0)}</text>
+                              <text x="480" y="270" fill="rgba(255,255,255,0.6)" textAnchor="middle" fontSize="10">${maxCost.toFixed(0)}</text>
+                              
+                              {/* Y-axis (Latency) ticks */}
+                              <text x="35" y="255" fill="rgba(255,255,255,0.6)" textAnchor="end" fontSize="10">{minLat.toFixed(0)}</text>
+                              <text x="35" y="135" fill="rgba(255,255,255,0.6)" textAnchor="end" fontSize="10">{((minLat + maxLat) / 2).toFixed(0)}</text>
+                              <text x="35" y="25" fill="rgba(255,255,255,0.6)" textAnchor="end" fontSize="10">{maxLat.toFixed(0)}</text>
+                            </g>
+                          );
+                        })()}
+                                                  {/* Plot Pareto frontier points */}
+                          {(() => {
+                            const solutions = results.paretoFrontier.solutions;
+                          
+                          const costs = solutions.map(s => s.cost);
+                          const latencies = solutions.map(s => s.latency);
+                          const minCost = Math.min(...costs);
+                          const maxCost = Math.max(...costs);
+                          const minLat = Math.min(...latencies);
+                          const maxLat = Math.max(...latencies);
+                          
+                          // Add padding to ranges to avoid division by zero and ensure visibility
+                          // Use larger absolute padding when range is tiny
+                          const rawCostRange = maxCost - minCost;
+                          const rawLatRange = maxLat - minLat;
+                          const costRange = rawCostRange > 50 ? rawCostRange : 50;  // Minimum $50 range for visibility
+                          const latRange = rawLatRange > 2 ? rawLatRange : 2;  // Minimum 2ms range for visibility
+                          
+                          // Center the data if we expanded the range
+                          const costOffset = rawCostRange < 50 ? (50 - rawCostRange) / 2 : 0;
+                          const latOffset = rawLatRange < 2 ? (2 - rawLatRange) / 2 : 0;
+                          
+                          return solutions.map((sol, idx) => {
+                            const x = 50 + ((sol.cost - minCost + costOffset) / costRange) * 420;
+                            const y = 250 - ((sol.latency - minLat + latOffset) / latRange) * 220;
+                            
+                            // Determine if this is an extreme solution
+                            const isMinCost = results.paretoFrontier.extremeSolutions.minCost && 
+                                            sol.cost === results.paretoFrontier.extremeSolutions.minCost.cost;
+                            const isMinLatency = results.paretoFrontier.extremeSolutions.minLatency && 
+                                               sol.latency === results.paretoFrontier.extremeSolutions.minLatency.latency;
+                            const isBalanced = results.paretoFrontier.extremeSolutions.balanced && 
+                                             sol.cost === results.paretoFrontier.extremeSolutions.balanced.cost;
+                            
+                            let color = "rgba(96, 165, 250, 0.8)"; // Default blue
+                            let size = 8;
+                            if (isMinCost) { color = "rgba(34, 197, 94, 1)"; size = 12; }
+                            if (isMinLatency) { color = "rgba(59, 130, 246, 1)"; size = 12; }
+                            if (isBalanced) { color = "rgba(168, 85, 247, 1)"; size = 12; }
+                            
+                            return (
+                              <g key={idx}>
+                                <circle cx={x} cy={y} r={size} fill={color} stroke="white" strokeWidth="2" />
+                                {/* Add solution number label */}
+                                <text x={x + size + 5} y={y + 4} fill="white" fontSize="11" fontWeight="bold">#{idx + 1}</text>
+                                <title>Solution #{idx + 1}: Cost: ${sol.cost.toFixed(2)} | Latency: {sol.latency.toFixed(1)}ms</title>
+                              </g>
+                            );
+                          });
+                        })()}
+                        
+                        {/* Connect Pareto points with a line */}
+                        {(() => {
+                          const solutions = results.paretoFrontier.solutions;
+                          if (solutions.length < 2) return null;
+                          
+                          const costs = solutions.map(s => s.cost);
+                          const latencies = solutions.map(s => s.latency);
+                          const minCost = Math.min(...costs);
+                          const maxCost = Math.max(...costs);
+                          const minLat = Math.min(...latencies);
+                          const maxLat = Math.max(...latencies);
+                          
+                          const rawCostRange = maxCost - minCost;
+                          const rawLatRange = maxLat - minLat;
+                          const costRange = rawCostRange > 50 ? rawCostRange : 50;
+                          const latRange = rawLatRange > 2 ? rawLatRange : 2;
+                          
+                          const costOffset = rawCostRange < 50 ? (50 - rawCostRange) / 2 : 0;
+                          const latOffset = rawLatRange < 2 ? (2 - rawLatRange) / 2 : 0;
+                          
+                          // Sort solutions by cost for proper line connection
+                          const sortedSols = [...solutions].sort((a, b) => a.cost - b.cost);
+                          
+                          const points = sortedSols.map(sol => {
+                            const x = 50 + ((sol.cost - minCost + costOffset) / costRange) * 420;
+                            const y = 250 - ((sol.latency - minLat + latOffset) / latRange) * 220;
+                            return `${x},${y}`;
+                          }).join(' ');
+                          
+                          return <polyline points={points} fill="none" stroke="rgba(96, 165, 250, 0.3)" strokeWidth="2" strokeDasharray="5,5" />;
+                        })()}
+                        
+                        {/* Legend */}
+                        <g transform="translate(350, 30)">
+                          <circle cx="0" cy="0" r="6" fill="rgba(34, 197, 94, 1)" stroke="white" strokeWidth="2" />
+                          <text x="15" y="5" fill="white" fontSize="12">Min Cost</text>
+                          <circle cx="0" cy="20" r="6" fill="rgba(59, 130, 246, 1)" stroke="white" strokeWidth="2" />
+                          <text x="15" y="25" fill="white" fontSize="12">Min Latency</text>
+                          <circle cx="0" cy="40" r="6" fill="rgba(168, 85, 247, 1)" stroke="white" strokeWidth="2" />
+                          <text x="15" y="45" fill="white" fontSize="12">Balanced</text>
+                        </g>
+                      </svg>
+                      
+                      {/* Solution details table */}
+                      <div className="mt-4 grid grid-cols-1 gap-2">
+                        <div className="text-xs font-semibold text-blue-200 mb-1">All Pareto Solutions:</div>
+                        {results.paretoFrontier.solutions.map((sol, idx) => {
+                          const isMinCost = results.paretoFrontier.extremeSolutions.minCost && 
+                                          sol.cost === results.paretoFrontier.extremeSolutions.minCost.cost;
+                          const isMinLatency = results.paretoFrontier.extremeSolutions.minLatency && 
+                                             sol.latency === results.paretoFrontier.extremeSolutions.minLatency.latency;
+                          const isBalanced = results.paretoFrontier.extremeSolutions.balanced && 
+                                           sol.cost === results.paretoFrontier.extremeSolutions.balanced.cost;
+                          
+                          let badge = "";
+                          let color = "bg-blue-500/20 border-blue-500/30";
+                          if (isMinCost) { badge = "🟢 Min Cost"; color = "bg-green-500/20 border-green-500/30"; }
+                          if (isMinLatency) { badge = "🔵 Min Latency"; color = "bg-blue-500/20 border-blue-500/30"; }
+                          if (isBalanced) { badge = "🟣 Balanced"; color = "bg-purple-500/20 border-purple-500/30"; }
+                          
+                          return (
+                            <div key={idx} className={`flex items-center justify-between p-2 rounded border ${color}`}>
+                              <span className="text-white font-semibold text-xs">#{idx + 1}</span>
+                              <span className="text-white text-xs">Cost: <strong>${sol.cost.toFixed(2)}</strong></span>
+                              <span className="text-white text-xs">Latency: <strong>{sol.latency.toFixed(2)}ms</strong></span>
+                              <span className="text-white text-xs">Providers: <strong>{sol.providers}</strong></span>
+                              {badge && <span className="text-xs font-semibold">{badge}</span>}
+                            </div>
+                          );
+                        })}
+                      </div>
+                      </div>
+                      ) : (
+                        <div className="flex items-center justify-center h-64 bg-white/5 rounded-lg border border-yellow-500/30">
+                          <div className="text-center">
+                            <div className="text-yellow-400 text-4xl mb-2">⚠️</div>
+                            <div className="text-yellow-300 font-semibold">No Pareto Solutions Found</div>
+                            <div className="text-yellow-200/60 text-sm mt-1">
+                              Try adjusting your constraints (budget, latency, providers) to find feasible solutions
+                            </div>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
+
+
+                {/* Sankey Diagrams for Solution Flow Visualization */}
+                {results.sankeyDiagram && (results.sankeyDiagram.costFlow || results.sankeyDiagram.latencyFlow) && (
+                  <div className="space-y-6">
+                    <div className="bg-gradient-to-r from-indigo-500/20 to-purple-500/20 backdrop-blur-md rounded-xl p-6 border border-indigo-500/30">
+                      <h2 className="text-xl font-bold text-white mb-3 flex items-center gap-2">
+                        📊 Solution Flow Visualization (Sankey Diagrams)
+                      </h2>
+                      <p className="text-indigo-200 text-sm mb-4">
+                        Visual representation of how resources flow from cloud providers through component categories. 
+                        Flow width represents magnitude (cost in dollars or latency in milliseconds).
+                      </p>
+                      
+                      {/* Cost Flow Sankey */}
+                      {results.sankeyDiagram.costFlow && (
+                        <div className="bg-white/10 backdrop-blur-md rounded-xl p-6 border border-indigo-500/20 mb-6">
+                          <h3 className="text-lg font-semibold text-white mb-3">💰 Cost Distribution Flow</h3>
+                          <p className="text-indigo-200 text-sm mb-4">
+                            Shows how monthly costs flow from cloud providers (AWS, Azure, GCP) to component categories (Compute, Data, Network, Security, Operations).
+                            Total Cost: <strong>${results.sankeyDiagram.costFlow.metadata.total_cost.toFixed(2)}/month</strong>
+                          </p>
+                          <SankeyDiagram 
+                            data={results.sankeyDiagram.costFlow}
+                            title="Cost Flow: Providers → Component Categories"
+                            containerId="sankey-cost-flow"
+                          />
+                        </div>
+                      )}
+                      
+                      {/* Latency Flow Sankey */}
+                      {results.sankeyDiagram.latencyFlow && (
+                        <div className="bg-white/10 backdrop-blur-md rounded-xl p-6 border border-indigo-500/20">
+                          <h3 className="text-lg font-semibold text-white mb-3">⚡ Latency Contribution Flow</h3>
+                          <p className="text-indigo-200 text-sm mb-4">
+                            Shows which providers and components contribute to overall system latency.
+                            Total Latency: <strong>{results.sankeyDiagram.latencyFlow.metadata.total_latency.toFixed(2)}ms</strong>
+                          </p>
+                          <SankeyDiagram 
+                            data={results.sankeyDiagram.latencyFlow}
+                            title="Latency Flow: Providers → Individual Components"
+                            containerId="sankey-latency-flow"
+                          />
+                        </div>
+                      )}
+                      
+                      {/* Academic Insight */}
+                      <div className="bg-purple-900/20 rounded-lg p-4 border border-purple-500/30 mt-4">
+                        <div className="text-purple-300 font-semibold mb-2">📚 Academic Insight</div>
+                        <p className="text-purple-200 text-sm">
+                          Sankey diagrams provide intuitive visual explainability for optimization results, 
+                          complementing the rule-based transparency of the expert system. They make complex 
+                          multi-provider, multi-component allocations immediately understandable to stakeholders.
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                <div className="bg-white/10 backdrop-blur-md rounded-xl p-6 border border-blue-500/20">
+                  <h2 className="text-xl font-semibold text-white mb-4">Top Alternative Solutions</h2>
+                  <div className="space-y-3">
+                    {results.solutions.slice(1, 6).map((solution, idx) => (
+                      <div key={idx} className="bg-white/5 rounded-lg p-4 flex items-center justify-between">
+                        <div className="flex items-center gap-4">
+                          <div className="text-blue-300 font-semibold">#{idx + 2}</div>
+                          <div>
+                            <div className="text-white font-medium">Score: {solution.score}</div>
+                            <div className="text-blue-300 text-sm">
+                              {Object.values(solution.providerDistribution).map((count, i) => `${Object.keys(solution.providerDistribution)[i]}: ${count}`).join(', ')}
+                            </div>
+                          </div>
+                        </div>
+                        <div className="text-right">
+                          <div className="text-white">${solution.cost}</div>
+                          <div className="text-blue-300 text-sm">{solution.latency.toFixed(1)}ms</div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Baseline Comparison Tab */}
+            {activeTab === 'comparison' && baselineComparison && (
+              <div className="space-y-6 animate-fade-in">
+                <div className="bg-gradient-to-br from-orange-900/30 to-red-900/30 backdrop-blur-md rounded-xl p-6 border border-orange-500/30">
+                  <h2 className="text-2xl font-bold text-white mb-2 flex items-center gap-2">
+                    📊 Baseline Comparison Results
+                  </h2>
+                  <p className="text-orange-200 text-sm">
+                    Empirical evaluation of CSP+Expert System vs. 5 baseline algorithms for journal paper
+                  </p>
+                </div>
+
+                {/* Warning if no CSP solution found */}
+                {!baselineComparison.csp_expert.cost && (
+                    <div className="bg-yellow-900/30 backdrop-blur-md rounded-xl p-6 border border-yellow-500/30">
+                    <h3 className="text-lg font-semibold text-yellow-300 mb-2 flex items-center gap-2">
+                      ⚠️ No Feasible CSP Solution
+                    </h3>
+                    <p className="text-yellow-200 text-sm mb-3">
+                      The CSP solver did not find any solutions satisfying all constraints. This typically happens when constraints are too restrictive (e.g., maxProviders=2 with 15 components).
+                    </p>
+                    <p className="text-yellow-200 text-sm">
+                      <strong>Suggestion:</strong> Try relaxing constraints (increase maxBudget, maxLatency, or maxProviders) or run optimization first to see feasible solutions.
+                    </p>
+                  </div>
+                )}
+
+                {/* Comparison Table */}
+                <div className="bg-white/10 backdrop-blur-md rounded-xl p-6 border border-orange-500/20">
+                  <h3 className="text-xl font-semibold text-white mb-4">Algorithm Performance Comparison</h3>
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-white">
+                      <thead>
+                        <tr className="border-b border-orange-500/30">
+                          <th className="text-left py-3 px-4">Algorithm</th>
+                          <th className="text-right py-3 px-4">Cost ($)</th>
+                          <th className="text-right py-3 px-4">Latency (ms)</th>
+                          <th className="text-right py-3 px-4">Time (ms)</th>
+                          <th className="text-center py-3 px-4">Quality</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {/* CSP + Expert System */}
+                        <tr className="border-b border-orange-500/20 bg-green-900/20">
+                          <td className="py-3 px-4 font-semibold">🏆 CSP + Expert System</td>
+                          <td className="text-right py-3 px-4">{baselineComparison.csp_expert.cost ? `$${baselineComparison.csp_expert.cost.toFixed(2)}` : 'N/A'}</td>
+                          <td className="text-right py-3 px-4">{baselineComparison.csp_expert.latency ? baselineComparison.csp_expert.latency.toFixed(2) : 'N/A'}</td>
+                          <td className="text-right py-3 px-4">{baselineComparison.csp_expert.execution_time_ms.toFixed(2)}</td>
+                          <td className="text-center py-3 px-4">
+                            <span className="inline-block px-3 py-1 bg-green-600 rounded-full text-xs font-semibold">
+                              {baselineComparison.comparison.total_wins} wins
+                            </span>
+                          </td>
+                        </tr>
+
+                        {/* Random */}
+                        <tr className="border-b border-orange-500/20">
+                          <td className="py-3 px-4">🎲 Random Selection</td>
+                          <td className="text-right py-3 px-4">{baselineComparison.baselines.random.cost > 0 ? `$${baselineComparison.baselines.random.cost.toFixed(2)}` : 'Failed'}</td>
+                          <td className="text-right py-3 px-4">{baselineComparison.baselines.random.latency > 0 ? baselineComparison.baselines.random.latency.toFixed(2) : '-'}</td>
+                          <td className="text-right py-3 px-4">{baselineComparison.baselines.random.execution_time_ms.toFixed(2)}</td>
+                          <td className="text-center py-3 px-4">
+                            {baselineComparison.baselines.random.success && baselineComparison.comparison.wins_per_baseline.random > 0 ? 
+                              <span className="text-green-400">✓</span> : 
+                              <span className="text-red-400">✗</span>
+                            }
+                          </td>
+                        </tr>
+
+                        {/* Greedy Cost */}
+                        <tr className="border-b border-orange-500/20">
+                          <td className="py-3 px-4">💰 Greedy Cost</td>
+                          <td className="text-right py-3 px-4">{baselineComparison.baselines.greedy_cost.cost > 0 ? `$${baselineComparison.baselines.greedy_cost.cost.toFixed(2)}` : 'Failed'}</td>
+                          <td className="text-right py-3 px-4">{baselineComparison.baselines.greedy_cost.latency > 0 ? baselineComparison.baselines.greedy_cost.latency.toFixed(2) : '-'}</td>
+                          <td className="text-right py-3 px-4">{baselineComparison.baselines.greedy_cost.execution_time_ms.toFixed(2)}</td>
+                          <td className="text-center py-3 px-4">
+                            {baselineComparison.baselines.greedy_cost.success && baselineComparison.comparison.wins_per_baseline.greedy_cost > 0 ? 
+                              <span className="text-green-400">✓</span> : 
+                              <span className="text-red-400">✗</span>
+                            }
+                          </td>
+                        </tr>
+
+                        {/* Greedy Latency */}
+                        <tr className="border-b border-orange-500/20">
+                          <td className="py-3 px-4">⚡ Greedy Latency</td>
+                          <td className="text-right py-3 px-4">{baselineComparison.baselines.greedy_latency.cost > 0 ? `$${baselineComparison.baselines.greedy_latency.cost.toFixed(2)}` : 'Failed'}</td>
+                          <td className="text-right py-3 px-4">{baselineComparison.baselines.greedy_latency.latency > 0 ? baselineComparison.baselines.greedy_latency.latency.toFixed(2) : '-'}</td>
+                          <td className="text-right py-3 px-4">{baselineComparison.baselines.greedy_latency.execution_time_ms.toFixed(2)}</td>
+                          <td className="text-center py-3 px-4">
+                            {baselineComparison.baselines.greedy_latency.success && baselineComparison.comparison.wins_per_baseline.greedy_latency > 0 ? 
+                              <span className="text-green-400">✓</span> : 
+                              <span className="text-red-400">✗</span>
+                            }
+                          </td>
+                        </tr>
+
+                        {/* Genetic Algorithm */}
+                        <tr className="border-b border-orange-500/20">
+                          <td className="py-3 px-4">🧬 Genetic Algorithm</td>
+                          <td className="text-right py-3 px-4">{baselineComparison.baselines.genetic_algorithm.cost > 0 ? `$${baselineComparison.baselines.genetic_algorithm.cost.toFixed(2)}` : 'Failed'}</td>
+                          <td className="text-right py-3 px-4">{baselineComparison.baselines.genetic_algorithm.latency > 0 ? baselineComparison.baselines.genetic_algorithm.latency.toFixed(2) : '-'}</td>
+                          <td className="text-right py-3 px-4">{baselineComparison.baselines.genetic_algorithm.execution_time_ms.toFixed(2)}</td>
+                          <td className="text-center py-3 px-4">
+                            {baselineComparison.baselines.genetic_algorithm.success && baselineComparison.comparison.wins_per_baseline.genetic_algorithm > 0 ? 
+                              <span className="text-green-400">✓</span> : 
+                              <span className="text-red-400">✗</span>
+                            }
+                          </td>
+                        </tr>
+
+                        {/* Weighted Sum */}
+                        <tr className="border-b border-orange-500/20">
+                          <td className="py-3 px-4">⚖️ Weighted Sum</td>
+                          <td className="text-right py-3 px-4">{baselineComparison.baselines.weighted_sum.cost > 0 ? `$${baselineComparison.baselines.weighted_sum.cost.toFixed(2)}` : 'Failed'}</td>
+                          <td className="text-right py-3 px-4">{baselineComparison.baselines.weighted_sum.latency > 0 ? baselineComparison.baselines.weighted_sum.latency.toFixed(2) : '-'}</td>
+                          <td className="text-right py-3 px-4">{baselineComparison.baselines.weighted_sum.execution_time_ms.toFixed(2)}</td>
+                          <td className="text-center py-3 px-4">
+                            {baselineComparison.baselines.weighted_sum.success && baselineComparison.comparison.wins_per_baseline.weighted_sum > 0 ? 
+                              <span className="text-green-400">✓</span> : 
+                              <span className="text-red-400">✗</span>
+                            }
+                          </td>
+                        </tr>
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+
+                {/* Advantages Summary */}
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div className="bg-green-900/20 backdrop-blur-md rounded-xl p-6 border border-green-500/30">
+                    <div className="text-3xl mb-2">🎯</div>
+                    <h3 className="text-lg font-semibold text-green-300 mb-2">Multi-Objective Optimization</h3>
+                    <p className="text-green-200 text-sm">
+                      Our hybrid approach simultaneously optimizes for <strong>cost</strong>, <strong>latency</strong>, and <strong>business constraints</strong>.<br/>
+                      The <strong>Pareto frontier</strong> reveals {baselineComparison.csp_expert.pareto_count || 'multiple'} distinct trade-off solutions, each representing a unique balance between objectives. This empowers you to select the best fit for your priorities.
+                    </p>
+                  </div>
+
+                  <div className="bg-blue-900/20 backdrop-blur-md rounded-xl p-6 border border-blue-500/30">
+                    <div className="text-3xl mb-2">⚡</div>
+                    <h3 className="text-lg font-semibold text-blue-300 mb-2">Fast & Deterministic Results</h3>
+                    <p className="text-blue-200 text-sm">
+                      The optimizer delivers results in <strong>{baselineComparison.csp_expert.execution_time_ms.toFixed(2)}ms</strong>, leveraging constraint programming for speed and reliability.<br/>
+                      Unlike stochastic methods, every solution is <strong>guaranteed to satisfy all constraints</strong>. In benchmarks, our approach is up to <strong>{Math.max(...Object.values(baselineComparison.baselines).map(b => b.execution_time_ms / baselineComparison.csp_expert.execution_time_ms)).toFixed(0)}× faster</strong> than Genetic Algorithms.
+                    </p>
+                  </div>
+
+                  <div className="bg-purple-900/20 backdrop-blur-md rounded-xl p-6 border border-purple-500/30">
+                    <div className="text-3xl mb-2">📚</div>
+                    <h3 className="text-lg font-semibold text-purple-300 mb-2">Transparent & Explainable</h3>
+                    <p className="text-purple-200 text-sm">
+                      Every recommendation is backed by <strong>rule-based reasoning</strong> and a transparent audit trail.<br/>
+                      The expert system fired <strong>{baselineComparison.csp_expert.rules_fired || 0} rules</strong>, each with clear justifications, so you can understand <strong>why</strong> each solution was chosen.
+                    </p>
+                  </div>
+                </div>
+
+                {/* Academic Context */}
+                <div className="bg-orange-900/20 backdrop-blur-md rounded-xl p-6 border border-orange-500/30">
+                  <h3 className="text-lg font-semibold text-orange-300 mb-3 flex items-center gap-2">
+                    📖 Journal Paper Significance
+                  </h3>
+                  <div className="text-orange-200 text-sm space-y-2">
+                    <p>
+                      <strong>Empirical Contribution:</strong> This comparison demonstrates the effectiveness of hybrid CSP+Expert systems for cloud migration optimization against 5 established baselines.
+                    </p>
+                    <p>
+                      <strong>Key Findings:</strong> CSP+Expert achieves competitive solution quality ({baselineComparison.comparison.total_wins}/{Object.keys(baselineComparison.comparison.wins_per_baseline).length} wins) with {baselineComparison.csp_expert.execution_time_ms.toFixed(2)}ms execution, offering explainability and multi-objective Pareto frontiers unavailable in traditional approaches.
+                    </p>
+                    <p>
+                      <strong>Novelty:</strong> Combines constraint programming efficiency, expert system reasoning, and Pareto optimization for principled, explainable, and fast cloud migration decisions.
+                    </p>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Explainability Tab (Priority 3) */}
+            {activeTab === 'explainability' && results && results.explainability && (
+              <div className="space-y-6 animate-fade-in">
+                <div className="bg-gradient-to-br from-green-900/30 to-emerald-900/30 backdrop-blur-md rounded-xl p-6 border border-green-500/30">
+                  <h2 className="text-2xl font-bold text-white mb-2 flex items-center gap-2">
+                    🔍 Decision Explainability & Transparency
+                  </h2>
+                  <p className="text-green-200 text-sm">
+                    Complete audit trail showing how the CSP+Expert System reached its decision with mathematical guarantees and rule-based reasoning
+                  </p>
+                </div>
+
+                {/* Constraint Satisfaction Proof */}
+                <div className="bg-white/10 backdrop-blur-md rounded-xl p-6 border border-green-500/20">
+                  <h3 className="text-xl font-semibold text-white mb-3 flex items-center gap-2">
+                    ✅ Constraint Satisfaction Proof
+                  </h3>
+                  <p className="text-green-200 text-sm mb-4">
+                    Mathematical proof that the solution satisfies all hard constraints - a guarantee that heuristic methods cannot provide
+                  </p>
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-white">
+                      <thead>
+                        <tr className="border-b border-green-500/30">
+                          <th className="text-left py-3 px-4">Constraint</th>
+                          <th className="text-left py-3 px-4">Required</th>
+                          <th className="text-left py-3 px-4">Actual</th>
+                          <th className="text-center py-3 px-4">Status</th>
+                          <th className="text-right py-3 px-4">Margin</th>
+                          <th className="text-left py-3 px-4">Explanation</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {results.explainability.constraintProof.map((check, idx) => (
+                          <tr key={idx} className="border-b border-green-500/20">
+                            <td className="py-3 px-4 font-semibold">{check.constraint_name}</td>
+                            <td className="py-3 px-4 text-green-300">{check.required_value}</td>
+                            <td className="py-3 px-4">{check.actual_value}</td>
+                            <td className="text-center py-3 px-4">
+                              {check.satisfied ? 
+                                <span className="inline-block px-3 py-1 bg-green-600 rounded-full text-xs">✓ SATISFIED</span> :
+                                <span className="inline-block px-3 py-1 bg-red-600 rounded-full text-xs">✗ VIOLATED</span>
+                              }
+                            </td>
+                            <td className="text-right py-3 px-4">
+                              {check.margin !== null && check.margin !== undefined ? 
+                                <span className={check.margin >= 0 ? 'text-green-400' : 'text-red-400'}>
+                                  {check.margin >= 0 ? '+' : ''}{check.margin.toFixed(2)}
+                                </span> : 
+                                '-'
+                              }
+                            </td>
+                            <td className="py-3 px-4 text-sm text-gray-300">{check.explanation}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+
+                {/* Rule Firing Trace */}
+                <div className="bg-white/10 backdrop-blur-md rounded-xl p-6 border border-green-500/20">
+                  <h3 className="text-xl font-semibold text-white mb-3 flex items-center gap-2">
+                    🎯 Expert Rule Firing Trace
+                  </h3>
+                  <p className="text-green-200 text-sm mb-4">
+                    Detailed log of all expert rules that fired during solution evaluation, showing transparent score calculation
+                  </p>
+                  <div className="space-y-3">
+                    {results.explainability.ruleTrace.map((rule, idx) => (
+                      <div key={idx} className="bg-white/5 rounded-lg p-4 border border-green-500/20">
+                        <div className="flex items-start justify-between mb-2">
+                          <div>
+                            <div className="text-white font-semibold">{rule.rule_name}</div>
+                            <div className="text-green-300 text-sm">Category: {rule.rule_category} | Weight: {rule.weight.toFixed(2)}</div>
+                          </div>
+                          <div className="text-right">
+                            <div className="text-2xl font-bold text-green-400">+{rule.score_contribution.toFixed(1)}</div>
+                            <div className="text-xs text-green-300">points</div>
+                          </div>
+                        </div>
+                        <div className="text-sm text-gray-300 mb-2">{rule.reasoning}</div>
+                        <div className="text-xs text-gray-400">
+                          Evidence: {JSON.stringify(rule.evidence)}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                  <div className="mt-4 bg-green-900/30 rounded-lg p-4">
+                    <div className="text-green-300 text-sm">Total Score Components</div>
+                    <div className="text-3xl font-bold text-white">
+                      {results.explainability.ruleTrace.reduce((sum, rule) => sum + rule.score_contribution, 0).toFixed(1)} points
+                    </div>
+                    <div className="text-xs text-green-400 mt-1">
+                      From {results.explainability.ruleTrace.length} rule firings
+                    </div>
+                  </div>
+                </div>
+
+                {/* Decision Path */}
+                <div className="bg-white/10 backdrop-blur-md rounded-xl p-6 border border-green-500/20">
+                  <h3 className="text-xl font-semibold text-white mb-3 flex items-center gap-2">
+                    🗺️ Step-by-Step Decision Path
+                  </h3>
+                  <p className="text-green-200 text-sm mb-4">
+                    Complete trace of the optimization process from input to final recommendation
+                  </p>
+                  <div className="space-y-4">
+                    {results.explainability.decisionPath.map((step, idx) => (
+                      <div key={idx} className="relative">
+                        {idx < results.explainability.decisionPath.length - 1 && (
+                          <div className="absolute left-6 top-12 bottom-0 w-0.5 bg-green-500/30" />
+                        )}
+                        <div className="bg-white/5 rounded-lg p-4 border border-green-500/20 relative">
+                          <div className="flex items-start gap-4">
+                            <div className="flex-shrink-0">
+                              <div className="w-12 h-12 rounded-full bg-green-600 flex items-center justify-center text-white font-bold text-lg">
+                                {step.step_number}
+                              </div>
+                            </div>
+                            <div className="flex-1">
+                              <div className="flex items-center justify-between mb-2">
+                                <div>
+                                  <div className="text-white font-semibold">{step.action}</div>
+                                  <div className="text-green-300 text-sm">Phase: {step.phase} | Time: {step.time_ms.toFixed(2)}ms</div>
+                                </div>
+                              </div>
+                              <div className="text-sm text-gray-300 mb-3">{step.reasoning}</div>
+                              <div className="grid grid-cols-2 gap-4 text-xs">
+                                <div className="bg-blue-900/20 rounded p-2">
+                                  <div className="text-blue-300 font-semibold mb-1">Input</div>
+                                  <div className="text-gray-400">{JSON.stringify(step.input_data).slice(0, 100)}...</div>
+                                </div>
+                                <div className="bg-green-900/20 rounded p-2">
+                                  <div className="text-green-300 font-semibold mb-1">Output</div>
+                                  <div className="text-gray-400">{JSON.stringify(step.output_data).slice(0, 100)}...</div>
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Explainability Comparison */}
+                <div className="bg-white/10 backdrop-blur-md rounded-xl p-6 border border-green-500/20">
+                  <h3 className="text-xl font-semibold text-white mb-3 flex items-center gap-2">
+                    📊 Explainability Comparison: CSP+Expert vs Baselines
+                  </h3>
+                  <p className="text-green-200 text-sm mb-4">
+                    Quantitative comparison showing the transparency advantage of the hybrid approach
+                  </p>
+                  
+                  {/* Explainability Scores Bar Chart */}
+                  <div className="mb-6">
+                    {Object.entries(results.explainability.comparison.methods).map(([method, data]) => (
+                      <div key={method} className="mb-3">
+                        <div className="flex items-center justify-between mb-1">
+                          <span className="text-white font-medium">{method}</span>
+                          <span className="text-green-400 font-bold">{data.explainability_score}/100</span>
+                        </div>
+                        <div className="w-full bg-gray-700 rounded-full h-6 overflow-hidden">
+                          <div 
+                            className={`h-full ${method === 'CSP+Expert' ? 'bg-green-500' : 'bg-gray-500'} flex items-center justify-end pr-2 text-xs text-white font-semibold transition-all duration-500`}
+                            style={{width: `${data.explainability_score}%`}}
+                          >
+                            {data.transparency}
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+
+                  {/* CSP+Expert Unique Features */}
+                  <div className="bg-green-900/20 rounded-lg p-4 border border-green-500/30">
+                    <div className="text-green-300 font-semibold mb-2">🏆 Unique Advantages of CSP+Expert System</div>
+                    <ul className="space-y-2 text-sm text-green-200">
+                      {results.explainability.comparison.summary.unique_features.map((feature, idx) => (
+                        <li key={idx} className="flex items-start gap-2">
+                          <span className="text-green-400 mt-1">✓</span>
+                          <span>{feature}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                </div>
+
+                {/* Academic Impact */}
+                <div className="bg-green-900/20 backdrop-blur-md rounded-xl p-6 border border-green-500/30">
+                  <h3 className="text-lg font-semibold text-green-300 mb-3 flex items-center gap-2">
+                    📖 Academic & Practical Impact
+                  </h3>
+                  <div className="text-green-200 text-sm space-y-2">
+                    <p>
+                      <strong>Research Contribution:</strong> {results.explainability.comparison.summary.academic_impact}
+                    </p>
+                    <p>
+                      <strong>Industry Value:</strong> {results.explainability.comparison.summary.practical_impact}
+                    </p>
+                    <p>
+                      <strong>Explainability Advantage:</strong> {results.explainability.comparison.summary.advantage}
+                    </p>
+                  </div>
+                </div>
+              </div>
+            )}
+          </main>
+
+          <footer className="mt-12 border-t border-blue-500/20 bg-black/30 backdrop-blur-sm">
+            <div className="max-w-7xl mx-auto px-6 py-4 text-center text-blue-300 text-sm">
+              Hybrid CSP + Expert System Approach | Based on Research by Olariu & Alboaie (2025)
+            </div>
+          </footer>
+        </div>
+      );
+    }
+
+    ReactDOM.createRoot(document.getElementById('root')).render(<CloudMigrationOptimizer />);
+  </script>
+</body>
+</html>
