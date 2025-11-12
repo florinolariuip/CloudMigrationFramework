@@ -17,7 +17,7 @@ for _name in ("Mapping", "MutableMapping", "Sequence"):
         setattr(collections, _name, getattr(collections.abc, _name))
 
 # Layered modules
-from config import (
+from backend.config import (
     DEFAULT_CONSTRAINTS,
     DEFAULT_PRICING,
     SERVICE_DEPENDENCIES,
@@ -25,28 +25,28 @@ from config import (
     SCORING_WEIGHTS,
     CSP_CONFIG,
 )
-from models import Constraints, Preferences
-from services.pricing import get_total_combinations
-from engines.constraints import generate_feasible_solutions
-from engines.rules import evaluate_solutions, calculate_statistics
-from engines.pareto import (
+from backend.models import Constraints, Preferences
+from backend.services.pricing import get_total_combinations
+from backend.engines.constraints import generate_feasible_solutions
+from backend.engines.rules import evaluate_solutions, calculate_statistics
+from backend.engines.pareto import (
     calculate_pareto_frontier,
     calculate_pareto_rank,
     calculate_pareto_metrics,
     get_extreme_solutions
 )
-from engines.baselines import (
+from backend.engines.baselines import (
     run_all_baselines,
     compare_with_csp_expert,
     BaselineResult
 )
-from engines.explainability import (
+from backend.engines.explainability import (
     generate_constraint_proof,
     generate_rule_trace,
     generate_decision_path,
     compare_explainability
 )
-from engines.sankey import (
+from backend.engines.sankey import (
     generate_sankey_data,
     generate_latency_sankey
 )
