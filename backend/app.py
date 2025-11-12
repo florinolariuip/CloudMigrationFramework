@@ -662,4 +662,4 @@ def refresh_experiments():
 if __name__ == "__main__":
     import os
     debug_mode = os.environ.get('FLASK_DEBUG', 'False') == 'True'
-    app.run(host="0.0.0.0", port=5055, debug=debug_mode)
+    pass
