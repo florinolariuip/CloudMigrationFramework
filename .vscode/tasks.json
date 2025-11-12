@@ -1,0 +1,23 @@
+{
+	"version": "2.0.0",
+	"tasks": [
+		{
+			"label": "Run Gunicorn server",
+			"type": "shell",
+			"command": "gunicorn backend.app:app",
+			"args": [],
+			"isBackground": false,
+			"problemMatcher": [],
+			"group": "build"
+		},
+		{
+			"label": "Run Gunicorn server on port 5000",
+			"type": "shell",
+			"command": "gunicorn backend.app:app --bind 127.0.0.1:5000",
+			"args": [],
+			"isBackground": false,
+			"problemMatcher": [],
+			"group": "build"
+		}
+	]
+}

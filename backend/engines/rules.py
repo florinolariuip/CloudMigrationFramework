@@ -2,8 +2,8 @@ from __future__ import annotations
 
 from typing import List, Dict, Any, Optional
 
-from models import Preferences, Solution
-from config import EXPERT_RULES_CONFIG, SCORING_WEIGHTS
+from backend.models import Preferences, Solution
+from backend.config import EXPERT_RULES_CONFIG, SCORING_WEIGHTS
 
 # Experta-based expert system
 from experta import KnowledgeEngine, Fact, Rule, Field, MATCH

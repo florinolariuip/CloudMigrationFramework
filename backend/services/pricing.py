@@ -40,7 +40,7 @@ from datetime import datetime
 from threading import Lock
 import requests
 
-from config import DEFAULT_PRICING
+from backend.config import DEFAULT_PRICING
 
 
 class ServiceDataCache:

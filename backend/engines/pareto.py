@@ -13,7 +13,7 @@ Key Concepts:
 
 from __future__ import annotations
 from typing import List, Dict, Any, Tuple
-from models import Solution
+from backend.models import Solution
 
 
 def dominates(sol_a: Solution, sol_b: Solution, objectives: List[str] = None) -> bool:

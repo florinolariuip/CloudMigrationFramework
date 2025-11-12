@@ -8,15 +8,15 @@ from __future__ import annotations
 from typing import Dict, List, Any
 import itertools
 
-from models import Constraints, Solution
-from services.pricing import (
+from backend.models import Constraints, Solution
+from backend.services.pricing import (
     get_service_options,
     get_service_costs,
     get_service_latency,
     COMPONENTS,
     get_total_combinations,
 )
-from config import CSP_CONFIG, SERVICE_DEPENDENCIES
+from backend.config import CSP_CONFIG, SERVICE_DEPENDENCIES
 
 
 

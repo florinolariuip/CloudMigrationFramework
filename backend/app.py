@@ -53,8 +53,12 @@ from backend.engines.sankey import (
 
 
 
-app = Flask(__name__)
+app = Flask(__name__, static_folder="static", static_url_path="")
 CORS(app)
+
+@app.route('/')
+def serve_index():
+    return app.send_static_file('index.html')
 
 # Generic documentation endpoint to serve markdown files from root, backend, or frontend
 import os

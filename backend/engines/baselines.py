@@ -20,8 +20,8 @@ import time
 from typing import Dict, List, Tuple, Any, Optional
 from dataclasses import dataclass
 
-from models import Solution, Constraints
-from services.pricing import (
+from backend.models import Solution, Constraints
+from backend.services.pricing import (
     get_service_options,
     get_service_costs,
     get_service_latency,

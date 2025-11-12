@@ -19,8 +19,8 @@ For Journal Paper:
 
 from typing import Dict, List, Any, Optional
 from dataclasses import dataclass, asdict
-from models import Solution, Constraints, Preferences
-from services.pricing import COMPONENTS
+from backend.models import Solution, Constraints, Preferences
+from backend.services.pricing import COMPONENTS
 
 
 @dataclass
@@ -300,8 +300,8 @@ def generate_decision_path(
     ))
     
     # Step 2: CSP search space calculation (dynamic for current architecture)
-    from engines.constraints import get_total_combinations
-    from services.pricing import get_service_options
+    from backend.engines.constraints import get_total_combinations
+    from backend.services.pricing import get_service_options
     total_combinations = get_total_combinations()
     options = get_service_options()
     services_per_component = [len(options[c]) for c in COMPONENTS]

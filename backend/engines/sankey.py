@@ -12,7 +12,7 @@ Key visualizations:
 """
 
 from typing import Dict, List, Any
-from models import Solution
+from backend.models import Solution
 
 
 def generate_sankey_data(solution: Solution, services_data: Dict[str, Any]) -> Dict[str, Any]:
