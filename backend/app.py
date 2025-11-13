@@ -250,13 +250,20 @@ def generate_sankey():
         if not config:
             return jsonify({"error": "No solution configuration provided"}), 400
         
+        # Calculate provider distribution from configuration
+        provider_dist = {}
+        for service_name in config.values():
+            provider = service_name.split('_')[0].upper()
+            provider_dist[provider] = provider_dist.get(provider, 0) + 1
+        
         # Create a temporary solution object
         from backend.models import Solution
         solution = Solution(
             configuration=config,
             cost=payload.get("cost", 0),
             latency=payload.get("latency", 0),
-            providers=payload.get("providers", 1)
+            providers=payload.get("providers", len(provider_dist)),
+            providerDistribution=provider_dist
         )
         
         # Build services_data with actual pricing and estimated latencies
