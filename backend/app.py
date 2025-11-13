@@ -242,35 +242,64 @@ def generate_sankey():
     Generate Sankey diagram data for a specific solution.
     Shows cost and latency flow through providers and components.
     """
-    payload = request.get_json(force=True, silent=True) or {}
+    try:
+        payload = request.get_json(force=True, silent=True) or {}
+        
+        # Get solution configuration
+        config = payload.get("configuration", {})
+        if not config:
+            return jsonify({"error": "No solution configuration provided"}), 400
+        
+        # Create a temporary solution object
+        from backend.models import Solution
+        solution = Solution(
+            configuration=config,
+            cost=payload.get("cost", 0),
+            latency=payload.get("latency", 0),
+            providers=payload.get("providers", 1)
+        )
+        
+        # Build services_data with actual pricing and estimated latencies
+        from backend.config import LATENCY_ESTIMATES
+        services_data = {
+            "costs": DEFAULT_PRICING,
+            "latency": LATENCY_ESTIMATES if 'LATENCY_ESTIMATES' in dir() else {}
+        }
+        
+        # If no latency data, create default estimates
+        if not services_data["latency"]:
+            services_data["latency"] = {}
+            for service_name in config.values():
+                # Estimate latency based on service type
+                if 'cdn' in service_name.lower():
+                    services_data["latency"][service_name] = 0.1
+                elif 'cache' in service_name.lower():
+                    services_data["latency"][service_name] = 0.2
+                elif 'database' in service_name.lower():
+                    services_data["latency"][service_name] = 1.0
+                elif 'storage' in service_name.lower():
+                    services_data["latency"][service_name] = 0.5
+                else:
+                    services_data["latency"][service_name] = 0.3
+        
+        diagram_type = payload.get("type", "cost")
+        if diagram_type == "latency":
+            sankey_data = generate_latency_sankey(solution, services_data)
+        else:
+            sankey_data = generate_sankey_data(solution, services_data)
+        
+        return jsonify(sankey_data)
     
-    # Get solution configuration
-    config = payload.get("configuration", {})
-    if not config:
-        return jsonify({"error": "No solution configuration provided"}), 400
-    
-    # Create a temporary solution object
-    from backend.models import Solution
-    solution = Solution(
-        configuration=config,
-        cost=payload.get("cost", 0),
-        latency=payload.get("latency", 0),
-        providers=payload.get("providers", 1)
-    )
-    
-    # Generate Sankey data
-    services_data = {
-        "costs": DEFAULT_PRICING,
-        "latency": {service: 0.5 for service in DEFAULT_PRICING.keys()}  # Default latency
-    }
-    
-    diagram_type = payload.get("type", "cost")
-    if diagram_type == "latency":
-        sankey_data = generate_latency_sankey(solution, services_data)
-    else:
-        sankey_data = generate_sankey_data(solution, services_data)
-    
-    return jsonify(sankey_data)
+    except Exception as e:
+        import traceback
+        error_detail = traceback.format_exc()
+        print(f"Sankey generation error: {error_detail}")
+        return jsonify({
+            "error": str(e),
+            "detail": error_detail,
+            "nodes": [],
+            "links": []
+        }), 500
 
 
 @app.get("/api/defaults")
