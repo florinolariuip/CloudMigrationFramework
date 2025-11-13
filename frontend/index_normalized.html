@@ -161,17 +161,39 @@
         <div id="pareto-metrics" class="mt-4 text-sm space-y-2"></div>
       </div>
 
-      <!-- Sankey Diagram -->
+      <!-- Sankey Diagrams -->
       <div class="bg-orange-900/20 backdrop-blur-md rounded-xl p-6 border border-orange-500/30">
-        <h3 class="text-xl font-semibold mb-3">📊 Cost Flow Analysis (Sankey)</h3>
-        <div class="mb-3">
+        <h3 class="text-xl font-semibold mb-3">📊 Solution Flow Visualization (Sankey Diagrams)</h3>
+        <p class="text-orange-200 text-sm mb-4">
+          Visual representation of how resources flow from cloud providers through component categories.
+        </p>
+        <div class="mb-4">
           <label class="text-sm mr-2">Select Solution:</label>
           <select id="sankey-solution-select" onchange="updateSankey()" class="bg-white/20 rounded px-3 py-1 text-sm">
             <option value="">-- Select a solution --</option>
           </select>
         </div>
-        <div id="sankey-chart" class="w-full h-96 flex items-center justify-center text-gray-400">
-          <p>Run analysis and select a solution to view cost flow</p>
+
+        <!-- Cost Flow Sankey -->
+        <div class="bg-white/10 backdrop-blur-md rounded-xl p-6 border border-orange-500/20 mb-6">
+          <h4 class="text-lg font-semibold mb-3">💰 Cost Distribution Flow</h4>
+          <p class="text-orange-200 text-sm mb-4">
+            Shows how monthly costs flow from cloud providers to component categories.
+          </p>
+          <div id="sankey-cost-chart" class="w-full" style="height: 450px;">
+            <p class="text-gray-400 p-4 text-center">Run analysis and select a solution to view cost flow</p>
+          </div>
+        </div>
+
+        <!-- Latency Flow Sankey -->
+        <div class="bg-white/10 backdrop-blur-md rounded-xl p-6 border border-orange-500/20">
+          <h4 class="text-lg font-semibold mb-3">⚡ Latency Contribution Flow</h4>
+          <p class="text-orange-200 text-sm mb-4">
+            Shows which providers and components contribute to overall system latency.
+          </p>
+          <div id="sankey-latency-chart" class="w-full" style="height: 450px;">
+            <p class="text-gray-400 p-4 text-center">Run analysis and select a solution to view latency flow</p>
+          </div>
         </div>
       </div>
     </div>
@@ -705,17 +727,20 @@
     async function updateSankey() {
       const selectedIdx = document.getElementById('sankey-solution-select').value;
       if (!selectedIdx || !allResults[selectedIdx]) {
-        document.getElementById('sankey-chart').innerHTML = '<p class="text-gray-400 p-4 text-center">Please select a solution to view cost flow analysis</p>';
+        document.getElementById('sankey-cost-chart').innerHTML = '<p class="text-gray-400 p-4 text-center">Please select a solution to view cost flow analysis</p>';
+        document.getElementById('sankey-latency-chart').innerHTML = '<p class="text-gray-400 p-4 text-center">Please select a solution to view latency flow analysis</p>';
         return;
       }
 
       const solution = allResults[selectedIdx];
       
-      // Show loading state
-      document.getElementById('sankey-chart').innerHTML = '<p class="text-blue-400 p-4 text-center">Loading Sankey diagram...</p>';
+      // Show loading state for both
+      document.getElementById('sankey-cost-chart').innerHTML = '<p class="text-blue-400 p-4 text-center">Loading cost flow diagram...</p>';
+      document.getElementById('sankey-latency-chart').innerHTML = '<p class="text-blue-400 p-4 text-center">Loading latency flow diagram...</p>';
 
+      // Fetch and render cost flow
       try {
-        const response = await fetch(`${API_URL}/api/sankey`, {
+        const costResponse = await fetch(`${API_URL}/api/sankey`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -727,61 +752,131 @@
           })
         });
         
-        if (!response.ok) {
-          const errorText = await response.text();
-          throw new Error(`Server error: ${response.status} - ${errorText}`);
+        if (!costResponse.ok) {
+          const errorText = await costResponse.text();
+          throw new Error(`Server error: ${costResponse.status} - ${errorText}`);
         }
         
-        const data = await response.json();
+        const costData = await costResponse.json();
         
-        // Check for error in response
-        if (data.error) {
-          throw new Error(data.error);
+        if (costData.error) {
+          throw new Error(costData.error);
         }
         
-        if (!data.nodes || !data.links || data.nodes.length === 0) {
-          console.error('Invalid Sankey data:', data);
-          document.getElementById('sankey-chart').innerHTML = '<p class="text-yellow-400 p-4 text-center">No cost flow data available for this solution</p>';
-          return;
+        if (!costData.nodes || !costData.links || costData.nodes.length === 0) {
+          console.error('Invalid cost Sankey data:', costData);
+          document.getElementById('sankey-cost-chart').innerHTML = '<p class="text-yellow-400 p-4 text-center">No cost flow data available for this solution</p>';
+        } else {
+          renderSankeyChart('sankey-cost-chart', costData, {
+            title: `Cost Flow - Solution #${parseInt(selectedIdx) + 1}`,
+            subtitle: `Total Cost: $${solution.cost.toFixed(2)}/month`,
+            height: 450
+          });
         }
-
-        const sankeyData = [{
-          type: "sankey",
-          node: {
-            pad: 15,
-            thickness: 20,
-            line: { color: "#1E293B", width: 0.5 },
-            label: data.nodes.map(n => n.name),
-            color: data.nodes.map(n => n.color)
-          },
-          link: {
-            source: data.links.map(l => l.source),
-            target: data.links.map(l => l.target),
-            value: data.links.map(l => l.value),
-            color: data.links.map(l => l.color || 'rgba(100, 116, 139, 0.4)')
-          }
-        }];
-
-        const layout = {
-          title: `Cost Flow for Solution #${parseInt(selectedIdx) + 1} ($${solution.cost.toFixed(2)}/mo)`,
-          font: { color: '#E2E8F0', size: 12 },
-          plot_bgcolor: 'rgba(15, 23, 42, 0.8)',
-          paper_bgcolor: 'rgba(15, 23, 42, 0.5)',
-          height: 400
-        };
-
-        Plotly.newPlot('sankey-chart', sankeyData, layout, {responsive: true});
-
       } catch (err) {
-        console.error('Sankey diagram error:', err);
-        document.getElementById('sankey-chart').innerHTML = `
+        console.error('Cost Sankey diagram error:', err);
+        document.getElementById('sankey-cost-chart').innerHTML = `
           <div class="text-red-400 p-4">
-            <p class="font-semibold">Error loading Sankey diagram</p>
+            <p class="font-semibold">Error loading cost flow diagram</p>
             <p class="text-sm mt-2">${err.message}</p>
-            <p class="text-xs text-gray-400 mt-2">Check browser console for details</p>
           </div>
         `;
       }
+
+      // Fetch and render latency flow
+      try {
+        const latencyResponse = await fetch(`${API_URL}/api/sankey`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            configuration: solution.configuration,
+            cost: solution.cost,
+            latency: solution.latency,
+            providers: solution.providers,
+            type: 'latency'
+          })
+        });
+        
+        if (!latencyResponse.ok) {
+          const errorText = await latencyResponse.text();
+          throw new Error(`Server error: ${latencyResponse.status} - ${errorText}`);
+        }
+        
+        const latencyData = await latencyResponse.json();
+        
+        if (latencyData.error) {
+          throw new Error(latencyData.error);
+        }
+        
+        if (!latencyData.nodes || !latencyData.links || latencyData.nodes.length === 0) {
+          console.error('Invalid latency Sankey data:', latencyData);
+          document.getElementById('sankey-latency-chart').innerHTML = '<p class="text-yellow-400 p-4 text-center">No latency flow data available for this solution</p>';
+        } else {
+          renderSankeyChart('sankey-latency-chart', latencyData, {
+            title: `Latency Flow - Solution #${parseInt(selectedIdx) + 1}`,
+            subtitle: `Total Latency: ${solution.latency.toFixed(2)}ms`,
+            height: 450
+          });
+        }
+      } catch (err) {
+        console.error('Latency Sankey diagram error:', err);
+        document.getElementById('sankey-latency-chart').innerHTML = `
+          <div class="text-red-400 p-4">
+            <p class="font-semibold">Error loading latency flow diagram</p>
+            <p class="text-sm mt-2">${err.message}</p>
+          </div>
+        `;
+      }
+    }
+
+    function renderSankeyChart(containerId, data, options = {}) {
+      const sankeyData = [{
+        type: "sankey",
+        orientation: "h",
+        node: {
+          pad: 15,
+          thickness: 20,
+          line: { color: "#1E293B", width: 0.5 },
+          label: data.nodes.map(n => n.name),
+          color: data.nodes.map(n => n.color)
+        },
+        link: {
+          source: data.links.map(l => l.source),
+          target: data.links.map(l => l.target),
+          value: data.links.map(l => l.value),
+          color: data.links.map(l => l.color || 'rgba(100, 116, 139, 0.4)')
+        }
+      }];
+
+      const layout = {
+        title: {
+          text: options.title || 'Flow Diagram',
+          font: { color: '#E2E8F0', size: 16 }
+        },
+        annotations: options.subtitle ? [{
+          text: options.subtitle,
+          xref: 'paper',
+          yref: 'paper',
+          x: 0.5,
+          y: 1.05,
+          xanchor: 'center',
+          yanchor: 'bottom',
+          showarrow: false,
+          font: { size: 12, color: '#94A3B8' }
+        }] : [],
+        font: { color: '#E2E8F0', size: 11 },
+        plot_bgcolor: 'rgba(15, 23, 42, 0.8)',
+        paper_bgcolor: 'rgba(15, 23, 42, 0.5)',
+        height: options.height || 450,
+        margin: { l: 10, r: 10, t: 80, b: 10 }
+      };
+
+      Plotly.newPlot(containerId, sankeyData, layout, {
+        responsive: true,
+        displayModeBar: true,
+        displaylogo: false,
+        modeBarButtonsToRemove: ['pan2d', 'lasso2d', 'select2d']
+      });
     }
   </script>
 </body>
