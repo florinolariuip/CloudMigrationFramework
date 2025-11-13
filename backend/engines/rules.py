@@ -301,31 +301,68 @@ def min_max_normalize(values):
     return normalized, min_v, max_v
 
 def evaluate_solutions_normalized(solutions: List[Solution], weights=None):
+    """
+    Evaluate solutions using min-max normalization and weighted scoring.
+    Now supports multiple metrics: cost, latency, reliability, security, vendor risk, scalability.
+    """
     if not solutions:
         return [], {}
+    
+    # Default weights (can be customized by user)
     if weights is None:
-        weights = {"cost": 0.5, "latency": 0.3, "reliability": 0.2}
+        weights = {
+            "cost": 0.30,
+            "latency": 0.20,
+            "reliability": 0.20,
+            "security": 0.15,
+            "vendor_risk": 0.10,  # Lower risk is better
+            "scalability": 0.05
+        }
+    
+    # Import and calculate advanced metrics
+    from backend.engines.metrics import enrich_solution_with_metrics
+    for sol in solutions:
+        enrich_solution_with_metrics(sol)
+    
+    # Extract values for normalization
     costs = [float(s.cost) for s in solutions]
     latencies = [float(s.latency) for s in solutions]
-    # Set default reliability if not present
-    for s in solutions:
-        if s.reliability is None:
-            s.reliability = 0.95
-    reliabilities = [float(s.reliability) for s in solutions]
+    reliabilities = [float(s.reliability) if s.reliability else 0.95 for s in solutions]
+    securities = [float(s.security_score) if s.security_score else 0.90 for s in solutions]
+    vendor_risks = [float(s.vendor_lockin_risk) if s.vendor_lockin_risk else 0.5 for s in solutions]
+    scalabilities = [float(s.scalability_score) if s.scalability_score else 0.80 for s in solutions]
+    
+    # Normalize all metrics
     norm_cost, cost_min, cost_max = min_max_normalize(costs)
     norm_latency, latency_min, latency_max = min_max_normalize(latencies)
     norm_reliability, reliability_min, reliability_max = min_max_normalize(reliabilities)
+    norm_security, security_min, security_max = min_max_normalize(securities)
+    norm_vendor_risk, vendor_risk_min, vendor_risk_max = min_max_normalize(vendor_risks)
+    norm_scalability, scalability_min, scalability_max = min_max_normalize(scalabilities)
+    
+    # Calculate weighted scores
     for i, sol in enumerate(solutions):
         sol.norm_cost = norm_cost[i]
         sol.norm_latency = norm_latency[i]
         sol.norm_reliability = norm_reliability[i]
-        # For cost/latency, lower is better; reliability, higher is better
+        sol.norm_security = norm_security[i]
+        sol.norm_vendor_risk = norm_vendor_risk[i]
+        sol.norm_scalability = norm_scalability[i]
+        
+        # Calculate final score
+        # For cost, latency, vendor_risk: lower is better (use 1 - norm)
+        # For reliability, security, scalability: higher is better (use norm)
         sol.score = (
-            weights["cost"] * (1 - norm_cost[i]) +
-            weights["latency"] * (1 - norm_latency[i]) +
-            weights["reliability"] * norm_reliability[i]
+            weights.get("cost", 0.30) * (1 - norm_cost[i]) +
+            weights.get("latency", 0.20) * (1 - norm_latency[i]) +
+            weights.get("reliability", 0.20) * norm_reliability[i] +
+            weights.get("security", 0.15) * norm_security[i] +
+            weights.get("vendor_risk", 0.10) * (1 - norm_vendor_risk[i]) +
+            weights.get("scalability", 0.05) * norm_scalability[i]
         )
+    
     solutions.sort(key=lambda s: s.score, reverse=True)
+    
     normalization = {
         "cost_min": cost_min,
         "cost_max": cost_max,
@@ -333,8 +370,15 @@ def evaluate_solutions_normalized(solutions: List[Solution], weights=None):
         "latency_max": latency_max,
         "reliability_min": reliability_min,
         "reliability_max": reliability_max,
+        "security_min": security_min,
+        "security_max": security_max,
+        "vendor_risk_min": vendor_risk_min,
+        "vendor_risk_max": vendor_risk_max,
+        "scalability_min": scalability_min,
+        "scalability_max": scalability_max,
         "weights": weights
     }
+    
     return solutions, normalization
 
 

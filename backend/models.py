@@ -38,3 +38,9 @@ class Solution:
     norm_cost: Optional[float] = None  # Normalized cost (0-1 scale)
     norm_latency: Optional[float] = None  # Normalized latency (0-1 scale)
     norm_reliability: Optional[float] = None  # Normalized reliability (0-1 scale)
+    # Advanced metrics
+    security_score: Optional[float] = None  # Security score (0-1 scale)
+    vendor_lockin_risk: Optional[float] = None  # Vendor lock-in risk (0-1, lower is better)
+    scalability_score: Optional[float] = None  # Scalability potential (0-1 scale)
+    norm_security: Optional[float] = None  # Normalized security
+    norm_vendor_risk: Optional[float] = None  # Normalized vendor risk

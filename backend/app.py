@@ -147,7 +147,15 @@ def experiment_normalized():
     # Use normalization-based scoring if requested
     use_norm = payload.get("use_normalization", False)
     if use_norm:
-        weights = {"cost": 0.5, "latency": 0.3, "reliability": 0.2}
+        # Get custom weights from request, or use defaults
+        weights = payload.get("weights", {
+            "cost": 0.30,
+            "latency": 0.20,
+            "reliability": 0.20,
+            "security": 0.15,
+            "vendor_risk": 0.10,
+            "scalability": 0.05
+        })
         results, normalization = evaluate_solutions_normalized(feasible, weights)
         # Add reliability to response if not present
         for sol in results:
