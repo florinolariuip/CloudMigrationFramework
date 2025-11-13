@@ -28,7 +28,50 @@ from backend.config import (
 from backend.models import Constraints, Preferences
 from backend.services.pricing import get_total_combinations
 from backend.engines.constraints import generate_feasible_solutions
-from backend.engines.rules import evaluate_solutions, calculate_statistics
+from backend.engines.rules import evaluate_solutions, calculate_statistics, evaluate_solutions_normalized
+# --- API routes ---
+
+# Normalization-based scoring endpoint for frontend transparency
+@app.post("/api/experiment")
+def experiment_normalized():
+    """
+    Returns solutions scored using normalization-based approach for transparency.
+    Expects: JSON with constraints, preferences, use_normalization flag.
+    """
+    payload = request.get_json(force=True, silent=True) or {}
+    cons = payload.get("constraints", {})
+    constraints = Constraints(
+        maxBudget=int(cons.get("maxBudget", DEFAULT_CONSTRAINTS["maxBudget"])),
+        maxLatency=float(cons.get("maxLatency", DEFAULT_CONSTRAINTS["maxLatency"])),
+        maxProviders=int(cons.get("maxProviders", DEFAULT_CONSTRAINTS["maxProviders"])),
+        selected_components=cons.get("selected_components", None)
+    )
+    feasible = generate_feasible_solutions(constraints)
+    # Use normalization-based scoring if requested
+    use_norm = payload.get("use_normalization", False)
+    if use_norm:
+        weights = {"cost": 0.5, "latency": 0.3, "reliability": 0.2}
+        results, normalization = evaluate_solutions_normalized(feasible, weights)
+        # Add reliability to response if not present
+        for sol in results:
+            if not hasattr(sol, "reliability"):
+                sol.reliability = 0.95
+        return jsonify({
+            "results": [asdict(s) for s in results],
+            "normalization": normalization
+        })
+    else:
+        # fallback to academic scoring
+        preferences = Preferences(
+            preferredProvider=payload.get("preferredProvider"),
+            prioritizeCost=bool(payload.get("prioritizeCost", False)),
+            prioritizePerformance=bool(payload.get("prioritizePerformance", False)),
+        )
+        results = evaluate_solutions(feasible, preferences)
+        return jsonify({
+            "results": [asdict(s) for s in results],
+            "normalization": None
+        })
 from backend.engines.pareto import (
     calculate_pareto_frontier,
     calculate_pareto_rank,

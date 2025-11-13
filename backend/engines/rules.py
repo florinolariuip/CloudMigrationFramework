@@ -249,6 +249,7 @@ def get_main_provider(config: Dict[str, str]) -> str:
     return max(dist.keys(), key=lambda k: dist[k])
 
 
+
 def evaluate_solutions(solutions: List[Solution], preferences: Preferences) -> List[Solution]:
     rules_config = EXPERT_RULES_CONFIG
     weights = SCORING_WEIGHTS
@@ -278,6 +279,45 @@ def evaluate_solutions(solutions: List[Solution], preferences: Preferences) -> L
         ranked.append(sol)
     ranked.sort(key=lambda s: s.score or 0, reverse=True)
     return ranked
+
+# --- Normalization-based scoring ---
+def min_max_normalize(values):
+    min_v, max_v = min(values), max(values)
+    return [(v - min_v) / (max_v - min_v) if max_v > min_v else 0.0 for v in values], min_v, max_v
+
+def evaluate_solutions_normalized(solutions: List[Solution], weights=None):
+    if not solutions:
+        return [], {}
+    if weights is None:
+        weights = {"cost": 0.5, "latency": 0.3, "reliability": 0.2}
+    costs = [float(s.cost) for s in solutions]
+    latencies = [float(s.latency) for s in solutions]
+    # For demo, use reliability as 0.95 for all (or add to Solution)
+    reliabilities = [getattr(s, "reliability", 0.95) for s in solutions]
+    norm_cost, cost_min, cost_max = min_max_normalize(costs)
+    norm_latency, latency_min, latency_max = min_max_normalize(latencies)
+    norm_reliability, reliability_min, reliability_max = min_max_normalize(reliabilities)
+    for i, sol in enumerate(solutions):
+        sol.norm_cost = norm_cost[i]
+        sol.norm_latency = norm_latency[i]
+        sol.norm_reliability = norm_reliability[i]
+        # For cost/latency, lower is better; reliability, higher is better
+        sol.score = (
+            weights["cost"] * (1 - norm_cost[i]) +
+            weights["latency"] * (1 - norm_latency[i]) +
+            weights["reliability"] * norm_reliability[i]
+        )
+    solutions.sort(key=lambda s: s.score, reverse=True)
+    normalization = {
+        "cost_min": cost_min,
+        "cost_max": cost_max,
+        "latency_min": latency_min,
+        "latency_max": latency_max,
+        "reliability_min": reliability_min,
+        "reliability_max": reliability_max,
+        "weights": weights
+    }
+    return solutions, normalization
 
 
 def calculate_statistics(solutions: List[Solution]) -> Optional[Dict[str, Any]]:

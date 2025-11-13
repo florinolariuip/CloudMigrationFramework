@@ -1,0 +1,47 @@
+<!-- index_normalized.html: Normalization-based scoring UI -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cloud Migration Framework - Normalized Scoring</title>
+    <link rel="stylesheet" href="styles.css">
+    <!-- Add any other styles/scripts as in index.html -->
+</head>
+<body>
+    <div class="container">
+        <h1>Cloud Migration Framework <span style="font-size:0.7em; color:#888;">(Normalized Scoring)</span></h1>
+        <!-- ...existing controls for experiment parameters... -->
+        <form id="experiment-form">
+            <!-- ...existing parameter controls copied from index.html... -->
+        </form>
+        <hr>
+        <div id="results">
+            <h2>Results (Normalized Scoring)</h2>
+            <table id="results-table">
+                <thead>
+                    <tr>
+                        <th>Solution</th>
+                        <th>Cost</th>
+                        <th>Latency</th>
+                        <th>Reliability</th>
+                        <th>Normalized Cost</th>
+                        <th>Normalized Latency</th>
+                        <th>Normalized Reliability</th>
+                        <th>Score</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <!-- Results will be populated here -->
+                </tbody>
+            </table>
+            <div id="normalization-details">
+                <h3>Normalization Details</h3>
+                <p>Scores are calculated using min-max normalization and weighted aggregation. See documentation for formulas.</p>
+                <!-- Optionally, show min/max values used for normalization -->
+            </div>
+        </div>
+    </div>
+    <script src="index_normalized.js"></script>
+</body>
+</html>
