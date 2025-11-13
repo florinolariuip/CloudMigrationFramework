@@ -254,6 +254,7 @@ def deduplicate_solutions(solutions: List[Solution]) -> List[Solution]:
     Remove duplicate solutions based on their service configuration.
     Two solutions are considered duplicates if they have identical configurations.
     """
+    original_count = len(solutions)
     seen_configs = set()
     unique_solutions = []
     
@@ -264,6 +265,10 @@ def deduplicate_solutions(solutions: List[Solution]) -> List[Solution]:
         if config_tuple not in seen_configs:
             seen_configs.add(config_tuple)
             unique_solutions.append(sol)
+    
+    duplicates_removed = original_count - len(unique_solutions)
+    if duplicates_removed > 0:
+        print(f"[DEDUP] Removed {duplicates_removed} duplicate solutions (from {original_count} to {len(unique_solutions)})")
     
     return unique_solutions
 
