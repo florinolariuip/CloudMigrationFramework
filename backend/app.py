@@ -266,28 +266,13 @@ def generate_sankey():
             providerDistribution=provider_dist
         )
         
-        # Build services_data with actual pricing and estimated latencies
-        from backend.config import LATENCY_ESTIMATES
+        # Build services_data with actual pricing and latency
+        # Use the same approach as /api/experiment endpoint
+        from backend.services.pricing import get_service_costs, get_service_latency
         services_data = {
-            "costs": DEFAULT_PRICING,
-            "latency": LATENCY_ESTIMATES if 'LATENCY_ESTIMATES' in dir() else {}
+            "costs": get_service_costs(),
+            "latency": get_service_latency()
         }
-        
-        # If no latency data, create default estimates
-        if not services_data["latency"]:
-            services_data["latency"] = {}
-            for service_name in config.values():
-                # Estimate latency based on service type
-                if 'cdn' in service_name.lower():
-                    services_data["latency"][service_name] = 0.1
-                elif 'cache' in service_name.lower():
-                    services_data["latency"][service_name] = 0.2
-                elif 'database' in service_name.lower():
-                    services_data["latency"][service_name] = 1.0
-                elif 'storage' in service_name.lower():
-                    services_data["latency"][service_name] = 0.5
-                else:
-                    services_data["latency"][service_name] = 0.3
         
         diagram_type = payload.get("type", "cost")
         if diagram_type == "latency":
