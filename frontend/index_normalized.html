@@ -148,6 +148,17 @@
         </div>
       </div>
 
+      <!-- Top Solution Explanation Card -->
+      <div id="top-solution-explanation" class="bg-gradient-to-r from-cyan-900/30 to-blue-900/30 backdrop-blur-md rounded-xl p-6 border border-cyan-500/40">
+        <h3 class="text-2xl font-semibold mb-4 flex items-center gap-2">
+          <span>💡</span>
+          <span>Top Solution Analysis</span>
+        </h3>
+        <div id="explanation-content" class="space-y-4">
+          <!-- Dynamic content will be inserted here -->
+        </div>
+      </div>
+
       <!-- Normalization Details -->
       <div class="bg-green-900/20 backdrop-blur-md rounded-xl p-6 border border-green-500/30">
         <h3 class="text-xl font-semibold mb-3">📊 Normalization & Scoring Details</h3>
@@ -339,6 +350,186 @@
 
       renderNormalizationDetails(normalization);
       document.getElementById('results').classList.remove('hidden');
+      
+      // Generate explanation for top solution
+      if (results && results.length > 0) {
+        generateTopSolutionExplanation(results[0], normalization);
+      }
+    }
+
+    function generateTopSolutionExplanation(topSol, norm) {
+      const explanationDiv = document.getElementById('explanation-content');
+      if (!topSol || !norm) {
+        explanationDiv.innerHTML = '<p class="text-gray-400">No solution to analyze.</p>';
+        return;
+      }
+
+      // Extract providers from configuration
+      const providers = new Set();
+      for (const choice of Object.values(topSol.configuration || {})) {
+        if (choice.includes('AWS')) providers.add('AWS');
+        if (choice.includes('Azure')) providers.add('Azure');
+        if (choice.includes('GCP')) providers.add('GCP');
+      }
+      const providerList = Array.from(providers);
+      const providerCount = providerList.length;
+
+      // Analyze metrics to generate insights
+      const costScore = safeNormalize(topSol.cost, norm.cost_min, norm.cost_max);
+      const latencyScore = safeNormalize(topSol.latency, norm.latency_min, norm.latency_max);
+      const reliabilityScore = safeNormalize(topSol.reliability || 0.95, norm.reliability_min, norm.reliability_max);
+      const securityScore = safeNormalize(topSol.security_score || 0.90, norm.security_min, norm.security_max);
+      const vendorRiskScore = safeNormalize(topSol.vendor_lockin_risk || 0.5, norm.vendor_risk_min, norm.vendor_risk_max);
+      const scalabilityScore = safeNormalize(topSol.scalability_score || 0.80, norm.scalability_min, norm.scalability_max);
+
+      // Determine strengths (top metrics)
+      const metrics = [
+        { name: 'Cost Efficiency', score: 1 - costScore, icon: '💰', raw: `$${topSol.cost}` },
+        { name: 'Low Latency', score: 1 - latencyScore, icon: '⚡', raw: `${topSol.latency.toFixed(2)}ms` },
+        { name: 'High Reliability', score: reliabilityScore, icon: '🛡️', raw: `${((topSol.reliability || 0.95) * 100).toFixed(2)}%` },
+        { name: 'Strong Security', score: securityScore, icon: '🔒', raw: `${((topSol.security_score || 0.90) * 100).toFixed(2)}%` },
+        { name: 'Low Vendor Risk', score: 1 - vendorRiskScore, icon: '⚠️', raw: `${((topSol.vendor_lockin_risk || 0.5) * 100).toFixed(0)}%` },
+        { name: 'High Scalability', score: scalabilityScore, icon: '📈', raw: `${((topSol.scalability_score || 0.80) * 100).toFixed(2)}%` }
+      ];
+      
+      metrics.sort((a, b) => b.score - a.score);
+      const topStrengths = metrics.slice(0, 3);
+      const weaknesses = metrics.slice(-2);
+
+      // Generate architectural insights
+      const config = topSol.configuration || {};
+      const usesServerless = Object.values(config).some(v => v.includes('Lambda') || v.includes('Functions') || v.includes('Cloud Functions'));
+      const usesContainers = Object.values(config).some(v => v.includes('Kubernetes') || v.includes('Container') || v.includes('ECS') || v.includes('AKS') || v.includes('GKE'));
+      const usesManaged = Object.values(config).some(v => v.includes('RDS') || v.includes('DynamoDB') || v.includes('CosmosDB') || v.includes('Firestore'));
+
+      let architectureStyle = '';
+      if (usesServerless) architectureStyle = 'Serverless-first';
+      else if (usesContainers) architectureStyle = 'Container-based';
+      else architectureStyle = 'Traditional VM-based';
+
+      // Generate explanation HTML
+      let html = `
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <!-- Why This Solution? -->
+          <div class="bg-white/5 p-4 rounded-lg border-l-4 border-cyan-500">
+            <h4 class="font-semibold mb-3 flex items-center gap-2">
+              <span>🎯</span>
+              <span>Why This Solution?</span>
+            </h4>
+            <div class="text-sm space-y-2">
+              <p>This solution achieved the <span class="text-green-400 font-semibold">highest overall score of ${(topSol.score || 0).toFixed(4)}</span> by optimizing across all ${Object.keys(norm.weights).length} weighted criteria.</p>
+              <p class="text-blue-300">It leverages <span class="font-semibold">${providerCount} provider${providerCount > 1 ? 's' : ''}</span> (${providerList.join(', ')}) in a <span class="font-semibold">${architectureStyle}</span> approach.</p>
+            </div>
+          </div>
+
+          <!-- Architecture Pattern -->
+          <div class="bg-white/5 p-4 rounded-lg border-l-4 border-purple-500">
+            <h4 class="font-semibold mb-3 flex items-center gap-2">
+              <span>🏗️</span>
+              <span>Architecture Pattern</span>
+            </h4>
+            <div class="text-sm space-y-2">
+              <div class="flex items-center gap-2">
+                ${usesServerless ? '<span class="bg-green-500/20 px-2 py-1 rounded text-xs">✓ Serverless</span>' : ''}
+                ${usesContainers ? '<span class="bg-blue-500/20 px-2 py-1 rounded text-xs">✓ Containers</span>' : ''}
+                ${usesManaged ? '<span class="bg-purple-500/20 px-2 py-1 rounded text-xs">✓ Managed Services</span>' : ''}
+              </div>
+              <p class="text-gray-300 text-xs mt-2">
+                ${usesServerless ? '• Auto-scaling and pay-per-use pricing' : ''}
+                ${usesContainers ? '• Portable and orchestrated workloads' : ''}
+                ${usesManaged ? '• Reduced operational overhead' : ''}
+              </p>
+            </div>
+          </div>
+        </div>
+
+        <!-- Top Strengths -->
+        <div class="bg-white/5 p-4 rounded-lg border-l-4 border-green-500 mt-4">
+          <h4 class="font-semibold mb-3 flex items-center gap-2">
+            <span>✨</span>
+            <span>Top Strengths</span>
+          </h4>
+          <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
+            ${topStrengths.map(m => `
+              <div class="bg-black/30 p-3 rounded">
+                <div class="flex items-center gap-2 mb-1">
+                  <span class="text-xl">${m.icon}</span>
+                  <span class="font-semibold text-sm">${m.name}</span>
+                </div>
+                <div class="text-xs text-gray-300">${m.raw}</div>
+                <div class="mt-2 bg-black/30 rounded-full h-1.5">
+                  <div class="bg-green-500 h-1.5 rounded-full" style="width: ${(m.score * 100).toFixed(1)}%"></div>
+                </div>
+              </div>
+            `).join('')}
+          </div>
+        </div>
+
+        <!-- Trade-offs & Considerations -->
+        <div class="bg-white/5 p-4 rounded-lg border-l-4 border-orange-500 mt-4">
+          <h4 class="font-semibold mb-3 flex items-center gap-2">
+            <span>⚖️</span>
+            <span>Trade-offs & Considerations</span>
+          </h4>
+          <div class="text-sm space-y-3">
+            <div>
+              <p class="font-semibold text-orange-300 mb-1">Areas for Improvement:</p>
+              <ul class="list-disc ml-6 space-y-1 text-xs">
+                ${weaknesses.map(m => `
+                  <li><span class="font-semibold">${m.name}</span>: ${m.raw} (could be optimized further)</li>
+                `).join('')}
+              </ul>
+            </div>
+            <div>
+              <p class="font-semibold text-blue-300 mb-1">Vendor Lock-in Risk:</p>
+              <p class="text-xs text-gray-300">
+                ${providerCount === 1 ? 
+                  `⚠️ <span class="text-red-400">Single provider (100% risk)</span> - Consider multi-cloud for redundancy` :
+                  providerCount === 2 ?
+                  `✓ Dual-provider strategy (50% risk) - Good balance of simplicity and redundancy` :
+                  `✓ Multi-cloud approach (${((topSol.vendor_lockin_risk || 0.33) * 100).toFixed(0)}% risk) - Maximum flexibility and resilience`
+                }
+              </p>
+            </div>
+          </div>
+        </div>
+
+        <!-- Recommendations -->
+        <div class="bg-white/5 p-4 rounded-lg border-l-4 border-yellow-500 mt-4">
+          <h4 class="font-semibold mb-3 flex items-center gap-2">
+            <span>💡</span>
+            <span>Recommendations</span>
+          </h4>
+          <div class="text-sm space-y-2">
+            <ul class="list-disc ml-6 space-y-1 text-xs">
+              <li>
+                <span class="font-semibold">Cost Optimization:</span> 
+                ${costScore < 0.3 ? 'Excellent cost efficiency. Monitor for unused resources.' : 
+                  costScore > 0.7 ? 'Consider reserved instances or savings plans to reduce costs.' :
+                  'Good cost balance. Review spending monthly.'}
+              </li>
+              <li>
+                <span class="font-semibold">Performance:</span>
+                ${latencyScore < 0.3 ? 'Outstanding latency. Maintain CDN and edge caching strategies.' :
+                  latencyScore > 0.7 ? 'Consider edge computing or CDN to reduce latency.' :
+                  'Acceptable latency. Monitor user experience metrics.'}
+              </li>
+              <li>
+                <span class="font-semibold">Reliability:</span>
+                ${reliabilityScore > 0.7 ? 'High reliability score. Ensure proper monitoring and alerting.' :
+                  'Consider implementing circuit breakers and retry mechanisms.'}
+              </li>
+              <li>
+                <span class="font-semibold">Security:</span>
+                ${securityScore > 0.7 ? 'Strong security posture. Maintain regular security audits.' :
+                  'Enhance security with encryption at rest/transit and IAM policies.'}
+              </li>
+            </ul>
+          </div>
+        </div>
+      `;
+
+      explanationDiv.innerHTML = html;
     }
 
     function renderNormalizationDetails(norm) {
