@@ -238,6 +238,18 @@
     let allResults = [];
     let currentNormalization = null;
 
+    // Helper function to safely normalize values (handles division by zero)
+    function safeNormalize(value, min, max) {
+      const range = max - min;
+      if (range === 0 || isNaN(range)) {
+        // If all values are the same, return 0.5 (middle value)
+        return 0.5;
+      }
+      const normalized = (value - min) / range;
+      // Clamp to [0, 1] range to handle any edge cases
+      return Math.max(0, Math.min(1, normalized));
+    }
+
     function updateWeight(metric, value) {
       const percent = parseInt(value);
       weights[metric] = percent / 100;
@@ -625,18 +637,6 @@
         content.innerHTML = '<p class="text-red-400">Normalization data not available</p>';
         modal.classList.remove('hidden');
         return;
-      }
-
-      // Helper function to safely normalize values (handles division by zero)
-      function safeNormalize(value, min, max) {
-        const range = max - min;
-        if (range === 0 || isNaN(range)) {
-          // If all values are the same, return 0.5 (middle value)
-          return 0.5;
-        }
-        const normalized = (value - min) / range;
-        // Clamp to [0, 1] range to handle any edge cases
-        return Math.max(0, Math.min(1, normalized));
       }
 
       // Calculate normalized values
