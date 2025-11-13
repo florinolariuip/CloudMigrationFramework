@@ -53,7 +53,7 @@ from backend.engines.sankey import (
 
 
 
-app = Flask(__name__, static_folder="static", static_url_path="")
+app = Flask(__name__, static_folder="../frontend", static_url_path="")
 CORS(app)
 
 @app.route('/')
@@ -252,7 +252,7 @@ def get_services():
     Returns current service data including costs, latency, and options.
     Supports optional force_refresh parameter to bypass cache.
     """
-    from services.pricing import service_cache
+    from backend.services.pricing import service_cache
     
     force_refresh = request.args.get('refresh', 'false').lower() == 'true'
     data = service_cache.get_service_data(force_refresh=force_refresh)
@@ -280,7 +280,7 @@ def get_pricing_settings():
 @app.post("/api/pricing")
 def update_pricing_settings():
     """Update pricing configuration and optionally refresh service cache."""
-    from services.pricing import service_cache
+    from backend.services.pricing import service_cache
     
     payload = request.get_json(force=True, silent=True) or {}
     updated = False
@@ -441,7 +441,7 @@ def optimize():
     sankey_data = None
     latency_sankey_data = None
     if best_solution:
-        from services.pricing import get_service_costs, get_service_latency
+        from backend.services.pricing import get_service_costs, get_service_latency
         services_info = {
             'costs': get_service_costs(),
             'latency': get_service_latency()
