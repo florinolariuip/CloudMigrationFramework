@@ -274,9 +274,7 @@ def deduplicate_solutions(solutions: List[Solution]) -> List[Solution]:
 
 
 def evaluate_solutions(solutions: List[Solution], preferences: Preferences) -> List[Solution]:
-    # Remove duplicates first
-    solutions = deduplicate_solutions(solutions)
-    
+    # Note: Deduplication now happens at the API endpoint level before this function is called
     if not solutions:
         return []
     
@@ -334,13 +332,8 @@ def evaluate_solutions_normalized(solutions: List[Solution], weights=None):
     """
     Evaluate solutions using min-max normalization and weighted scoring.
     Now supports multiple metrics: cost, latency, reliability, security, vendor risk, scalability.
+    Note: Deduplication now happens at the API endpoint level before this function is called.
     """
-    if not solutions:
-        return [], {}
-    
-    # Remove duplicates first
-    solutions = deduplicate_solutions(solutions)
-    
     if not solutions:
         return [], {}
     

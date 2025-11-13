@@ -144,6 +144,11 @@ def experiment_normalized():
         selected_components=cons.get("selected_components", None)
     )
     feasible = generate_feasible_solutions(constraints)
+    
+    # Remove duplicates early
+    from backend.engines.rules import deduplicate_solutions
+    feasible = deduplicate_solutions(feasible)
+    
     # Use normalization-based scoring if requested
     use_norm = payload.get("use_normalization", False)
     if use_norm:
@@ -196,6 +201,10 @@ def analyze_pareto():
     
     # Generate feasible solutions
     feasible = generate_feasible_solutions(constraints)
+    
+    # Remove duplicates before Pareto calculation
+    from backend.engines.rules import deduplicate_solutions
+    feasible = deduplicate_solutions(feasible)
     
     if not feasible:
         return jsonify({
@@ -518,12 +527,19 @@ def optimize():
     feasible = generate_feasible_solutions(constraints)
     csp_duration = time.time() - csp_start
     
+    # IMPORTANT: Remove duplicates before any further processing
+    from backend.engines.rules import deduplicate_solutions
+    original_count = len(feasible)
+    feasible = deduplicate_solutions(feasible)
+    if len(feasible) < original_count:
+        print(f"[OPTIMIZE] Removed {original_count - len(feasible)} duplicate solutions from CSP results")
+    
     # PHASE 2: Expert System - Rank by business rules
     expert_start = time.time()
     ranked = evaluate_solutions(feasible, preferences)
     expert_duration = time.time() - expert_start
     
-    # MULTI-OBJECTIVE: Calculate Pareto frontier
+    # MULTI-OBJECTIVE: Calculate Pareto frontier (now on deduplicated solutions)
     pareto_start = time.time()
     pareto_frontier = calculate_pareto_frontier(feasible, objectives=['cost', 'latency'])
     pareto_ranked = evaluate_solutions(pareto_frontier, preferences)  # Rank Pareto solutions
