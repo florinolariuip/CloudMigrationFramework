@@ -830,6 +830,10 @@
     }
 
     function renderSankeyChart(containerId, data, options = {}) {
+      // Clear any loading messages or previous content
+      const container = document.getElementById(containerId);
+      container.innerHTML = '';
+      
       const sankeyData = [{
         type: "sankey",
         orientation: "h",
