@@ -72,8 +72,8 @@
       function escapeHTML(s) { return s.replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
 
       async function load(mdFile, updateURL = true) {
-  // Always fetch from backend on 5055 for dynamic docs (use /api/docs/)
-  const url = `http://localhost:5055/api/docs/${mdFile}`;
+  // Always fetch from backend for dynamic docs (use /api/docs/)
+  const url = `https://migration-framework-c77589bc07d3.herokuapp.com/api/docs/${mdFile}`;
         try {
           setHTML('<div class="loading">Loading documentation…</div>');
           const res = await fetch(url, { credentials: 'omit' });
