@@ -179,6 +179,100 @@ def experiment_normalized():
         })
 
 
+@app.post("/api/pareto")
+def analyze_pareto():
+    """
+    Calculate Pareto frontier and metrics for multi-objective optimization.
+    Returns Pareto-optimal solutions and comprehensive metrics.
+    """
+    payload = request.get_json(force=True, silent=True) or {}
+    cons = payload.get("constraints", {})
+    constraints = Constraints(
+        maxBudget=int(cons.get("maxBudget", DEFAULT_CONSTRAINTS["maxBudget"])),
+        maxLatency=float(cons.get("maxLatency", DEFAULT_CONSTRAINTS["maxLatency"])),
+        maxProviders=int(cons.get("maxProviders", DEFAULT_CONSTRAINTS["maxProviders"])),
+        selected_components=cons.get("selected_components", None)
+    )
+    
+    # Generate feasible solutions
+    feasible = generate_feasible_solutions(constraints)
+    
+    if not feasible:
+        return jsonify({
+            "error": "No feasible solutions found",
+            "pareto_solutions": [],
+            "metrics": {}
+        })
+    
+    # Calculate Pareto frontier
+    objectives = payload.get("objectives", ["cost", "latency"])
+    pareto_solutions = calculate_pareto_frontier(feasible, objectives)
+    pareto_ranks = calculate_pareto_rank(feasible, objectives)
+    
+    # Calculate metrics
+    max_cost = max(s.cost for s in feasible)
+    max_latency = max(s.latency for s in feasible)
+    reference_point = (max_cost * 1.1, max_latency * 1.1)
+    metrics = calculate_pareto_metrics(feasible, pareto_solutions, reference_point)
+    
+    # Get extreme solutions
+    extreme = get_extreme_solutions(pareto_solutions)
+    
+    return jsonify({
+        "pareto_solutions": [asdict(s) for s in pareto_solutions],
+        "all_solutions": [asdict(s) for s in feasible],
+        "pareto_ranks": pareto_ranks,
+        "metrics": {
+            "frontier_size": metrics.get("frontier_size", 0),
+            "coverage_rate": metrics.get("coverage_rate", 0),
+            "hypervolume": metrics.get("hypervolume", 0),
+            "spacing": metrics.get("spacing", 0),
+            "cost_range": metrics.get("cost_range", {}),
+            "latency_range": metrics.get("latency_range", {}),
+        },
+        "extreme_solutions": {
+            k: asdict(v) for k, v in extreme.items()
+        } if extreme else {}
+    })
+
+
+@app.post("/api/sankey")
+def generate_sankey():
+    """
+    Generate Sankey diagram data for a specific solution.
+    Shows cost and latency flow through providers and components.
+    """
+    payload = request.get_json(force=True, silent=True) or {}
+    
+    # Get solution configuration
+    config = payload.get("configuration", {})
+    if not config:
+        return jsonify({"error": "No solution configuration provided"}), 400
+    
+    # Create a temporary solution object
+    from backend.models import Solution
+    solution = Solution(
+        configuration=config,
+        cost=payload.get("cost", 0),
+        latency=payload.get("latency", 0),
+        providers=payload.get("providers", 1)
+    )
+    
+    # Generate Sankey data
+    services_data = {
+        "costs": DEFAULT_PRICING,
+        "latency": {service: 0.5 for service in DEFAULT_PRICING.keys()}  # Default latency
+    }
+    
+    diagram_type = payload.get("type", "cost")
+    if diagram_type == "latency":
+        sankey_data = generate_latency_sankey(solution, services_data)
+    else:
+        sankey_data = generate_sankey_data(solution, services_data)
+    
+    return jsonify(sankey_data)
+
+
 @app.get("/api/defaults")
 def get_defaults():
     """Get default constraint values"""

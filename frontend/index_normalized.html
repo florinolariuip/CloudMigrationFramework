@@ -5,6 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Cloud Migration - Normalized Scoring</title>
   <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.plot.ly/plotly-2.27.0.min.js"></script>
 </head>
 <body class="bg-gradient-to-br from-slate-900 via-blue-900 to-slate-900 text-white min-h-screen">
   <div class="max-w-7xl mx-auto px-4 py-8">
@@ -132,6 +133,25 @@
         <h3 class="text-xl font-semibold mb-3">📊 Normalization & Scoring Details</h3>
         <div id="norm-info" class="text-sm space-y-2"></div>
       </div>
+
+      <!-- Pareto Frontier Visualization -->
+      <div class="bg-purple-900/20 backdrop-blur-md rounded-xl p-6 border border-purple-500/30">
+        <h3 class="text-xl font-semibold mb-3">🎯 Pareto Frontier Analysis</h3>
+        <div id="pareto-chart" class="w-full h-96"></div>
+        <div id="pareto-metrics" class="mt-4 text-sm space-y-2"></div>
+      </div>
+
+      <!-- Sankey Diagram -->
+      <div class="bg-orange-900/20 backdrop-blur-md rounded-xl p-6 border border-orange-500/30">
+        <h3 class="text-xl font-semibold mb-3">📊 Cost Flow Analysis (Sankey)</h3>
+        <div class="mb-3">
+          <label class="text-sm mr-2">Select Solution:</label>
+          <select id="sankey-solution-select" onchange="updateSankey()" class="bg-white/20 rounded px-3 py-1 text-sm">
+            <option value="">-- Select a solution --</option>
+          </select>
+        </div>
+        <div id="sankey-chart" class="w-full h-96"></div>
+      </div>
     </div>
 
     <!-- Solution Details Modal -->
@@ -213,6 +233,20 @@
         allResults = data.results;
         currentNormalization = data.normalization;
         renderResults(data.results, data.normalization);
+        
+        // Run Pareto analysis
+        await renderParetoFrontier();
+        
+        // Populate Sankey solution selector
+        const select = document.getElementById('sankey-solution-select');
+        select.innerHTML = '<option value="">-- Select a solution --</option>';
+        data.results.slice(0, 10).forEach((sol, idx) => {
+          const option = document.createElement('option');
+          option.value = idx;
+          option.textContent = `Solution #${idx + 1} ($${sol.cost.toFixed(2)}, ${sol.latency.toFixed(2)}ms)`;
+          select.appendChild(option);
+        });
+        
       } catch (err) {
         console.error('Error details:', err);
         alert('Error: ' + err.message);
@@ -526,6 +560,180 @@
       `;
       
       modal.classList.remove('hidden');
+    }
+
+    async function renderParetoFrontier() {
+      const form = document.getElementById('experiment-form');
+      const formData = new FormData(form);
+      const constraints = {
+        maxBudget: parseInt(formData.get('maxBudget')),
+        maxLatency: parseFloat(formData.get('maxLatency')),
+        maxProviders: parseInt(formData.get('maxProviders'))
+      };
+
+      try {
+        const response = await fetch(`${API_URL}/api/pareto`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ constraints, objectives: ['cost', 'latency'] })
+        });
+        
+        const data = await response.json();
+        
+        if (!data.pareto_solutions || !data.all_solutions) {
+          console.error('No Pareto data received');
+          return;
+        }
+
+        // Prepare data for Plotly
+        const allSolutions = data.all_solutions;
+        const paretoSolutions = data.pareto_solutions;
+        const paretoIds = new Set(paretoSolutions.map(s => JSON.stringify({cost: s.cost, latency: s.latency})));
+
+        const nonParetoSolutions = allSolutions.filter(s => 
+          !paretoIds.has(JSON.stringify({cost: s.cost, latency: s.latency}))
+        );
+
+        const paretoTrace = {
+          x: paretoSolutions.map(s => s.cost),
+          y: paretoSolutions.map(s => s.latency),
+          mode: 'markers+lines',
+          type: 'scatter',
+          name: 'Pareto Frontier',
+          marker: {
+            size: 12,
+            color: '#22C55E',
+            symbol: 'star',
+            line: { width: 2, color: '#fff' }
+          },
+          line: { color: '#22C55E', width: 2, dash: 'dot' }
+        };
+
+        const nonParetoTrace = {
+          x: nonParetoSolutions.map(s => s.cost),
+          y: nonParetoSolutions.map(s => s.latency),
+          mode: 'markers',
+          type: 'scatter',
+          name: 'Other Solutions',
+          marker: {
+            size: 8,
+            color: '#64748B',
+            opacity: 0.6
+          }
+        };
+
+        const layout = {
+          title: 'Pareto Frontier: Cost vs Latency Trade-off',
+          xaxis: { title: 'Cost ($)', gridcolor: '#334155' },
+          yaxis: { title: 'Latency (ms)', gridcolor: '#334155' },
+          plot_bgcolor: 'rgba(15, 23, 42, 0.8)',
+          paper_bgcolor: 'rgba(15, 23, 42, 0.5)',
+          font: { color: '#E2E8F0' },
+          hovermode: 'closest',
+          showlegend: true,
+          legend: { x: 1, y: 1, bgcolor: 'rgba(30, 41, 59, 0.8)' }
+        };
+
+        Plotly.newPlot('pareto-chart', [paretoTrace, nonParetoTrace], layout, {responsive: true});
+
+        // Display metrics
+        const metrics = data.metrics;
+        const metricsHtml = `
+          <div class="grid grid-cols-2 gap-3">
+            <div class="bg-black/30 p-3 rounded">
+              <p class="text-xs text-blue-300">Pareto Solutions</p>
+              <p class="text-2xl font-bold text-green-400">${metrics.frontier_size}</p>
+            </div>
+            <div class="bg-black/30 p-3 rounded">
+              <p class="text-xs text-blue-300">Coverage Rate</p>
+              <p class="text-2xl font-bold text-purple-400">${metrics.coverage_rate.toFixed(1)}%</p>
+            </div>
+            <div class="bg-black/30 p-3 rounded">
+              <p class="text-xs text-blue-300">Hypervolume</p>
+              <p class="text-lg font-bold text-yellow-400">${metrics.hypervolume.toFixed(2)}</p>
+            </div>
+            <div class="bg-black/30 p-3 rounded">
+              <p class="text-xs text-blue-300">Spacing</p>
+              <p class="text-lg font-bold text-cyan-400">${metrics.spacing.toFixed(3)}</p>
+            </div>
+          </div>
+          <div class="mt-3 p-3 bg-blue-900/30 rounded text-xs">
+            <p><strong>💡 Interpretation:</strong></p>
+            <ul class="list-disc ml-5 mt-2 space-y-1">
+              <li><strong>Pareto Solutions</strong> are non-dominated - you can't improve one objective without worsening another</li>
+              <li><strong>Coverage Rate</strong> shows what % of solutions are Pareto-optimal (higher = more trade-off options)</li>
+              <li><strong>Hypervolume</strong> measures quality of the frontier (higher = better)</li>
+              <li><strong>Spacing</strong> measures distribution uniformity (lower = more evenly distributed)</li>
+            </ul>
+          </div>
+        `;
+        document.getElementById('pareto-metrics').innerHTML = metricsHtml;
+
+      } catch (err) {
+        console.error('Pareto analysis error:', err);
+        document.getElementById('pareto-chart').innerHTML = '<p class="text-red-400 p-4">Error loading Pareto analysis</p>';
+      }
+    }
+
+    async function updateSankey() {
+      const selectedIdx = document.getElementById('sankey-solution-select').value;
+      if (!selectedIdx || !allResults[selectedIdx]) {
+        return;
+      }
+
+      const solution = allResults[selectedIdx];
+
+      try {
+        const response = await fetch(`${API_URL}/api/sankey`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            configuration: solution.configuration,
+            cost: solution.cost,
+            latency: solution.latency,
+            providers: solution.providers,
+            type: 'cost'
+          })
+        });
+        
+        const data = await response.json();
+        
+        if (!data.nodes || !data.links) {
+          console.error('Invalid Sankey data');
+          return;
+        }
+
+        const sankeyData = [{
+          type: "sankey",
+          node: {
+            pad: 15,
+            thickness: 20,
+            line: { color: "#1E293B", width: 0.5 },
+            label: data.nodes.map(n => n.name),
+            color: data.nodes.map(n => n.color)
+          },
+          link: {
+            source: data.links.map(l => l.source),
+            target: data.links.map(l => l.target),
+            value: data.links.map(l => l.value),
+            color: data.links.map(l => l.color || 'rgba(100, 116, 139, 0.4)')
+          }
+        }];
+
+        const layout = {
+          title: `Cost Flow for Solution #${parseInt(selectedIdx) + 1} ($${solution.cost.toFixed(2)}/mo)`,
+          font: { color: '#E2E8F0', size: 12 },
+          plot_bgcolor: 'rgba(15, 23, 42, 0.8)',
+          paper_bgcolor: 'rgba(15, 23, 42, 0.5)',
+          height: 400
+        };
+
+        Plotly.newPlot('sankey-chart', sankeyData, layout, {responsive: true});
+
+      } catch (err) {
+        console.error('Sankey diagram error:', err);
+        document.getElementById('sankey-chart').innerHTML = '<p class="text-red-400 p-4">Error loading Sankey diagram</p>';
+      }
     }
   </script>
 </body>
