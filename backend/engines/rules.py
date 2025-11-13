@@ -249,8 +249,32 @@ def get_main_provider(config: Dict[str, str]) -> str:
     return max(dist.keys(), key=lambda k: dist[k])
 
 
+def deduplicate_solutions(solutions: List[Solution]) -> List[Solution]:
+    """
+    Remove duplicate solutions based on their service configuration.
+    Two solutions are considered duplicates if they have identical configurations.
+    """
+    seen_configs = set()
+    unique_solutions = []
+    
+    for sol in solutions:
+        # Create a hashable representation of the configuration
+        config_tuple = tuple(sorted(sol.configuration.items()))
+        
+        if config_tuple not in seen_configs:
+            seen_configs.add(config_tuple)
+            unique_solutions.append(sol)
+    
+    return unique_solutions
+
 
 def evaluate_solutions(solutions: List[Solution], preferences: Preferences) -> List[Solution]:
+    # Remove duplicates first
+    solutions = deduplicate_solutions(solutions)
+    
+    if not solutions:
+        return []
+    
     rules_config = EXPERT_RULES_CONFIG
     weights = SCORING_WEIGHTS
     ranked = []
@@ -300,11 +324,18 @@ def min_max_normalize(values):
             normalized.append(0.0)
     return normalized, min_v, max_v
 
+
 def evaluate_solutions_normalized(solutions: List[Solution], weights=None):
     """
     Evaluate solutions using min-max normalization and weighted scoring.
     Now supports multiple metrics: cost, latency, reliability, security, vendor risk, scalability.
     """
+    if not solutions:
+        return [], {}
+    
+    # Remove duplicates first
+    solutions = deduplicate_solutions(solutions)
+    
     if not solutions:
         return [], {}
     
