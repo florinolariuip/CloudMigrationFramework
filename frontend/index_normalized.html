@@ -353,13 +353,25 @@
         return;
       }
 
+      // Helper function to safely normalize values (handles division by zero)
+      function safeNormalize(value, min, max) {
+        const range = max - min;
+        if (range === 0 || isNaN(range)) {
+          // If all values are the same, return 0.5 (middle value)
+          return 0.5;
+        }
+        const normalized = (value - min) / range;
+        // Clamp to [0, 1] range to handle any edge cases
+        return Math.max(0, Math.min(1, normalized));
+      }
+
       // Calculate normalized values
-      const normCost = (sol.cost - norm.cost_min) / (norm.cost_max - norm.cost_min);
-      const normLatency = (sol.latency - norm.latency_min) / (norm.latency_max - norm.latency_min);
-      const normReliability = ((sol.reliability || 0.95) - norm.reliability_min) / (norm.reliability_max - norm.reliability_min);
-      const normSecurity = ((sol.security_score || 0.90) - norm.security_min) / (norm.security_max - norm.security_min);
-      const normVendorRisk = ((sol.vendor_lockin_risk || 0.5) - norm.vendor_risk_min) / (norm.vendor_risk_max - norm.vendor_risk_min);
-      const normScalability = ((sol.scalability_score || 0.80) - norm.scalability_min) / (norm.scalability_max - norm.scalability_min);
+      const normCost = safeNormalize(sol.cost, norm.cost_min, norm.cost_max);
+      const normLatency = safeNormalize(sol.latency, norm.latency_min, norm.latency_max);
+      const normReliability = safeNormalize(sol.reliability || 0.95, norm.reliability_min, norm.reliability_max);
+      const normSecurity = safeNormalize(sol.security_score || 0.90, norm.security_min, norm.security_max);
+      const normVendorRisk = safeNormalize(sol.vendor_lockin_risk || 0.5, norm.vendor_risk_min, norm.vendor_risk_max);
+      const normScalability = safeNormalize(sol.scalability_score || 0.80, norm.scalability_min, norm.scalability_max);
 
       // Calculate contributions (for cost and latency, lower is better, so use 1-norm)
       const costContribution = norm.weights.cost * (1 - normCost);
@@ -445,7 +457,10 @@
               <div class="text-sm space-y-1">
                 <p>• Raw Value: <span class="text-yellow-300">${((sol.security_score || 0.90) * 100).toFixed(2)}%</span></p>
                 <p>• Range: ${(norm.security_min * 100).toFixed(2)}% to ${(norm.security_max * 100).toFixed(2)}%</p>
-                <p>• Normalized: ${normSecurity.toFixed(4)}</p>
+                ${norm.security_max === norm.security_min ? 
+                  '<p class="text-orange-400">⚠️ No variation - all solutions have identical security scores (normalized to 0.5)</p>' : 
+                  `<p>• Normalized: ${normSecurity.toFixed(4)}</p>`
+                }
                 <p>• Weight: ${(norm.weights.security * 100).toFixed(0)}%</p>
                 <p>• Contribution: ${(norm.weights.security * 100).toFixed(0)}% × ${normSecurity.toFixed(4)} = <span class="text-green-400">${securityContribution.toFixed(4)}</span></p>
                 <p class="text-blue-300 text-xs mt-2">ℹ️ Based on encryption, compliance & identity features</p>
