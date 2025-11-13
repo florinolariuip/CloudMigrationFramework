@@ -27,7 +27,7 @@ class Solution:
     latency: float
     providers: int
     providerDistribution: Dict[str, int]
-    score: Optional[int] = None
+    score: Optional[float] = None  # Changed from int to float for normalization support
     evaluationLog: Optional[List[Dict[str, Any]]] = None
     # Explainability fields (Priority 3 enhancement)
     constraintProof: Optional[List[Dict[str, Any]]] = None  # Constraint satisfaction evidence

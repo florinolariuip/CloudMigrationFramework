@@ -282,8 +282,23 @@ def evaluate_solutions(solutions: List[Solution], preferences: Preferences) -> L
 
 # --- Normalization-based scoring ---
 def min_max_normalize(values):
-    min_v, max_v = min(values), max(values)
-    return [(v - min_v) / (max_v - min_v) if max_v > min_v else 0.0 for v in values], min_v, max_v
+    """Normalize values to [0, 1] range using min-max normalization."""
+    # Filter out None values
+    valid_values = [v for v in values if v is not None]
+    if not valid_values:
+        # If all values are None, return zeros
+        return [0.0] * len(values), 0.0, 0.0
+    min_v, max_v = min(valid_values), max(valid_values)
+    # Normalize, replacing None with 0
+    normalized = []
+    for v in values:
+        if v is None:
+            normalized.append(0.0)
+        elif max_v > min_v:
+            normalized.append((v - min_v) / (max_v - min_v))
+        else:
+            normalized.append(0.0)
+    return normalized, min_v, max_v
 
 def evaluate_solutions_normalized(solutions: List[Solution], weights=None):
     if not solutions:
@@ -292,8 +307,11 @@ def evaluate_solutions_normalized(solutions: List[Solution], weights=None):
         weights = {"cost": 0.5, "latency": 0.3, "reliability": 0.2}
     costs = [float(s.cost) for s in solutions]
     latencies = [float(s.latency) for s in solutions]
-    # For demo, use reliability as 0.95 for all (or add to Solution)
-    reliabilities = [getattr(s, "reliability", 0.95) for s in solutions]
+    # Set default reliability if not present
+    for s in solutions:
+        if s.reliability is None:
+            s.reliability = 0.95
+    reliabilities = [float(s.reliability) for s in solutions]
     norm_cost, cost_min, cost_max = min_max_normalize(costs)
     norm_latency, latency_min, latency_max = min_max_normalize(latencies)
     norm_reliability, reliability_min, reliability_max = min_max_normalize(reliabilities)
