@@ -1,47 +1,157 @@
-<!-- index_normalized.html: Normalization-based scoring UI -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Cloud Migration Framework - Normalized Scoring</title>
-    <link rel="stylesheet" href="styles.css">
-    <!-- Add any other styles/scripts as in index.html -->
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Cloud Migration - Normalized Scoring</title>
+  <script src="https://cdn.tailwindcss.com"></script>
 </head>
-<body>
-    <div class="container">
-        <h1>Cloud Migration Framework <span style="font-size:0.7em; color:#888;">(Normalized Scoring)</span></h1>
-        <!-- ...existing controls for experiment parameters... -->
-        <form id="experiment-form">
-            <!-- ...existing parameter controls copied from index.html... -->
-        </form>
-        <hr>
-        <div id="results">
-            <h2>Results (Normalized Scoring)</h2>
-            <table id="results-table">
-                <thead>
-                    <tr>
-                        <th>Solution</th>
-                        <th>Cost</th>
-                        <th>Latency</th>
-                        <th>Reliability</th>
-                        <th>Normalized Cost</th>
-                        <th>Normalized Latency</th>
-                        <th>Normalized Reliability</th>
-                        <th>Score</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    <!-- Results will be populated here -->
-                </tbody>
-            </table>
-            <div id="normalization-details">
-                <h3>Normalization Details</h3>
-                <p>Scores are calculated using min-max normalization and weighted aggregation. See documentation for formulas.</p>
-                <!-- Optionally, show min/max values used for normalization -->
-            </div>
+<body class="bg-gradient-to-br from-slate-900 via-blue-900 to-slate-900 text-white min-h-screen">
+  <div class="max-w-7xl mx-auto px-4 py-8">
+    <header class="mb-8">
+      <h1 class="text-3xl font-bold mb-2">Cloud Migration Framework</h1>
+      <p class="text-blue-300">Normalized Scoring & Transparency</p>
+      <a href="index.html" class="text-sm text-blue-400 hover:underline mt-2 inline-block">← Back to Main Dashboard</a>
+    </header>
+
+    <div class="bg-white/10 backdrop-blur-md rounded-xl p-6 mb-6">
+      <h2 class="text-xl font-semibold mb-4">Configuration</h2>
+      <form id="experiment-form" class="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div>
+          <label class="block text-sm mb-1">Max Budget ($)</label>
+          <input type="number" name="maxBudget" value="3000" class="w-full px-3 py-2 bg-white/20 rounded border border-blue-500/30 text-white" />
         </div>
+        <div>
+          <label class="block text-sm mb-1">Max Latency (ms)</label>
+          <input type="number" name="maxLatency" value="12" step="0.1" class="w-full px-3 py-2 bg-white/20 rounded border border-blue-500/30 text-white" />
+        </div>
+        <div>
+          <label class="block text-sm mb-1">Max Providers</label>
+          <input type="number" name="maxProviders" value="3" class="w-full px-3 py-2 bg-white/20 rounded border border-blue-500/30 text-white" />
+        </div>
+        <div class="md:col-span-3">
+          <button type="submit" class="px-6 py-3 bg-green-600 hover:bg-green-700 rounded-lg font-semibold transition">
+            Run Normalized Scoring
+          </button>
+        </div>
+      </form>
     </div>
-    <script src="index_normalized.js"></script>
+
+    <div id="loading" class="hidden bg-blue-900/20 backdrop-blur-md rounded-xl p-6 mb-6">
+      <p class="text-center">Running analysis...</p>
+    </div>
+
+    <div id="results" class="hidden">
+      <div class="bg-white/10 backdrop-blur-md rounded-xl p-6 mb-6">
+        <h2 class="text-2xl font-semibold mb-4">Results (Normalized Scoring)</h2>
+        <div class="overflow-x-auto">
+          <table class="w-full text-sm" id="results-table">
+            <thead>
+              <tr class="border-b border-blue-500/30">
+                <th class="px-4 py-2 text-left">#</th>
+                <th class="px-4 py-2 text-right">Cost</th>
+                <th class="px-4 py-2 text-right">Latency</th>
+                <th class="px-4 py-2 text-right">Reliability</th>
+                <th class="px-4 py-2 text-right">Norm Cost</th>
+                <th class="px-4 py-2 text-right">Norm Latency</th>
+                <th class="px-4 py-2 text-right">Norm Reliability</th>
+                <th class="px-4 py-2 text-right">Score</th>
+              </tr>
+            </thead>
+            <tbody id="results-body">
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <div id="normalization-details" class="bg-green-900/20 backdrop-blur-md rounded-xl p-6 border border-green-500/30">
+        <h3 class="text-xl font-semibold mb-3">Normalization Details</h3>
+        <div id="norm-info" class="text-sm space-y-2"></div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const API_URL = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
+      ? 'http://127.0.0.1:5055'
+      : 'https://migration-framework-c77589bc07d3.herokuapp.com';
+
+    document.getElementById('experiment-form').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const formData = new FormData(e.target);
+      const constraints = {
+        maxBudget: parseInt(formData.get('maxBudget')),
+        maxLatency: parseFloat(formData.get('maxLatency')),
+        maxProviders: parseInt(formData.get('maxProviders'))
+      };
+
+      document.getElementById('loading').classList.remove('hidden');
+      document.getElementById('results').classList.add('hidden');
+
+      try {
+        const response = await fetch(`${API_URL}/api/experiment`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ constraints, use_normalization: true })
+        });
+        
+        const data = await response.json();
+        renderResults(data.results, data.normalization);
+      } catch (err) {
+        alert('Error: ' + err.message);
+      } finally {
+        document.getElementById('loading').classList.add('hidden');
+      }
+    });
+
+    function renderResults(results, normalization) {
+      const tbody = document.getElementById('results-body');
+      tbody.innerHTML = '';
+      
+      results.slice(0, 10).forEach((sol, idx) => {
+        const row = document.createElement('tr');
+        row.className = 'border-b border-blue-500/20 hover:bg-white/5';
+        row.innerHTML = `
+          <td class="px-4 py-2">${idx + 1}</td>
+          <td class="px-4 py-2 text-right">$${sol.cost}</td>
+          <td class="px-4 py-2 text-right">${sol.latency.toFixed(2)}ms</td>
+          <td class="px-4 py-2 text-right">${(sol.reliability || 0.95).toFixed(2)}</td>
+          <td class="px-4 py-2 text-right">${sol.norm_cost.toFixed(3)}</td>
+          <td class="px-4 py-2 text-right">${sol.norm_latency.toFixed(3)}</td>
+          <td class="px-4 py-2 text-right">${sol.norm_reliability.toFixed(3)}</td>
+          <td class="px-4 py-2 text-right font-bold text-green-400">${sol.score.toFixed(3)}</td>
+        `;
+        tbody.appendChild(row);
+      });
+
+      const normInfo = document.getElementById('norm-info');
+      normInfo.innerHTML = `
+        <p><strong>Min-Max Normalization Ranges:</strong></p>
+        <ul class="list-disc ml-6 space-y-1">
+          <li>Cost: min=$${normalization.cost_min}, max=$${normalization.cost_max}</li>
+          <li>Latency: min=${normalization.latency_min.toFixed(2)}ms, max=${normalization.latency_max.toFixed(2)}ms</li>
+          <li>Reliability: min=${normalization.reliability_min.toFixed(2)}, max=${normalization.reliability_max.toFixed(2)}</li>
+        </ul>
+        <p class="mt-4"><strong>Weights Applied:</strong></p>
+        <ul class="list-disc ml-6 space-y-1">
+          <li>Cost Weight: ${normalization.weights.cost}</li>
+          <li>Latency Weight: ${normalization.weights.latency}</li>
+          <li>Reliability Weight: ${normalization.weights.reliability}</li>
+        </ul>
+        <p class="mt-4"><strong>Score Formula:</strong></p>
+        <code class="block bg-black/30 p-2 rounded mt-2">
+          score = cost_weight × (1 - norm_cost) + latency_weight × (1 - norm_latency) + reliability_weight × norm_reliability
+        </code>
+        <p class="mt-4 text-xs text-blue-300">
+          <strong>Academic Rationale:</strong> Min-max normalization ensures all criteria are on a common [0,1] scale, 
+          enabling fair comparison and weighted aggregation. Lower cost and latency are better (hence 1-norm), 
+          while higher reliability is better. This approach is grounded in multi-criteria decision analysis (MCDA) 
+          and provides full transparency for reproducible research.
+        </p>
+      `;
+
+      document.getElementById('results').classList.remove('hidden');
+    }
+  </script>
 </body>
 </html>
