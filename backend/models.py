@@ -33,3 +33,8 @@ class Solution:
     constraintProof: Optional[List[Dict[str, Any]]] = None  # Constraint satisfaction evidence
     ruleTrace: Optional[List[Dict[str, Any]]] = None  # Expert rule firing log
     decisionPath: Optional[List[Dict[str, Any]]] = None  # Step-by-step decision process
+    # Normalization fields (for transparent scoring)
+    reliability: Optional[float] = None  # Reliability metric (0-1 scale)
+    norm_cost: Optional[float] = None  # Normalized cost (0-1 scale)
+    norm_latency: Optional[float] = None  # Normalized latency (0-1 scale)
+    norm_reliability: Optional[float] = None  # Normalized reliability (0-1 scale)

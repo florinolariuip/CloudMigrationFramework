@@ -95,9 +95,20 @@
           body: JSON.stringify({ constraints, use_normalization: true })
         });
         
+        if (!response.ok) {
+          throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        
         const data = await response.json();
+        console.log('Received data:', data); // Debug log
+        
+        if (!data.results || !data.normalization) {
+          throw new Error('Invalid response format');
+        }
+        
         renderResults(data.results, data.normalization);
       } catch (err) {
+        console.error('Error details:', err);
         alert('Error: ' + err.message);
       } finally {
         document.getElementById('loading').classList.add('hidden');
@@ -108,18 +119,23 @@
       const tbody = document.getElementById('results-body');
       tbody.innerHTML = '';
       
+      if (!results || results.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="8" class="px-4 py-2 text-center">No results found</td></tr>';
+        return;
+      }
+      
       results.slice(0, 10).forEach((sol, idx) => {
         const row = document.createElement('tr');
         row.className = 'border-b border-blue-500/20 hover:bg-white/5';
         row.innerHTML = `
           <td class="px-4 py-2">${idx + 1}</td>
-          <td class="px-4 py-2 text-right">$${sol.cost}</td>
-          <td class="px-4 py-2 text-right">${sol.latency.toFixed(2)}ms</td>
+          <td class="px-4 py-2 text-right">$${sol.cost || 0}</td>
+          <td class="px-4 py-2 text-right">${(sol.latency || 0).toFixed(2)}ms</td>
           <td class="px-4 py-2 text-right">${(sol.reliability || 0.95).toFixed(2)}</td>
-          <td class="px-4 py-2 text-right">${sol.norm_cost.toFixed(3)}</td>
-          <td class="px-4 py-2 text-right">${sol.norm_latency.toFixed(3)}</td>
-          <td class="px-4 py-2 text-right">${sol.norm_reliability.toFixed(3)}</td>
-          <td class="px-4 py-2 text-right font-bold text-green-400">${sol.score.toFixed(3)}</td>
+          <td class="px-4 py-2 text-right">${(sol.norm_cost !== undefined ? sol.norm_cost : 0).toFixed(3)}</td>
+          <td class="px-4 py-2 text-right">${(sol.norm_latency !== undefined ? sol.norm_latency : 0).toFixed(3)}</td>
+          <td class="px-4 py-2 text-right">${(sol.norm_reliability !== undefined ? sol.norm_reliability : 0).toFixed(3)}</td>
+          <td class="px-4 py-2 text-right font-bold text-green-400">${(sol.score || 0).toFixed(3)}</td>
         `;
         tbody.appendChild(row);
       });
