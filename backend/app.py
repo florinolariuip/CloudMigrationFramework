@@ -522,149 +522,174 @@ def optimize():
         prioritizePerformance=bool(prefs.get("prioritizePerformance", False)),
     )
 
-    # PHASE 1: CSP - Generate feasible solutions
-    csp_start = time.time()
-    feasible = generate_feasible_solutions(constraints)
-    csp_duration = time.time() - csp_start
-    
-    # IMPORTANT: Remove duplicates before any further processing
-    from backend.engines.rules import deduplicate_solutions
-    original_count = len(feasible)
-    feasible = deduplicate_solutions(feasible)
-    if len(feasible) < original_count:
-        print(f"[OPTIMIZE] Removed {original_count - len(feasible)} duplicate solutions from CSP results")
-    
-    # PHASE 2: Expert System - Rank by business rules
-    expert_start = time.time()
-    ranked = evaluate_solutions(feasible, preferences)
-    expert_duration = time.time() - expert_start
-    
-    # MULTI-OBJECTIVE: Calculate Pareto frontier (now on deduplicated solutions)
-    pareto_start = time.time()
-    pareto_frontier = calculate_pareto_frontier(feasible, objectives=['cost', 'latency'])
-    pareto_ranked = evaluate_solutions(pareto_frontier, preferences)  # Rank Pareto solutions
-    pareto_metrics = calculate_pareto_metrics(feasible, pareto_frontier)
-    extreme_solutions = get_extreme_solutions(pareto_frontier)
-    pareto_duration = time.time() - pareto_start
-    
-    # EXPLAINABILITY: Generate transparency data for best solution (Priority 3)
-    explainability_start = time.time()
-    best_solution = ranked[0] if ranked else None
-    explainability_data = None
-    
-    if best_solution:
-        # Generate constraint proof
-        constraint_proof = generate_constraint_proof(best_solution, constraints)
-        
-        # Generate rule firing trace
-        rule_trace = generate_rule_trace(best_solution, preferences, SCORING_WEIGHTS)
-        
-        # Generate decision path
-        decision_path = generate_decision_path(
-            constraints=constraints,
-            preferences=preferences,
-            csp_time_ms=csp_duration * 1000,
-            expert_time_ms=expert_duration * 1000,
-            pareto_time_ms=pareto_duration * 1000,
-            feasible_count=len(feasible),
-            pareto_count=len(pareto_frontier),
-            best_solution=best_solution
-        )
-        
-        # Add explainability to best solution
-        best_solution.constraintProof = [asdict(check) for check in constraint_proof]
-        best_solution.ruleTrace = [asdict(rule) for rule in rule_trace]
-        best_solution.decisionPath = [asdict(step) for step in decision_path]
-        
-        # Get explainability comparison
-        explainability_comparison = compare_explainability()
-        
-        explainability_data = {
-            "constraintProof": best_solution.constraintProof,
-            "ruleTrace": best_solution.ruleTrace,
-            "decisionPath": best_solution.decisionPath,
-            "comparison": explainability_comparison,
-            "explainabilityScore": 100,  # CSP+Expert has full explainability
-        }
-    
-    explainability_duration = time.time() - explainability_start
-    
-    total_combinations = get_total_combinations()
-    total_duration = time.time() - start_time
+    # Optional per-request CSP overrides (do not persist globally)
+    csp_overrides = payload.get("csp") or {}
+    old_csp = CSP_CONFIG.copy()
+    try:
+        if csp_overrides:
+            for key, value in csp_overrides.items():
+                if key in CSP_CONFIG:
+                    if key == "search_strategy":
+                        CSP_CONFIG[key] = str(value)
+                    elif isinstance(CSP_CONFIG[key], bool):
+                        CSP_CONFIG[key] = bool(value)
+                    else:
+                        try:
+                            CSP_CONFIG[key] = int(value)
+                        except Exception:
+                            # Fallback: ignore invalid type
+                            pass
 
-    # Academic metrics for research/analysis
-    metrics = {
-        "total_time_ms": round(total_duration * 1000, 2),
-        "csp_time_ms": round(csp_duration * 1000, 2),
-        "expert_time_ms": round(expert_duration * 1000, 2),
-        "pareto_time_ms": round(pareto_duration * 1000, 2),
-        "explainability_time_ms": round(explainability_duration * 1000, 2),
-        "search_space_size": total_combinations,
-        "feasible_space_size": len(feasible),
-        "pareto_frontier_size": len(pareto_frontier),
-        "pruning_efficiency": round((1 - len(feasible) / total_combinations) * 100, 2) if total_combinations > 0 else 0,
-        "solutions_evaluated": len(ranked),
-        "config_snapshot": {
-            "csp_strategy": CSP_CONFIG["search_strategy"],
-            "rule_weights": SCORING_WEIGHTS.copy(),
-        }
-    }
+        # PHASE 1: CSP - Generate feasible solutions
+        csp_start = time.time()
+        feasible = generate_feasible_solutions(constraints)
+        csp_duration = time.time() - csp_start
 
-    # Academic extension: log the run for empirical validation
-    RUN_LOG.append({
-        "timestamp": datetime.now().isoformat(),
-        "constraints": asdict(constraints),
-        "preferences": asdict(preferences),
-        "metrics": metrics,
-        "topSolution": asdict(ranked[0]) if ranked else None,
-    })
-    
-    # SANKEY DIAGRAM: Generate visualization data for solution flows
-    sankey_data = None
-    latency_sankey_data = None
-    if best_solution:
-        from backend.services.pricing import get_service_costs, get_service_latency
-        services_info = {
-            'costs': get_service_costs(),
-            'latency': get_service_latency()
-        }
-        sankey_data = generate_sankey_data(best_solution, services_info)
-        latency_sankey_data = generate_latency_sankey(best_solution, services_info)
-    
-    resp = {
-        "totalCombinations": total_combinations,
-        "feasibleSolutions": len(feasible),
-        "feasibilityRate": round((len(feasible) / total_combinations) * 100, 1),
-        "solutions": [asdict(s) for s in ranked],
-        "topSolution": asdict(ranked[0]) if ranked else None,
-        "statistics": calculate_statistics(ranked),
-        "metrics": metrics,  # Academic performance metrics
-        # Multi-objective Pareto results
-        "paretoFrontier": {
-            "size": len(pareto_frontier),
-            "solutions": [asdict(s) for s in pareto_ranked],
-            "metrics": {
-                "hypervolume": pareto_metrics.get('hypervolume', 0),
-                "spacing": pareto_metrics.get('spacing', 0),
-                "coverage_rate": pareto_metrics.get('coverage_rate', 0),
-                "cost_range": pareto_metrics.get('cost_range', {}),
-                "latency_range": pareto_metrics.get('latency_range', {}),
-            },
-            "extremeSolutions": {
-                "minCost": asdict(extreme_solutions['min_cost']) if 'min_cost' in extreme_solutions else None,
-                "minLatency": asdict(extreme_solutions['min_latency']) if 'min_latency' in extreme_solutions else None,
-                "balanced": asdict(extreme_solutions['balanced']) if 'balanced' in extreme_solutions else None,
+        # IMPORTANT: Remove duplicates before any further processing
+        from backend.engines.rules import deduplicate_solutions
+        original_count = len(feasible)
+        feasible = deduplicate_solutions(feasible)
+        if len(feasible) < original_count:
+            print(f"[OPTIMIZE] Removed {original_count - len(feasible)} duplicate solutions from CSP results")
+
+        # PHASE 2: Expert System - Rank by business rules
+        expert_start = time.time()
+        ranked = evaluate_solutions(feasible, preferences)
+        expert_duration = time.time() - expert_start
+
+        # MULTI-OBJECTIVE: Calculate Pareto frontier (now on deduplicated solutions)
+        pareto_start = time.time()
+        pareto_frontier = calculate_pareto_frontier(feasible, objectives=['cost', 'latency'])
+        pareto_ranked = evaluate_solutions(pareto_frontier, preferences)  # Rank Pareto solutions
+        pareto_metrics = calculate_pareto_metrics(feasible, pareto_frontier)
+        extreme_solutions = get_extreme_solutions(pareto_frontier)
+        pareto_duration = time.time() - pareto_start
+
+        # EXPLAINABILITY: Generate transparency data for best solution (Priority 3)
+        explainability_start = time.time()
+        best_solution = ranked[0] if ranked else None
+        explainability_data = None
+
+        if best_solution:
+            # Generate constraint proof
+            constraint_proof = generate_constraint_proof(best_solution, constraints)
+
+            # Generate rule firing trace
+            rule_trace = generate_rule_trace(best_solution, preferences, SCORING_WEIGHTS)
+
+            # Generate decision path
+            decision_path = generate_decision_path(
+                constraints=constraints,
+                preferences=preferences,
+                csp_time_ms=csp_duration * 1000,
+                expert_time_ms=expert_duration * 1000,
+                pareto_time_ms=pareto_duration * 1000,
+                feasible_count=len(feasible),
+                pareto_count=len(pareto_frontier),
+                best_solution=best_solution
+            )
+
+            # Add explainability to best solution
+            best_solution.constraintProof = [asdict(check) for check in constraint_proof]
+            best_solution.ruleTrace = [asdict(rule) for rule in rule_trace]
+            best_solution.decisionPath = [asdict(step) for step in decision_path]
+
+            # Get explainability comparison
+            explainability_comparison = compare_explainability()
+
+            explainability_data = {
+                "constraintProof": best_solution.constraintProof,
+                "ruleTrace": best_solution.ruleTrace,
+                "decisionPath": best_solution.decisionPath,
+                "comparison": explainability_comparison,
+                "explainabilityScore": 100,  # CSP+Expert has full explainability
             }
-        },
-        # Explainability data (Priority 3)
-        "explainability": explainability_data,
-        # Sankey diagram data for flow visualization
-        "sankeyDiagram": {
-            "costFlow": sankey_data,
-            "latencyFlow": latency_sankey_data
+
+        explainability_duration = time.time() - explainability_start
+
+        total_combinations = get_total_combinations()
+        total_duration = time.time() - start_time
+
+        # Academic metrics for research/analysis
+        metrics = {
+            "total_time_ms": round(total_duration * 1000, 2),
+            "csp_time_ms": round(csp_duration * 1000, 2),
+            "expert_time_ms": round(expert_duration * 1000, 2),
+            "pareto_time_ms": round(pareto_duration * 1000, 2),
+            "explainability_time_ms": round(explainability_duration * 1000, 2),
+            "search_space_size": total_combinations,
+            "feasible_space_size": len(feasible),
+            "pareto_frontier_size": len(pareto_frontier),
+            "pruning_efficiency": round((1 - len(feasible) / total_combinations) * 100, 2) if total_combinations > 0 else 0,
+            "solutions_evaluated": len(ranked),
+            "config_snapshot": {
+                "csp_strategy": CSP_CONFIG["search_strategy"],
+                "rule_weights": SCORING_WEIGHTS.copy(),
+            }
         }
-    }
-    return jsonify(resp)
+
+        # Academic extension: log the run for empirical validation
+        RUN_LOG.append({
+            "timestamp": datetime.now().isoformat(),
+            "constraints": asdict(constraints),
+            "preferences": asdict(preferences),
+            "metrics": metrics,
+            "topSolution": asdict(ranked[0]) if ranked else None,
+        })
+
+        # SANKEY DIAGRAM: Generate visualization data for solution flows
+        sankey_data = None
+        latency_sankey_data = None
+        if best_solution:
+            from backend.services.pricing import get_service_costs, get_service_latency
+            services_info = {
+                'costs': get_service_costs(),
+                'latency': get_service_latency()
+            }
+            sankey_data = generate_sankey_data(best_solution, services_info)
+            latency_sankey_data = generate_latency_sankey(best_solution, services_info)
+
+        resp = {
+            "totalCombinations": total_combinations,
+            "feasibleSolutions": len(feasible),
+            "feasibilityRate": round((len(feasible) / total_combinations) * 100, 1),
+            "solutions": [asdict(s) for s in ranked],
+            "topSolution": asdict(ranked[0]) if ranked else None,
+            "statistics": calculate_statistics(ranked),
+            "metrics": metrics,  # Academic performance metrics
+            # Multi-objective Pareto results
+            "paretoFrontier": {
+                "size": len(pareto_frontier),
+                "solutions": [asdict(s) for s in pareto_ranked],
+                "metrics": {
+                    "hypervolume": pareto_metrics.get('hypervolume', 0),
+                    "spacing": pareto_metrics.get('spacing', 0),
+                    "coverage_rate": pareto_metrics.get('coverage_rate', 0),
+                    "cost_range": pareto_metrics.get('cost_range', {}),
+                    "latency_range": pareto_metrics.get('latency_range', {}),
+                },
+                "extremeSolutions": {
+                    "minCost": asdict(extreme_solutions['min_cost']) if 'min_cost' in extreme_solutions else None,
+                    "minLatency": asdict(extreme_solutions['min_latency']) if 'min_latency' in extreme_solutions else None,
+                    "balanced": asdict(extreme_solutions['balanced']) if 'balanced' in extreme_solutions else None,
+                }
+            },
+            # Explainability data (Priority 3)
+            "explainability": explainability_data,
+            # Sankey diagram data for flow visualization
+            "sankeyDiagram": {
+                "costFlow": sankey_data,
+                "latencyFlow": latency_sankey_data
+            }
+        }
+        return jsonify(resp)
+    except Exception as e:
+        import traceback
+        print(f"[OPTIMIZE] Error: {e}\n" + traceback.format_exc())
+        return jsonify({"error": str(e)}), 500
+    finally:
+        # Restore global CSP config to avoid leaking per-request overrides
+        CSP_CONFIG.update(old_csp)
 
 
 @app.post("/api/compare-baselines")
@@ -822,8 +847,9 @@ def ensure_experiment_results():
     else:
         print("[INFO] Experiment results already present.")
 
-# Ensure results at startup
-ensure_experiment_results()
+# Ensure results at startup (skip during tests/CI)
+if os.environ.get('SKIP_EXPERIMENTS') != '1' and os.environ.get('FLASK_ENV') != 'testing':
+    ensure_experiment_results()
 
 from flask import jsonify
 import threading

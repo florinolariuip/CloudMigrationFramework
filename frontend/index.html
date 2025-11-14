@@ -257,7 +257,12 @@
           const res = await fetch(`${API_BASE}/api/optimize`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ constraints: constraintsPayload, preferences }),
+            body: JSON.stringify({ 
+              constraints: constraintsPayload, 
+              preferences,
+              // Pass current CSP strategy so the run uses what the user selected even if not saved
+              csp: academicConfig?.csp || undefined,
+            }),
           });
           const data = await res.json();
           setResults(data);
