@@ -165,7 +165,25 @@
       const [serviceError, setServiceError] = useState(null);
       const [academicConfig, setAcademicConfig] = useState(null);
 
-  const API_BASE = (window.API_BASE || 'https://migration-framework-c77589bc07d3.herokuapp.com');
+  // Dynamic API base resolution:
+  // 1. Explicit window.API_BASE override (set via console or injected script)
+  // 2. localStorage key 'API_BASE'
+  // 3. If running on localhost, try local backend first then fallback to Heroku
+  // 4. Default to Heroku deployment URL
+  const resolveApiBase = () => {
+    const heroku = 'https://migration-framework-c77589bc07d3.herokuapp.com';
+    const explicit = window.API_BASE || localStorage.getItem('API_BASE');
+    if (explicit) return explicit.replace(/\/$/, '');
+    const isLocal = ['localhost','127.0.0.1'].includes(window.location.hostname);
+    if (!isLocal) return heroku;
+    // For local dev attempt health probe synchronously-ish (with timeout) using navigator.sendBeacon fallback
+    // We'll optimistically return local first; frontend fetch calls will handle failure gracefully and user can set override.
+    return 'http://127.0.0.1:5055';
+  };
+  const API_BASE = resolveApiBase();
+  // Expose helper to set override manually
+  window.setApiBase = (url) => { localStorage.setItem('API_BASE', url); window.location.reload(); };
+  window.clearApiBase = () => { localStorage.removeItem('API_BASE'); window.location.reload(); };
 
       // Fetch service data and defaults on component mount
       useEffect(() => {

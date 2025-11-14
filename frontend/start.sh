@@ -79,16 +79,18 @@ kill_port "$FRONTEND_PORT"
 # --- Backend ---
 HEALTH_URL="http://127.0.0.1:${BACKEND_PORT}/health"
 BE_PID=""
+FE_PID=""
 
 if curl -fsS -m 1 "$HEALTH_URL" >/dev/null 2>&1; then
   log "Backend already running on ${BACKEND_PORT} (health OK)"
 else
   log "Starting backend (Flask) on port ${BACKEND_PORT}..."
   export FLASK_DEBUG="${FLASK_DEBUG_ENV}"
+  export SKIP_EXPERIMENTS=1
   (
-    cd "$BACKEND_DIR"
-    # Run in background; log to file
-    "$PY_BIN" app.py > "${BACKEND_DIR}/.backend.log" 2>&1 & echo $! > "${BACKEND_DIR}/.backend.pid"
+    cd "$ROOT_DIR"
+    # Run Flask app in background; log to file (disable reloader for stability)
+    "$PY_BIN" -m flask --app backend.app:app run --host 127.0.0.1 --port "${BACKEND_PORT}" --no-reload > "${BACKEND_DIR}/.backend.log" 2>&1 & echo $! > "${BACKEND_DIR}/.backend.pid"
   )
   BE_PID="$(cat "${BACKEND_DIR}/.backend.pid" 2>/dev/null || true)"
   trap 'log "Stopping services"; kill_if_running "$FE_PID"; kill_if_running "$BE_PID"' EXIT INT TERM
