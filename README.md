@@ -125,8 +125,15 @@ python -m http.server 8080
 
 ### Available Documents
 
+#### Core System Documentation
 1. **[EXPLANATION.md](./backend/EXPLANATION.md)** - Complete system overview and usage guide
 2. **[SCALABILITY_IMPLEMENTATION.md](./backend/SCALABILITY_IMPLEMENTATION.md)** - Detailed scalability analysis (15 components, 21M+ combinations)
+
+#### Advanced Features & Research
+3. **[NORMALIZED_MCDA.md](./backend/NORMALIZED_MCDA.md)** - Normalized MCDA interface with 6-metric framework, min-max normalization, and weighted sum model
+4. **[MEASUREMENT_PLAN.md](./backend/MEASUREMENT_PLAN.md)** - Comprehensive measurement methodology, research questions, and 8-week data collection plan
+5. **[DEMO_FLOW.md](./backend/DEMO_FLOW.md)** - Step-by-step presentation guide with 3 scenarios and 20-minute demo script
+6. **[JOURNAL_ARTICLE_GUIDE.md](./backend/JOURNAL_ARTICLE_GUIDE.md)** - Complete journal article preparation roadmap with 3-week timeline and target journals
 
 ### Access Documentation
 
@@ -138,6 +145,10 @@ python -m http.server 8080
 **Or directly:**
 - Navigate to `http://localhost:8080/docs.html?doc=../backend/EXPLANATION.md`
 - Navigate to `http://localhost:8080/docs.html?doc=../backend/SCALABILITY_IMPLEMENTATION.md`
+- Navigate to `http://localhost:8080/docs.html?doc=../backend/NORMALIZED_MCDA.md`
+- Navigate to `http://localhost:8080/docs.html?doc=../backend/MEASUREMENT_PLAN.md`
+- Navigate to `http://localhost:8080/docs.html?doc=../backend/DEMO_FLOW.md`
+- Navigate to `http://localhost:8080/docs.html?doc=../backend/JOURNAL_ARTICLE_GUIDE.md`
 
 ---
 

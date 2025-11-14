@@ -845,6 +845,30 @@ def refresh_experiments():
     finally:
         refresh_lock.release()
 
+@app.route('/api/docs/<path:filename>', methods=['GET'])
+def serve_documentation(filename):
+    """Serve documentation files from the backend directory."""
+    import os
+    from flask import send_file, abort
+    
+    # Security: Only allow .md files
+    if not filename.endswith('.md'):
+        abort(404)
+    
+    # Get backend directory
+    backend_dir = os.path.dirname(os.path.abspath(__file__))
+    doc_path = os.path.join(backend_dir, filename)
+    
+    # Security: Ensure the file is within backend directory
+    if not os.path.abspath(doc_path).startswith(backend_dir):
+        abort(403)
+    
+    # Check if file exists
+    if not os.path.exists(doc_path):
+        abort(404)
+    
+    return send_file(doc_path, mimetype='text/markdown')
+
 if __name__ == "__main__":
     import os
     debug_mode = os.environ.get('FLASK_DEBUG', 'False') == 'True'
