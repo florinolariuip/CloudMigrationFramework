@@ -225,9 +225,18 @@
   </div>
 
   <script>
-    const API_URL = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
-      ? 'http://127.0.0.1:5055'
-      : 'https://migration-framework-c77589bc07d3.herokuapp.com';
+    // Allow overriding API base via window.API_BASE or localStorage('API_BASE');
+    // Fallback: if running locally, try local backend; otherwise use Heroku
+    function resolveApiBase() {
+      const heroku = 'https://migration-framework-c77589bc07d3.herokuapp.com';
+      const explicit = window.API_BASE || localStorage.getItem('API_BASE');
+      if (explicit) return explicit.replace(/\/$/, '');
+      const isLocal = ['localhost','127.0.0.1'].includes(window.location.hostname);
+      return isLocal ? 'http://127.0.0.1:5055' : heroku;
+    }
+    const API_URL = resolveApiBase();
+    window.setApiBase = (url) => { localStorage.setItem('API_BASE', url); window.location.reload(); };
+    window.clearApiBase = () => { localStorage.removeItem('API_BASE'); window.location.reload(); };
 
     let weights = {
       cost: 0.30,
