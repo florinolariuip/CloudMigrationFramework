@@ -315,6 +315,71 @@ Research/Academic use. See paper for citation.
 
 ---
 
+## ☁️ Deployment (Heroku)
+
+The Flask app entrypoint is `backend/app.py`. For Heroku, the root contains:
+
+* `Procfile` → `web: gunicorn backend.app:app`
+* `requirements.txt` → Python dependencies (mirrors backend plus Gunicorn)
+* `runtime.txt` → Python version pin (e.g. `python-3.12.2`)
+
+### One-Time Setup
+
+```bash
+heroku login          # Interactive browser login
+heroku create migration-framework-c77589bc07d3  # If app not yet created
+heroku git:remote -a migration-framework-c77589bc07d3
+```
+
+### Deploy
+
+```bash
+git push heroku main
+```
+
+Wait for build to finish, then verify the running version and seed feature:
+
+```bash
+curl -s https://migration-framework-c77589bc07d3.herokuapp.com/api/version | jq
+```
+
+Expected keys: `version`, `has_seed_support: true`, feature flags.
+
+### Deterministic Seed Test
+
+Run two identical requests with a seed; metrics should match (feasible counts, Pareto size):
+
+```bash
+for i in 1 2; do
+    curl -s -X POST https://migration-framework-c77589bc07d3.herokuapp.com/api/optimize \
+        -H 'Content-Type: application/json' \
+        -d '{"constraints":{"maxBudget":5000,"maxLatency":12,"maxProviders":3},"preferences":{"prioritizeCost":true,"prioritizePerformance":true},"seed":99}' \
+        | jq '{seed:.metrics.seed_used,pre:.metrics.feasible_pre_dedup,post:.metrics.feasible_post_dedup,pareto:.metrics.pareto_frontier_size}';
+done
+```
+
+### Troubleshooting
+
+| Symptom | Cause | Fix |
+|---------|-------|-----|
+| 404 /api/version | Old slug running | Push again or restart dynos |
+| seed_used = null | Older code deployed | Confirm latest commit, redeploy |
+| Counts differ for same seed | Pricing cache changed mid-run or non-deterministic strategy | Disable cache refresh during test; ensure `search_strategy` stable |
+
+### Rollback
+
+List releases and rollback:
+
+```bash
+heroku releases -a migration-framework-c77589bc07d3
+heroku releases:info v123 -a migration-framework-c77589bc07d3
+heroku rollback v123 -a migration-framework-c77589bc07d3
+```
+
+---
+
+---
+
 ## 🔄 Version History
 
 ### v3 (Current)
