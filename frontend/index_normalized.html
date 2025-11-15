@@ -56,6 +56,11 @@
               <label class="block text-sm mb-1">Max Providers</label>
               <input type="number" name="maxProviders" value="3" class="w-full px-3 py-2 bg-white/20 rounded border border-blue-500/30 text-white" />
             </div>
+            <div>
+              <label class="block text-sm mb-1 flex items-center gap-2">Deterministic Seed <span class="text-xs text-gray-400">(optional)</span></label>
+              <input type="number" name="seed" placeholder="e.g. 42" class="w-full px-3 py-2 bg-white/20 rounded border border-blue-500/30 text-white" />
+              <p class="mt-1 text-xs text-gray-400">Provide a seed to make feasible & Pareto counts reproducible.</p>
+            </div>
           </div>
         </form>
       </div>
@@ -287,6 +292,8 @@
         maxLatency: parseFloat(formData.get('maxLatency')),
         maxProviders: parseInt(formData.get('maxProviders'))
       };
+      const seedVal = formData.get('seed');
+      const seed = seedVal !== '' && seedVal !== null ? parseInt(seedVal) : undefined;
 
       document.getElementById('loading').classList.remove('hidden');
       document.getElementById('results').classList.add('hidden');
@@ -295,7 +302,7 @@
         const response = await fetch(`${API_URL}/api/experiment`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ constraints, use_normalization: true, weights })
+          body: JSON.stringify({ constraints, use_normalization: true, weights, seed })
         });
         
         if (!response.ok) {

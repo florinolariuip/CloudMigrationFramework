@@ -43,6 +43,24 @@ See BASELINE_IMPLEMENTATION.md and PARETO_IMPLEMENTATION.md for full tables. All
 - **Metrics Sensitivity**: Pareto and hypervolume metrics depend on constraint tightness and problem structure.
 - **Reproducibility**: All code, seeds, and requirements are pinned and available in the Docker image.
 
+### Deterministic Seeds (v3.1 Extension)
+For exact reproducibility of heuristic enumeration and feasible/Pareto counts you can pass an optional `seed` field in the JSON body of `/api/optimize` (and future experiment endpoints). Example:
+
+```json
+{
+  "constraints": {"maxBudget": 5000, "maxLatency": 12, "maxProviders": 3},
+  "preferences": {"prioritizeCost": true, "prioritizePerformance": true},
+  "seed": 42
+}
+```
+
+When provided, Python's `random` and NumPy's RNG are both seeded, making:
+- `feasible_pre_dedup` / `feasible_post_dedup` counts deterministic
+- `pareto_frontier_size` stable for identical inputs
+- Any random sampling strategy (e.g., `random_sample`) reproducible
+
+Returned metrics now include `seed_used` (null if no seed). Omit `seed` for natural stochastic variability during exploratory runs.
+
 ## Key Concepts & Numbers
 
 ### 1. Constraints (CSP Phase)

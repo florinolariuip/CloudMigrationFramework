@@ -501,6 +501,27 @@ def optimize():
     
     payload = request.get_json(force=True, silent=True) or {}
 
+    # Optional deterministic seed for reproducibility in academic experiments.
+    # When provided, this will fix Python's and NumPy's RNG so that heuristic sampling
+    # and any random ordering inside CSP strategies become repeatable. This stabilizes
+    # feasible_pre_dedup / feasible_post_dedup counts and Pareto frontier size for a given input.
+    seed = payload.get("seed")
+    seed_used = None
+    if seed is not None:
+        try:
+            seed_int = int(seed)
+            import random
+            random.seed(seed_int)
+            try:
+                import numpy as np  # numpy available per requirements.txt
+                np.random.seed(seed_int)
+            except Exception:
+                pass  # NumPy seeding best-effort; ignore if unavailable
+            seed_used = seed_int
+            print(f"[OPTIMIZE] Using deterministic seed: {seed_int}")
+        except Exception as _seed_err:
+            print(f"[OPTIMIZE] Invalid seed provided '{seed}': {_seed_err}")
+
     cons = payload.get("constraints", {})
     prefs = payload.get("preferences", {})
 
@@ -631,6 +652,7 @@ def optimize():
             "pareto_frontier_size": len(pareto_frontier),
             "pruning_efficiency": round((1 - post_dedup_count / total_combinations) * 100, 2) if total_combinations > 0 else 0,
             "solutions_evaluated": len(ranked),
+            "seed_used": seed_used,
             "config_snapshot": {
                 "csp_strategy": CSP_CONFIG["search_strategy"],
                 "rule_weights": SCORING_WEIGHTS.copy(),
