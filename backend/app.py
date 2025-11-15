@@ -601,6 +601,13 @@ def optimize():
         if duplicates_removed > 0:
             print(f"[OPTIMIZE] Removed {duplicates_removed} duplicate solutions from CSP results (pre={pre_dedup_count}, post={post_dedup_count})")
 
+        # Deterministic ordering: sort solutions to eliminate ordering noise between runs
+        feasible.sort(key=lambda s: (
+            round(s.cost, 4),
+            round(s.latency, 4),
+            tuple(sorted(s.configuration.items()))
+        ))
+
         # PHASE 2: Expert System - Rank by business rules
         expert_start = time.time()
         ranked = evaluate_solutions(feasible, preferences)
