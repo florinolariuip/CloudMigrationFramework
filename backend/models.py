@@ -28,6 +28,7 @@ class Solution:
     providers: int
     providerDistribution: Dict[str, int]
     score: Optional[float] = None  # Changed from int to float for normalization support
+    raw_score: Optional[float] = None  # Uncapped score for explanation accuracy validation
     evaluationLog: Optional[List[Dict[str, Any]]] = None
     # Explainability fields (Priority 3 enhancement)
     constraintProof: Optional[List[Dict[str, Any]]] = None  # Constraint satisfaction evidence
