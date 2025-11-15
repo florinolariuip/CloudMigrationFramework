@@ -545,12 +545,16 @@ def optimize():
         feasible = generate_feasible_solutions(constraints)
         csp_duration = time.time() - csp_start
 
+        # Capture pre-dedup count for research reproducibility
+        pre_dedup_count = len(feasible)
+
         # IMPORTANT: Remove duplicates before any further processing
         from backend.engines.rules import deduplicate_solutions
-        original_count = len(feasible)
         feasible = deduplicate_solutions(feasible)
-        if len(feasible) < original_count:
-            print(f"[OPTIMIZE] Removed {original_count - len(feasible)} duplicate solutions from CSP results")
+        post_dedup_count = len(feasible)
+        duplicates_removed = pre_dedup_count - post_dedup_count
+        if duplicates_removed > 0:
+            print(f"[OPTIMIZE] Removed {duplicates_removed} duplicate solutions from CSP results (pre={pre_dedup_count}, post={post_dedup_count})")
 
         # PHASE 2: Expert System - Rank by business rules
         expert_start = time.time()
@@ -618,9 +622,14 @@ def optimize():
             "pareto_time_ms": round(pareto_duration * 1000, 2),
             "explainability_time_ms": round(explainability_duration * 1000, 2),
             "search_space_size": total_combinations,
-            "feasible_space_size": len(feasible),
+            # Feasible set sizes (pre & post dedup) for variance analysis in experiments
+            "feasible_pre_dedup": pre_dedup_count,
+            "feasible_post_dedup": post_dedup_count,
+            "duplicates_removed": duplicates_removed,
+            # Backward compatible field (will equal post-dedup going forward)
+            "feasible_space_size": post_dedup_count,
             "pareto_frontier_size": len(pareto_frontier),
-            "pruning_efficiency": round((1 - len(feasible) / total_combinations) * 100, 2) if total_combinations > 0 else 0,
+            "pruning_efficiency": round((1 - post_dedup_count / total_combinations) * 100, 2) if total_combinations > 0 else 0,
             "solutions_evaluated": len(ranked),
             "config_snapshot": {
                 "csp_strategy": CSP_CONFIG["search_strategy"],
@@ -651,8 +660,10 @@ def optimize():
 
         resp = {
             "totalCombinations": total_combinations,
-            "feasibleSolutions": len(feasible),
-            "feasibilityRate": round((len(feasible) / total_combinations) * 100, 1),
+            "feasibleSolutions": post_dedup_count,
+            "feasibleSolutionsPreDedup": pre_dedup_count,
+            "duplicatesRemoved": duplicates_removed,
+            "feasibilityRate": round((post_dedup_count / total_combinations) * 100, 1),
             "solutions": [asdict(s) for s in ranked],
             "topSolution": asdict(ranked[0]) if ranked else None,
             "statistics": calculate_statistics(ranked),

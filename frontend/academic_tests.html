@@ -311,7 +311,10 @@
           const entry = {
             time_ms: (t1 - t0),
             search_space_size: m.search_space_size ?? null,
-            feasible_space_size: m.feasible_space_size ?? null,
+            feasible_space_size: m.feasible_space_size ?? null, // backward compat (post-dedup)
+            feasible_pre_dedup: m.feasible_pre_dedup ?? null,
+            feasible_post_dedup: m.feasible_post_dedup ?? m.feasible_space_size ?? null,
+            duplicates_removed: m.duplicates_removed ?? null,
             pareto_frontier_size: (pf.size ?? m.pareto_frontier_size ?? 0),
             hypervolume: (pfm.hypervolume ?? null),
             spacing: (pfm.spacing ?? null),
@@ -337,7 +340,10 @@
         const summary = {
           time_ms: meanStd(runResults, 'time_ms'),
           pareto_frontier_size: meanStd(runResults, 'pareto_frontier_size'),
-          feasible_space_size: meanStd(runResults, 'feasible_space_size'),
+          feasible_space_size: meanStd(runResults, 'feasible_space_size'), // legacy
+          feasible_post_dedup: meanStd(runResults, 'feasible_post_dedup'),
+          feasible_pre_dedup: meanStd(runResults, 'feasible_pre_dedup'),
+          duplicates_removed: meanStd(runResults, 'duplicates_removed'),
           hypervolume: meanStd(runResults, 'hypervolume'),
           spacing: meanStd(runResults, 'spacing'),
           coverage_rate: meanStd(runResults, 'coverage_rate'),
@@ -441,7 +447,9 @@
                     <th className="py-2 px-3">Selected Components</th>
                     <th className="py-2 px-3">Mean Time (ms)</th>
                     <th className="py-2 px-3">Pareto (μ±σ)</th>
-                    <th className="py-2 px-3">Feasible (μ)</th>
+                    <th className="py-2 px-3">Feasible Post (μ)</th>
+                    <th className="py-2 px-3">Feasible Pre (μ)</th>
+                    <th className="py-2 px-3">Dup Removed (μ)</th>
                     <th className="py-2 px-3">Hypervolume (μ)</th>
                     <th className="py-2 px-3">Spacing (μ)</th>
                     <th className="py-2 px-3">Coverage % (μ)</th>
@@ -462,7 +470,9 @@
                       </td>
                       <td className="py-2 px-3">{r.summary?.time_ms ? `${pretty(r.summary.time_ms.mean,1)} ± ${pretty(r.summary.time_ms.std,1)}` : '—'}</td>
                       <td className="py-2 px-3">{r.summary?.pareto_frontier_size ? `${pretty(r.summary.pareto_frontier_size.mean,1)} ± ${pretty(r.summary.pareto_frontier_size.std,1)}` : '—'}</td>
-                      <td className="py-2 px-3">{r.summary?.feasible_space_size ? `${Math.round(r.summary.feasible_space_size.mean)}` : '—'}</td>
+                      <td className="py-2 px-3">{r.summary?.feasible_post_dedup ? `${Math.round(r.summary.feasible_post_dedup.mean)}` : (r.summary?.feasible_space_size ? `${Math.round(r.summary.feasible_space_size.mean)}` : '—')}</td>
+                      <td className="py-2 px-3">{r.summary?.feasible_pre_dedup ? `${Math.round(r.summary.feasible_pre_dedup.mean)}` : '—'}</td>
+                      <td className="py-2 px-3">{r.summary?.duplicates_removed ? `${Math.round(r.summary.duplicates_removed.mean)}` : '—'}</td>
                       <td className="py-2 px-3">{r.summary?.hypervolume ? `${pretty(r.summary.hypervolume.mean,2)}` : '—'}</td>
                       <td className="py-2 px-3">{r.summary?.spacing ? `${pretty(r.summary.spacing.mean,2)}` : '—'}</td>
                       <td className="py-2 px-3">{r.summary?.coverage_rate ? `${pretty(r.summary.coverage_rate.mean,1)}%` : '—'}</td>
