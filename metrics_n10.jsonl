@@ -1,0 +1,8 @@
+{"run":1,"pre":37,"post":36,"dup":1,"pareto":2,"total_time_ms":282.58}
+{"run":2,"pre":35,"post":34,"dup":1,"pareto":2,"total_time_ms":243.4}
+{"run":3,"pre":39,"post":38,"dup":1,"pareto":4,"total_time_ms":283.45}
+{"run":4,"pre":34,"post":33,"dup":1,"pareto":2,"total_time_ms":237.94}
+{"run":5,"pre":40,"post":39,"dup":1,"pareto":2,"total_time_ms":290.01}
+{"run":6,"pre":41,"post":40,"dup":1,"pareto":2,"total_time_ms":293.67}
+{"run":7,"pre":39,"post":38,"dup":1,"pareto":2,"total_time_ms":299.96}
+{"run":8,"pre":40,"post":39,"dup":1,"pareto":2,"total_time_ms":286.93}

@@ -255,6 +255,16 @@
     let allResults = [];
     let currentNormalization = null;
 
+    // Formatting helpers to eliminate floating point artifacts (e.g. 1600.2900000000002)
+    function formatMoney(val) {
+      if (val === undefined || val === null || isNaN(val)) return '$0.00';
+      return '$' + Number(val).toFixed(2);
+    }
+    function formatLatency(val) {
+      if (val === undefined || val === null || isNaN(val)) return '0.00ms';
+      return Number(val).toFixed(2) + 'ms';
+    }
+
     // Helper function to safely normalize values (handles division by zero)
     function safeNormalize(value, min, max) {
       const range = max - min;
@@ -364,7 +374,7 @@
         
         row.innerHTML = `
           <td class="px-2 py-2 font-bold">${isPareto ? '⭐' : ''} ${idx + 1}</td>
-          <td class="px-2 py-2 text-right">$${sol.cost || 0}</td>
+          <td class="px-2 py-2 text-right">${formatMoney(sol.cost)}</td>
           <td class="px-2 py-2 text-right">${(sol.latency || 0).toFixed(2)}ms</td>
           <td class="px-2 py-2 text-right">${((sol.reliability || 0.95) * 100).toFixed(1)}%</td>
           <td class="px-2 py-2 text-right">${((sol.security_score || 0.90) * 100).toFixed(1)}%</td>
@@ -415,7 +425,7 @@
 
       // Determine strengths (top metrics)
       const metrics = [
-        { name: 'Cost Efficiency', score: 1 - costScore, icon: '💰', raw: `$${topSol.cost}` },
+        { name: 'Cost Efficiency', score: 1 - costScore, icon: '💰', raw: formatMoney(topSol.cost) },
         { name: 'Low Latency', score: 1 - latencyScore, icon: '⚡', raw: `${topSol.latency.toFixed(2)}ms` },
         { name: 'High Reliability', score: reliabilityScore, icon: '🛡️', raw: `${((topSol.reliability || 0.95) * 100).toFixed(2)}%` },
         { name: 'Strong Security', score: securityScore, icon: '🔒', raw: `${((topSol.security_score || 0.90) * 100).toFixed(2)}%` },
@@ -626,7 +636,7 @@
         <div>
           <h4 class="font-semibold mb-2">Metrics:</h4>
           <ul class="space-y-1 text-sm">
-            <li>💰 Cost: $${sol.cost}</li>
+            <li>💰 Cost: ${formatMoney(sol.cost)}</li>
             <li>⚡ Latency: ${sol.latency.toFixed(2)}ms</li>
             <li>🛡️ Reliability: ${((sol.reliability || 0.95) * 100).toFixed(2)}%</li>
             <li>🔒 Security: ${((sol.security_score || 0.90) * 100).toFixed(2)}%</li>

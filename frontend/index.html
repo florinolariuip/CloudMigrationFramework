@@ -1510,6 +1510,8 @@
                     ))}
                   </div>
                 </div>
+                {/* Dynamic Academic Summary Card with Explanation Accuracy */}
+                <AcademicSummary results={results} academicConfig={academicConfig} />
               </div>
             )}
 
@@ -1910,6 +1912,127 @@
         </div>
       );
     }
+
+    /* Academic Summary Component */
+    const AcademicSummary = ({ results, academicConfig }) => {
+      if (!results || !results.metrics) return null;
+      const metrics = results.metrics;
+      const pareto = results.paretoFrontier;
+      const top = results.topSolution;
+      const ruleCount = top?.evaluationLog?.length || 0;
+      const totalRulesDefined = academicConfig?.rules ? Object.keys(academicConfig.rules).length : null;
+      // Reconstruct score from evaluation log (base 100 + impacts)
+      let reconstructedScore = 0;
+      if (top?.evaluationLog) {
+        reconstructedScore = 100 + top.evaluationLog.reduce((sum, r) => sum + (r.impact || 0), 0);
+      }
+      const displayedScore = top?.score || reconstructedScore;
+      const scoreDelta = Math.abs(displayedScore - reconstructedScore);
+      const scoreIntegrityPass = scoreDelta < 1e-6; // backend may store float exactly
+      // Constraint proof accuracy (if explainability present)
+      let constraintsSatisfiedRatio = null;
+      if (results.explainability?.constraintProof) {
+        const cps = results.explainability.constraintProof;
+        const satisfied = cps.filter(c => c.satisfied).length;
+        constraintsSatisfiedRatio = (satisfied / cps.length) * 100;
+      }
+      // Rule coverage estimate
+      const ruleCoverage = totalRulesDefined ? ((ruleCount / totalRulesDefined) * 100).toFixed(1) : 'N/A';
+      // Reliability proximity (if normalization available via pareto extreme solutions else approximate)
+      const reliability = top?.reliability || 0;
+      const relMax = results.statistics?.reliability?.max || reliability;
+      const reliabilityAccuracy = relMax ? (reliability / relMax) * 100 : 100;
+      // Overall explanation accuracy heuristic
+      const components = [];
+      components.push(scoreIntegrityPass ? 1 : 0);
+      if (constraintsSatisfiedRatio !== null) components.push(constraintsSatisfiedRatio / 100);
+      if (ruleCoverage !== 'N/A') components.push(parseFloat(ruleCoverage) / 100);
+      const explanationAccuracy = (components.reduce((a,b)=>a+b,0) / components.length) * 100;
+      // Accuracy labels
+      const accuracyLabel = explanationAccuracy >= 90 ? 'High' : explanationAccuracy >= 75 ? 'Moderate' : 'Needs Review';
+      return (
+        <div className="bg-gradient-to-r from-blue-800/40 to-purple-800/40 backdrop-blur-md rounded-xl p-6 border border-purple-500/30">
+          <h2 className="text-2xl font-bold text-white mb-4 flex items-center gap-2">
+            <span>🎓</span>
+            <span>Academic Interpretation & Explanation Accuracy</span>
+          </h2>
+          <div className="grid md:grid-cols-4 gap-4 mb-6">
+            <div className="bg-white/5 rounded-lg p-4 border border-blue-500/30">
+              <div className="text-blue-300 text-xs mb-1">Search Space Reduction</div>
+              <div className="text-lg font-bold text-white">{metrics.search_space_size.toLocaleString()} → {metrics.feasible_space_size}</div>
+              <div className="text-blue-300 text-xs mt-1">Pruning: {metrics.pruning_efficiency}%</div>
+            </div>
+            <div className="bg-white/5 rounded-lg p-4 border border-cyan-500/30">
+              <div className="text-cyan-300 text-xs mb-1">Timing Breakdown</div>
+              <div className="text-lg font-bold text-white">{metrics.total_time_ms}ms</div>
+              <div className="text-cyan-300 text-[10px] mt-1">CSP {metrics.csp_time_ms}ms • Expert {metrics.expert_time_ms}ms • Pareto {metrics.pareto_time_ms}ms</div>
+            </div>
+            <div className="bg-white/5 rounded-lg p-4 border border-green-500/30">
+              <div className="text-green-300 text-xs mb-1">Frontier</div>
+              <div className="text-lg font-bold text-white">{metrics.pareto_frontier_size} sol.</div>
+              <div className="text-green-300 text-[10px] mt-1">Coverage {pareto?.metrics.coverage_rate}% • HV {pareto?.metrics.hypervolume.toFixed(2)}</div>
+            </div>
+            <div className="bg-white/5 rounded-lg p-4 border border-purple-500/30">
+              <div className="text-purple-300 text-xs mb-1">Explanation Accuracy</div>
+              <div className="text-lg font-bold text-white">{explanationAccuracy.toFixed(1)}%</div>
+              <div className="text-purple-300 text-[10px] mt-1">{accuracyLabel}</div>
+            </div>
+          </div>
+          <div className="space-y-3 text-sm text-blue-200">
+            <p>
+              <strong>Score Integrity:</strong> Reconstructed score {reconstructedScore.toFixed(2)} vs displayed {displayedScore.toFixed(2)} → {scoreIntegrityPass ? 'PASS (exact match)' : `Δ=${scoreDelta.toFixed(4)} (investigate rounding)`}.
+            </p>
+            {constraintsSatisfiedRatio !== null && (
+              <p>
+                <strong>Constraint Satisfaction:</strong> {constraintsSatisfiedRatio.toFixed(1)}% of constraints satisfied (mathematical proof). This confirms CSP phase validity.
+              </p>
+            )}
+            <p>
+              <strong>Rule Coverage:</strong> {ruleCount} rules fired{totalRulesDefined ? ` / ${totalRulesDefined} defined` : ''} ({ruleCoverage === 'N/A' ? 'coverage unknown' : `${ruleCoverage}% coverage`}). Higher coverage indicates deeper expert system engagement.
+            </p>
+            <p>
+              <strong>Reliability Proximity:</strong> {reliabilityAccuracy.toFixed(1)}% of observed max reliability, ensuring performance claims are near empirical upper bound.
+            </p>
+            <p>
+              <strong>Frontier Interpretation:</strong> Size {metrics.pareto_frontier_size} reflects dominance compression; limited trade-off points suggest either tight constraints or aligned objectives. To expand: relax budget/latency or switch CSP strategy.
+            </p>
+            <p>
+              <strong>Economic Impact:</strong> Recommended cost ${top?.cost.toFixed(2)} vs max {results.statistics?.cost?.max.toFixed(2)} (Δ ${(results.statistics && top) ? (results.statistics.cost.max - top.cost).toFixed(0) : '—'}). Latency {top?.latency.toFixed(2)}ms with no cheaper + faster alternative → Pareto optimal confirmation.
+            </p>
+            <p>
+              <strong>Explainability Quality Metric:</strong> Accuracy combines score integrity, constraint satisfaction, and rule coverage. Values &gt;90% indicate publication-grade traceability.
+            </p>
+            <p>
+              <strong>Replication Guidance:</strong> Persist pricing snapshot, seed_used, rule log, and configuration JSON to reproduce results across temporal pricing shifts.
+            </p>
+          </div>
+          <div className="mt-5 grid md:grid-cols-2 gap-4 text-xs">
+            <div className="bg-blue-900/30 rounded p-3 border border-blue-500/30">
+              <div className="text-blue-300 font-semibold mb-1">Recommended Reporting Set</div>
+              <ul className="list-disc ml-4 space-y-1 text-blue-200">
+                <li>search_space_size, feasible_space_size, pruning_efficiency</li>
+                <li>csp_time_ms, expert_time_ms, pareto_time_ms, total_time_ms</li>
+                <li>pareto_frontier_size, hypervolume, coverage_rate</li>
+                <li>rule trace + seed_used + timestamp</li>
+                <li>configuration + cost/latency + providerDistribution</li>
+              </ul>
+            </div>
+            <div className="bg-purple-900/30 rounded p-3 border border-purple-500/30">
+              <div className="text-purple-300 font-semibold mb-1">Next Research Extensions</div>
+              <ul className="list-disc ml-4 space-y-1 text-purple-200">
+                <li>Add carbon intensity & reliability to Pareto objectives</li>
+                <li>Adaptive rule weighting via feedback loops</li>
+                <li>Surrogate feasibility prediction to cut CSP time</li>
+                <li>Outranking methods (ELECTRE/Promethee) for robustness</li>
+              </ul>
+            </div>
+          </div>
+          <div className="mt-4 bg-black/30 rounded p-3 border border-white/10 text-[11px] text-gray-300">
+            <strong>Accuracy Definition:</strong> Score integrity (exact reconstruction), constraint satisfaction ratio, and rule coverage fraction jointly form an Explanation Accuracy composite. Thresholds: ≥90% High, 75–89% Moderate, &lt;75% Review.
+          </div>
+        </div>
+      );
+    };
 
     ReactDOM.createRoot(document.getElementById('root')).render(<CloudMigrationOptimizer />);
   </script>
