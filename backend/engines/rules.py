@@ -301,6 +301,8 @@ def evaluate_solutions(solutions: List[Solution], preferences: Preferences) -> L
         engine.reset()
         engine.declare(fact)
         engine.run()
+        # Preserve raw score for explanation accuracy, cap displayed score
+        sol.raw_score = engine.final_score
         sol.score = max(0, min(150, engine.final_score))
         sol.evaluationLog = engine.evaluation_log
         ranked.append(sol)

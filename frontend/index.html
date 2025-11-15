@@ -1926,8 +1926,10 @@
       if (top?.evaluationLog) {
         reconstructedScore = 100 + top.evaluationLog.reduce((sum, r) => sum + (r.impact || 0), 0);
       }
-      const displayedScore = top?.score || reconstructedScore;
-      const scoreDelta = Math.abs(displayedScore - reconstructedScore);
+      // Use raw_score if available (uncapped), otherwise use displayed score
+      const rawScore = top?.raw_score !== undefined ? top.raw_score : top?.score;
+      const displayedScore = top?.score || rawScore;
+      const scoreDelta = Math.abs(rawScore - reconstructedScore);
       const scoreIntegrityPass = scoreDelta < 1e-6; // backend may store float exactly
       // Constraint proof accuracy (if explainability present)
       let constraintsSatisfiedRatio = null;
@@ -1980,7 +1982,7 @@
           </div>
           <div className="space-y-3 text-sm text-blue-200">
             <p>
-              <strong>Score Integrity:</strong> Reconstructed score {reconstructedScore.toFixed(2)} vs displayed {displayedScore.toFixed(2)} → {scoreIntegrityPass ? 'PASS (exact match)' : `Δ=${scoreDelta.toFixed(4)} (investigate rounding)`}.
+              <strong>Score Integrity:</strong> Reconstructed score {reconstructedScore.toFixed(2)} vs raw {rawScore.toFixed(2)} → {scoreIntegrityPass ? 'PASS (exact match)' : `Δ=${scoreDelta.toFixed(4)} (check evaluation log)`}. {rawScore !== displayedScore && `Note: Displayed score ${displayedScore.toFixed(2)} is capped at 150 for normalization.`}
             </p>
             {constraintsSatisfiedRatio !== null && (
               <p>

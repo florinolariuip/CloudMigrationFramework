@@ -84,8 +84,10 @@
       if (Array.isArray(top.evaluationLog)) {
         reconstructedScore = 100 + top.evaluationLog.reduce((s,r)=> s + (r.impact||0), 0);
       }
+      // Use raw_score if available (uncapped), otherwise use displayed score
+      const rawScore = top.raw_score !== undefined ? top.raw_score : top.score;
       const displayedScore = typeof top.score === 'number' ? top.score : reconstructedScore;
-      const scoreDelta = Math.abs(displayedScore - reconstructedScore);
+      const scoreDelta = Math.abs(rawScore - reconstructedScore);
       const scoreIntegrityPass = scoreDelta < 1e-6;
       let constraintsRatio = null;
       const proof = raw.explainability && raw.explainability.constraintProof;
