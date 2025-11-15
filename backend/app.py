@@ -56,6 +56,30 @@ from backend.engines.sankey import (
 app = Flask(__name__, static_folder="../frontend", static_url_path="")
 CORS(app)
 
+# Lightweight internal version identifier (update on meaningful backend changes)
+APP_VERSION = "2025-11-15-seed-diagnostics-1"
+
+@app.get("/api/version")
+def version():
+    """Return backend version and feature flags for deployment verification.
+    This helps confirm the running slug actually contains recent seed logic.
+    """
+    # Detect presence of seed support by inspecting optimize function code text
+    import inspect
+    optimize_src = inspect.getsource(optimize)
+    has_seed_support = "seed_used" in optimize_src and "deterministic seed" in optimize_src
+    return jsonify({
+        "version": APP_VERSION,
+        "heroku_release": os.environ.get("HEROKU_RELEASE_VERSION"),
+        "python_version": os.environ.get("PYTHON_VERSION"),
+        "has_seed_support": has_seed_support,
+        "features": {
+            "seed": has_seed_support,
+            "pareto": True,
+            "explainability": True
+        }
+    })
+
 @app.route('/')
 def serve_index():
     return app.send_static_file('index.html')
