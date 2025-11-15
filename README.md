@@ -56,6 +56,16 @@ python -m http.server 8080
 
 ## 📊 Features
 
+### ✨ What’s New (Nov 2025)
+
+- Deterministic runs via optional seed on /api/optimize (reports metrics.seed_used)
+- New /api/version endpoint exposes version and feature flags
+- Added instrumentation: feasible_pre_dedup, feasible_post_dedup, duplicates_removed, timing breakdowns
+- Deterministic ordering of feasible solutions (stable sorting) for reproducible tables
+- Dynamic AcademicSummary card on the main dashboard (explanation accuracy)
+- New academic_tests.html page to batch experiments and aggregate explanation accuracy; CSV/JSON export
+- Normalized scoring page polish: fixed-decimal formatting for cost/latency
+
 ### ✨ Version 3 Highlights
 
 - **🔢 Default Budget**: Set to **$5000** (configurable)
@@ -116,7 +126,7 @@ python -m http.server 8080
 - **TailwindCSS** (CDN)
 - **Plotly.js** (for Sankey diagrams)
 - **Lucide Icons**
-- **Single-page app**: `index.html`
+- **Apps**: `index.html` (main), `index_normalized.html` (normalized view), `academic_tests.html` (batch experiments)
 - **Markdown Viewer**: `docs.html`
 
 ---
@@ -126,14 +136,11 @@ python -m http.server 8080
 ### Available Documents
 
 #### Core System Documentation
-1. **[EXPLANATION.md](./backend/EXPLANATION.md)** - Complete system overview and usage guide
-2. **[SCALABILITY_IMPLEMENTATION.md](./backend/SCALABILITY_IMPLEMENTATION.md)** - Detailed scalability analysis (15 components, 21M+ combinations)
+1. **[backend/EXPLANATION.md](./backend/EXPLANATION.md)** — System overview, API and pipeline
+2. **[backend/SCALABILITY_IMPLEMENTATION.md](./backend/SCALABILITY_IMPLEMENTATION.md)** — Scalability analysis (15 components, 21M+ combinations)
+3. **[frontend/EXPLANATION.md](./frontend/EXPLANATION.md)** — Frontend usage, Academic tab, experiments
 
-#### Advanced Features & Research
-3. **[NORMALIZED_MCDA.md](./backend/NORMALIZED_MCDA.md)** - Normalized MCDA interface with 6-metric framework, min-max normalization, and weighted sum model
-4. **[MEASUREMENT_PLAN.md](./backend/MEASUREMENT_PLAN.md)** - Comprehensive measurement methodology, research questions, and 8-week data collection plan
-5. **[DEMO_FLOW.md](./backend/DEMO_FLOW.md)** - Step-by-step presentation guide with 3 scenarios and 20-minute demo script
-6. **[JOURNAL_ARTICLE_GUIDE.md](./backend/JOURNAL_ARTICLE_GUIDE.md)** - Complete journal article preparation roadmap with 3-week timeline and target journals
+Note: Some previously referenced research docs are planned but not yet included in this repository.
 
 ### Access Documentation
 
@@ -143,12 +150,9 @@ python -m http.server 8080
 - View rendered markdown with syntax highlighting
 
 **Or directly:**
-- Navigate to `http://localhost:8080/docs.html?doc=../backend/EXPLANATION.md`
-- Navigate to `http://localhost:8080/docs.html?doc=../backend/SCALABILITY_IMPLEMENTATION.md`
-- Navigate to `http://localhost:8080/docs.html?doc=../backend/NORMALIZED_MCDA.md`
-- Navigate to `http://localhost:8080/docs.html?doc=../backend/MEASUREMENT_PLAN.md`
-- Navigate to `http://localhost:8080/docs.html?doc=../backend/DEMO_FLOW.md`
-- Navigate to `http://localhost:8080/docs.html?doc=../backend/JOURNAL_ARTICLE_GUIDE.md`
+- `http://localhost:8080/docs.html?doc=../backend/EXPLANATION.md`
+- `http://localhost:8080/docs.html?doc=../backend/SCALABILITY_IMPLEMENTATION.md`
+- `http://localhost:8080/docs.html?doc=../frontend/EXPLANATION.md`
 
 ---
 
@@ -169,10 +173,12 @@ This system demonstrates:
 The system provides extensive metrics for research:
 
 - **Search Space**: Total combinations, feasible solutions, pruning efficiency
+- **Feasible Breakdown**: feasible_pre_dedup, feasible_post_dedup, duplicates_removed
 - **Performance**: CSP time, Expert time, Pareto time, total execution time
 - **Solution Quality**: Cost, latency, provider diversity, constraint satisfaction
 - **Comparison Data**: CSP+Expert vs. 5 baselines across multiple dimensions
 - **Run Logs**: All optimization runs logged for empirical validation
+- **Explanation Accuracy**: Composite metric derived from score integrity, constraint proofs ratio, and rule coverage
 
 ### Configuration
 
@@ -241,7 +247,7 @@ All parameters are configurable for experimentation:
 ### Project Structure
 
 ```
-journalimplementationver2 2/
+journalimplementationver2 3/
 ├── backend/
 │   ├── app.py                     # Flask API server
 │   ├── config.py                  # Configuration & defaults
@@ -259,9 +265,12 @@ journalimplementationver2 2/
 │   └── services/
 │       └── pricing.py            # Cloud pricing integration
 └── frontend/
-    ├── index.html                # Main React app
+    ├── index.html                # Main React app (AcademicSummary)
+    ├── index_normalized.html     # Normalized scoring view
+    ├── academic_tests.html       # Batch experiments & accuracy aggregation
     ├── docs.html                 # Markdown viewer
     ├── start.sh                  # Startup script
+    └── stop.sh                   # Stop helper for local dev
     └── EXPLANATION.md            # Frontend documentation
 ```
 
@@ -294,6 +303,7 @@ journalimplementationver2 2/
 ### Scalability Metrics
 
 - **Pruning Efficiency**: ~99.9% (from 21M to ~4-10 feasible solutions)
+- **Duplicates Removed**: Number of duplicate feasible solutions eliminated before ranking
 - **Memory**: <100MB for full search space
 - **Pareto Frontier**: <10ms for 100s of feasible solutions
 - **Explainability**: <5ms per solution
@@ -345,6 +355,8 @@ curl -s https://migration-framework-c77589bc07d3.herokuapp.com/api/version | jq
 
 Expected keys: `version`, `has_seed_support: true`, feature flags.
 
+Note: Heroku is deprecating runtime.txt; pin Python via .python-version or the Python buildpack when possible. Current deployments still accept runtime.txt but may warn.
+
 ### Deterministic Seed Test
 
 Run two identical requests with a seed; metrics should match (feasible counts, Pareto size):
@@ -378,7 +390,6 @@ heroku rollback v123 -a migration-framework-c77589bc07d3
 
 ---
 
----
 
 ## 🔄 Version History
 
@@ -389,6 +400,7 @@ heroku rollback v123 -a migration-framework-c77589bc07d3
 - ✨ Multi-provider pricing display
 - ✨ Automatic port cleanup
 - ✨ Enhanced documentation viewer
+- ✨ Deterministic seeding, /api/version, explanation accuracy metrics
 
 ### v2
 - Added Pareto frontier optimization
@@ -412,3 +424,25 @@ For technical issues:
 4. Check browser console for frontend errors
 
 For research questions, refer to the academic papers and documentation.
+ 
+---
+
+## 🔌 API Summary
+
+- POST `/api/optimize`
+    - Body: `{ constraints: {...}, preferences: {...}, seed?: number }`
+    - Returns: results, paretoFrontier, explainability, and `metrics` including `search_space_size`, `feasible_pre_dedup`, `feasible_post_dedup`, `duplicates_removed`, `pareto_frontier_size`, timings, and `seed_used`.
+
+- GET `/api/version`
+    - Returns: `{ version: string, has_seed_support: boolean, features: { explainability: boolean, pareto: boolean, seed: boolean } }`
+
+## 🧪 Academic Tests & Explanation Accuracy
+
+- Open `http://localhost:8080/academic_tests.html`
+- Configure experiment sizes and repeats, then run; per-run panels show `ExplAcc: % (Label)`
+- Summary table includes “Expl Accuracy (μ)”; an aggregated card reports mean±std and label counts
+- Export CSV/JSON includes explanation accuracy fields (`ExplAccMean`, `ExplAccStd`)
+
+Explanation Accuracy (frontend-computed):
+- Components: score integrity (reconstructed vs shown), constraints ratio (from constraintProof), rule coverage (when available)
+- Composite: average of available components → percent; labels: High (≥90%), Moderate (75–89%), Needs Review (<75%)

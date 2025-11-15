@@ -8,6 +8,14 @@ This document describes the implementation of **Priority 4: Extend to 15 Compone
 
 ---
 
+## Reproducibility & Explanation Accuracy (Nov 2025)
+
+- Backend supports optional seeding for deterministic runs (`seed` field on `/api/optimize`); metrics include `seed_used`.
+- Use `/api/version` to verify deployed features and seed support.
+- Experiments (see `academic_tests.html`) now aggregate explanation accuracy (composite of score integrity, constraints ratio, rule coverage) with mean±std and label counts.
+
+---
+
 ## 1. Motivation
 
 ### Research Question
@@ -622,6 +630,10 @@ def benchmark_scalability():
 | 5 | 138.8 ± 34.2 | 7.0 ± 1.4 | 24 | 494.74 | 16.57 | 29.5% |
 | 10 | 59.6 ± 7.2 | 3.3 ± 0.5 | 8 | 1147.33 | 20.17 | 43.5% |
 | 15 | 64.3 ± 20.5 | 1.7 ± 0.5 | 5 | 1590.17 | 0.00 | 36.7% |
+
+### Explanation Accuracy (μ)
+
+Each experiment run now computes explanation accuracy (see frontend/academic_tests.html): composite of score integrity, constraints ratio, and rule coverage. Aggregated mean±std and label counts are shown in summary tables and exports.
 
 ### Interpretation
 

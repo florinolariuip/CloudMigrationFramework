@@ -21,6 +21,17 @@ The optimizer uses a Constraint Satisfaction Problem (CSP) engine to generate an
 All these settings are available in the Academic tab and can be tuned for your scenario or research needs.
 
 # Cloud Migration Optimizer: Complete Usage & Configuration Guide
+---
+
+## AcademicSummary (Results Dashboard)
+
+On the main dashboard (`index.html`), the AcademicSummary card presents a compact research view for each run:
+- Reconstructed vs displayed score integrity check (from `evaluationLog`)
+- Constraint satisfaction proof summary (from `constraintProof`)
+- Rule coverage when a `ruleSet` is present
+- Composite Explanation Accuracy with label: High (≥90%), Moderate (75–89%), Needs Review (<75%)
+
+This card helps validate that the displayed score and explanations are consistent and complete.
 
 ## What Can You Configure?
 
@@ -66,6 +77,18 @@ All these settings are available in the Academic tab and can be tuned for your s
 6. **Review Diagnostics:** Use the troubleshooting card and source diagnostics to understand why solutions may be filtered out.
 7. **Export Results:** Download results and run logs for further analysis or reporting.
 8. **Iterate:** Adjust constraints, rules, or strategy and rerun to explore alternatives.
+---
+
+## Academic Tests (Batch Experiments)
+
+Open `academic_tests.html` to run repeated experiments across component sizes. Features:
+- Configure sizes and repeats; optional fixed seed for reproducibility
+- Per‑run panels show Pareto, feasible counts, timings, and `ExplAcc: % (Label)`
+- Summary table includes an “Expl Accuracy (μ)” column
+- Aggregated Explanation Accuracy card shows Mean±Std and counts by label
+- Export CSV/JSON includes explanation accuracy fields (`ExplAccMean`, `ExplAccStd`)
+
+Explanation Accuracy is computed on the client using score integrity, constraints ratio, and rule coverage when available, then averaged (available components only).
 
 ---
 
@@ -122,6 +145,17 @@ If you see "Feasible Solutions: 0" in the results, it means that none of the gen
 - Review service dependencies and ensure all required services are available.
 
 If you need deeper analysis, check the actual pricing data and constraints being used, or contact the system maintainer for support.
+---
+
+## Normalized View (index_normalized.html)
+
+Use the normalized scoring page for min‑max normalized metrics and weighted sums. Recent update: cost and latency are formatted with fixed decimals to avoid floating‑point artifacts in the UI.
+
+---
+
+## Reproducibility
+
+The backend supports an optional `seed` on `/api/optimize` for deterministic runs. The UI surfaces `seed_used` in metrics when provided. For experiments, repeat runs with the same seed to confirm stable feasible counts and Pareto sizes. Verify deploy state with GET `/api/version`.
 
 ---
 For further details, see code comments in each backend and frontend file.

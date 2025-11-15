@@ -23,6 +23,12 @@ This project implements a hybrid optimization pipeline for cloud migration plann
 - **Enhanced Documentation**: Comprehensive README and markdown viewer
 - **Auto Port Cleanup**: Startup script automatically cleans ports 5055 and 8080
 
+### Reproducibility & Instrumentation (Nov 2025)
+- Optional seeding for reproducible enumeration and Pareto results (`seed` field on `/api/optimize`)
+- Deterministic sorting of feasible solutions to stabilize ordering across runs
+- New metrics surfaced in responses: `feasible_pre_dedup`, `feasible_post_dedup`, `duplicates_removed`, `pareto_frontier_size`, `seed_used`, detailed timings
+- New `/api/version` endpoint to verify deployed features and version
+
 ### Scalability
 - **15 Components**: Extended from 6 to 15 components for enterprise-scale scenarios
 - **21+ Million Combinations**: Handles 21,257,640 possible configurations efficiently
@@ -60,6 +66,23 @@ When provided, Python's `random` and NumPy's RNG are both seeded, making:
 - Any random sampling strategy (e.g., `random_sample`) reproducible
 
 Returned metrics now include `seed_used` (null if no seed). Omit `seed` for natural stochastic variability during exploratory runs.
+
+Additionally, feasible solutions are sorted deterministically post‑dedup so that tables and top selections have stable order when inputs are identical.
+
+### Version Endpoint
+
+- GET `/api/version`
+- Returns deployment diagnostics:
+
+```json
+{
+  "version": "2025-11-15-seed-diagnostics-1",
+  "has_seed_support": true,
+  "features": { "explainability": true, "pareto": true, "seed": true }
+}
+```
+
+Use this to ensure the running environment supports seeding and matches the expected build.
 
 ## Key Concepts & Numbers
 
@@ -114,6 +137,14 @@ Returned metrics now include `seed_used` (null if no seed). Omit `seed` for natu
   - Expert phase: How solutions were scored and ranked
   - Pareto phase: How frontier was calculated
   - Final selection: Why the top solution was chosen
+
+#### Explanation Accuracy (frontend‑computed)
+For academic reporting, the frontend computes an explanation accuracy score per run using:
+- Score integrity: reconstructed score from `evaluationLog` vs displayed score
+- Constraints ratio: proportion of satisfied constraints from `constraintProof`
+- Rule coverage: fraction of rule categories present when a `ruleSet` is available
+
+Composite accuracy = average of available components → percentage. Labels: High (≥90%), Moderate (75–89%), Needs Review (<75%). Aggregated stats and label counts are shown in `academic_tests.html` and included in CSV/JSON exports.
 
 ### 6. Baseline Comparisons
 The system compares CSP+Expert against 5 baseline algorithms:
@@ -190,6 +221,8 @@ The system compares CSP+Expert against 5 baseline algorithms:
 7. **Compare with baselines**: Click "Compare with Baselines" to run all 6 algorithms
 
 8. **Export results**: Download results as JSON for further analysis
+
+9. **Run experiments (academic tests)**: Open `frontend/academic_tests.html` to execute multiple runs across component sizes and repeats. The page aggregates timing, Pareto size, feasible counts, and explanation accuracy, and supports CSV/JSON export. For reproducibility tests, run multiple repeats with a fixed `seed`.
 
 ## Sankey Diagram Interpretation
 
