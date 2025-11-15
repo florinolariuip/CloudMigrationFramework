@@ -40,7 +40,17 @@
       }
     }
     const { useState, useEffect } = React;
-  const API_BASE = (window.API_BASE || 'https://migration-framework-c77589bc07d3.herokuapp.com');
+  // Dynamic API base resolution with localStorage override (align with main dashboard)
+  function resolveApiBase() {
+    const heroku = 'https://migration-framework-c77589bc07d3.herokuapp.com';
+    const explicit = window.API_BASE || localStorage.getItem('API_BASE');
+    if (explicit) return explicit.replace(/\/$/, '');
+    const isLocal = ['localhost','127.0.0.1'].includes(window.location.hostname);
+    return isLocal ? 'http://127.0.0.1:5055' : heroku;
+  }
+  const API_BASE = resolveApiBase();
+  window.setApiBase = (url) => { localStorage.setItem('API_BASE', url); window.location.reload(); };
+  window.clearApiBase = () => { localStorage.removeItem('API_BASE'); window.location.reload(); };
 
     function Header() {
       return (
@@ -253,13 +263,45 @@
         for (let r = 0; r < repeatCount; r++) {
           const constraints = { maxBudget, maxLatency, maxProviders, selected_components: selected };
           const t0 = performance.now();
-          const res = await fetch(`${API_BASE}/api/optimize`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ constraints, preferences: { prioritizeCost, prioritizePerformance } })
-          });
-          const t1 = performance.now();
-          const data = await res.json();
+          let data = null;
+          let t1 = null;
+          try {
+            const res = await fetch(`${API_BASE}/api/optimize`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ constraints, preferences: { prioritizeCost, prioritizePerformance } })
+            });
+            t1 = performance.now();
+            const contentType = res.headers.get('content-type') || '';
+            if (!res.ok) {
+              const text = await res.text();
+              throw new Error(`HTTP ${res.status} for N=${N} run=${r+1}: ${text.slice(0,200)}`);
+            }
+            if (!/application\/json/.test(contentType)) {
+              const text = await res.text();
+              throw new Error(`Non-JSON response for N=${N} run=${r+1}: ${text.slice(0,200)}`);
+            }
+            try {
+              data = await res.json();
+            } catch (parseErr) {
+              const text = await res.text();
+              throw new Error(`JSON parse error for N=${N} run=${r+1}: ${parseErr.message}; snippet: ${text.slice(0,120)}`);
+            }
+          } catch (err) {
+            console.error('Run failed (will record error entry):', err);
+            runResults.push({
+              time_ms: performance.now() - t0,
+              error: err.message,
+              pareto_frontier_size: 0,
+              feasible_space_size: null,
+              hypervolume: null,
+              spacing: null,
+              coverage_rate: null,
+              raw: { error: err.message }
+            });
+            continue; // proceed to next repeat
+          }
+
 
           // Normalize metrics based on backend schema
           const m = data.metrics || {};
@@ -386,7 +428,7 @@
               <button onClick={runAll} disabled={running || !serviceData} className="px-4 py-2 bg-blue-600 rounded disabled:opacity-50">{running ? 'Running…' : 'Run All'}</button>
               <button onClick={()=>setResults([])} className="px-4 py-2 bg-white/10 rounded">Clear</button>
             </div>
-            <div className="text-xs text-yellow-300 mt-3">Note: ensure backend is running (API {API_BASE}). Uses first N components from catalog.</div>
+            <div className="text-xs text-yellow-300 mt-3">Note: ensure backend is running (API {API_BASE}). Uses first N components from catalog. Override API via <code>setApiBase('https://…')</code> in console if needed.</div>
           </div>
 
           <div className="bg-white/10 rounded-xl p-6 border border-cyan-500/20 mb-6">
