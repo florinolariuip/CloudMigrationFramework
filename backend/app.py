@@ -1156,6 +1156,7 @@ def compare_cmov4_baselines():
         import time
         import sys
         import os
+        import random
         
         # Add backend to path if needed
         backend_dir = os.path.dirname(os.path.abspath(__file__))
@@ -1172,8 +1173,9 @@ def compare_cmov4_baselines():
             calculate_config_latency
         )
         from engines.pareto import calculate_pareto_frontier
-        from models import Constraints
-        from services.pricing import COMPONENTS
+        from models import Constraints, Solution
+        from services.pricing import COMPONENTS, get_service_options, get_service_costs, get_service_latency
+        import itertools
         
         data = request.json
         if not data:
@@ -1181,7 +1183,7 @@ def compare_cmov4_baselines():
         
         # Extract scenario parameters
         scenario = data.get('scenario', {})
-        components = scenario.get('components', list(COMPONENTS.keys()))
+        components = scenario.get('components', list(COMPONENTS.keys())[:5])  # Default to first 5
         max_budget = float(scenario.get('maxBudget', 5000))
         max_latency = float(scenario.get('maxLatency', 200))
         max_providers = int(scenario.get('maxProviders', 3))
@@ -1195,13 +1197,57 @@ def compare_cmov4_baselines():
         
         print(f"[CMOv4 Baseline Comparison] Components: {len(components)}, Budget: ${max_budget}, Latency: {max_latency}ms, Max Providers: {max_providers}")
         
-        # Run CMOv4 Pareto optimization
+        # Run CMOv4 Pareto optimization (sample-based approach)
         start_time = time.time()
         try:
-            pareto_solutions = calculate_pareto_frontier(
-                components=components,
-                constraints=constraints
-            )
+            # Generate diverse solutions using multiple strategies
+            all_solutions = []
+            options = get_service_options()
+            costs = get_service_costs()
+            latencies = get_service_latency()
+            
+            # Helper to create solution from config
+            def make_solution(config):
+                cost = sum(costs.get(service, 0) for service in config.values())
+                latency = sum(latencies.get(service, 0) for service in config.values()) / len(config)
+                providers_count = len(set(config.values()))
+                
+                # Check constraints
+                if cost <= max_budget and latency <= max_latency and providers_count <= max_providers:
+                    return Solution(
+                        configuration=config,
+                        cost=cost,
+                        latency=latency,
+                        providers=providers_count,
+                        score=100  # Default score
+                    )
+                return None
+            
+            # Strategy 1: Greedy variations (cost-focused, latency-focused, balanced)
+            for _ in range(50):
+                config = {}
+                for comp in components:
+                    if comp in options and options[comp]:
+                        # Mix of cost and latency preferences
+                        services = options[comp]
+                        weights = [1.0 / (costs.get(s, 1000) + latencies.get(s, 100)) for s in services]
+                        total = sum(weights)
+                        weights = [w/total for w in weights]
+                        config[comp] = random.choices(services, weights=weights)[0]
+                
+                sol = make_solution(config)
+                if sol:
+                    all_solutions.append(sol)
+            
+            # Strategy 2: Random sampling
+            for _ in range(50):
+                config = {comp: random.choice(options.get(comp, ['AWS-EC2'])) for comp in components}
+                sol = make_solution(config)
+                if sol:
+                    all_solutions.append(sol)
+            
+            # Calculate Pareto frontier from generated solutions
+            pareto_solutions = calculate_pareto_frontier(all_solutions, objectives=['cost', 'latency'])
             cmov4_time_ms = (time.time() - start_time) * 1000
             
             # Get best solution (lowest cost from Pareto frontier)
