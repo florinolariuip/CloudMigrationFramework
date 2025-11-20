@@ -31,7 +31,10 @@
       { name: "15 Components", key: 2, description: "Event-driven, Vue, Go, SQL Server, Redis, Datadog, Kafka, Blob, HAProxy, Restic, Keycloak, Cloudflare, Mixpanel, AWS KMS, Docker, Lambda" }
     ];
 
-    const API_BASE = 'http://localhost:5055';
+    // Dynamic API base URL - works locally and on Heroku
+    const API_BASE = (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')
+      ? 'http://localhost:5055'
+      : '';
 
     function App() {
       const [mode, setMode] = useState('preset');
