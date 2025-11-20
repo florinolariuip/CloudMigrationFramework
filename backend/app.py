@@ -1146,6 +1146,237 @@ def generate_academic_benchmark_report():
             'details': error_details
         }), 500
 
+@app.route('/api/cmov4/compare-baselines', methods=['POST'])
+def compare_cmov4_baselines():
+    """
+    Compare CMOv4 Pareto optimization against 5 baseline algorithms.
+    Enhanced for multi-objective comparison showing Pareto frontier advantages.
+    """
+    try:
+        import time
+        import sys
+        import os
+        
+        # Add backend to path if needed
+        backend_dir = os.path.dirname(os.path.abspath(__file__))
+        if backend_dir not in sys.path:
+            sys.path.insert(0, backend_dir)
+        
+        from engines.baselines import (
+            run_random_selection,
+            run_greedy_cost,
+            run_greedy_latency,
+            run_genetic_algorithm,
+            run_weighted_sum,
+            calculate_config_cost,
+            calculate_config_latency
+        )
+        from engines.pareto import calculate_pareto_frontier
+        from models import Constraints
+        from services.pricing import COMPONENTS
+        
+        data = request.json
+        if not data:
+            return jsonify({'error': 'Missing request data'}), 400
+        
+        # Extract scenario parameters
+        scenario = data.get('scenario', {})
+        components = scenario.get('components', list(COMPONENTS.keys()))
+        max_budget = float(scenario.get('maxBudget', 5000))
+        max_latency = float(scenario.get('maxLatency', 200))
+        max_providers = int(scenario.get('maxProviders', 3))
+        
+        # Create constraints
+        constraints = Constraints(
+            max_budget=max_budget,
+            max_latency=max_latency,
+            max_providers=max_providers
+        )
+        
+        print(f"[CMOv4 Baseline Comparison] Components: {len(components)}, Budget: ${max_budget}, Latency: {max_latency}ms, Max Providers: {max_providers}")
+        
+        # Run CMOv4 Pareto optimization
+        start_time = time.time()
+        try:
+            pareto_solutions = calculate_pareto_frontier(
+                components=components,
+                constraints=constraints
+            )
+            cmov4_time_ms = (time.time() - start_time) * 1000
+            
+            # Get best solution (lowest cost from Pareto frontier)
+            if pareto_solutions:
+                best_pareto = min(pareto_solutions, key=lambda s: s.cost)
+                cmov4_success = True
+                cmov4_cost = best_pareto.cost
+                cmov4_latency = best_pareto.latency
+                cmov4_providers = len(set(best_pareto.configuration.values()))
+            else:
+                cmov4_success = False
+                cmov4_cost = 0
+                cmov4_latency = 0
+                cmov4_providers = 0
+                best_pareto = None
+            
+            pareto_count = len(pareto_solutions)
+            
+        except Exception as e:
+            print(f"[ERROR] CMOv4 Pareto optimization failed: {str(e)}")
+            cmov4_success = False
+            cmov4_cost = 0
+            cmov4_latency = 0
+            cmov4_providers = 0
+            cmov4_time_ms = 0
+            pareto_count = 0
+            pareto_solutions = []
+            best_pareto = None
+        
+        # Run baseline algorithms
+        baselines = {}
+        
+        # 1. Random Selection
+        result = run_random_selection(components, constraints)
+        baselines['random'] = {
+            'success': result.success,
+            'cost': result.solution.cost if result.solution else 0,
+            'latency': result.solution.latency if result.solution else 0,
+            'providers': len(set(result.solution.configuration.values())) if result.solution else 0,
+            'execution_time_ms': result.execution_time_ms,
+            'reason': result.reason
+        }
+        
+        # 2. Greedy Cost
+        result = run_greedy_cost(components, constraints)
+        baselines['greedy_cost'] = {
+            'success': result.success,
+            'cost': result.solution.cost if result.solution else 0,
+            'latency': result.solution.latency if result.solution else 0,
+            'providers': len(set(result.solution.configuration.values())) if result.solution else 0,
+            'execution_time_ms': result.execution_time_ms,
+            'reason': result.reason
+        }
+        
+        # 3. Greedy Latency
+        result = run_greedy_latency(components, constraints)
+        baselines['greedy_latency'] = {
+            'success': result.success,
+            'cost': result.solution.cost if result.solution else 0,
+            'latency': result.solution.latency if result.solution else 0,
+            'providers': len(set(result.solution.configuration.values())) if result.solution else 0,
+            'execution_time_ms': result.execution_time_ms,
+            'reason': result.reason
+        }
+        
+        # 4. Genetic Algorithm
+        result = run_genetic_algorithm(components, constraints)
+        baselines['genetic_algorithm'] = {
+            'success': result.success,
+            'cost': result.solution.cost if result.solution else 0,
+            'latency': result.solution.latency if result.solution else 0,
+            'providers': len(set(result.solution.configuration.values())) if result.solution else 0,
+            'execution_time_ms': result.execution_time_ms,
+            'reason': result.reason
+        }
+        
+        # 5. Weighted Sum
+        result = run_weighted_sum(components, constraints)
+        baselines['weighted_sum'] = {
+            'success': result.success,
+            'cost': result.solution.cost if result.solution else 0,
+            'latency': result.solution.latency if result.solution else 0,
+            'providers': len(set(result.solution.configuration.values())) if result.solution else 0,
+            'execution_time_ms': result.execution_time_ms,
+            'reason': result.reason
+        }
+        
+        # Calculate comparison metrics
+        wins_per_baseline = {name: 0 for name in baselines.keys()}
+        total_wins = 0
+        
+        if cmov4_success:
+            for name, baseline in baselines.items():
+                if baseline['success']:
+                    # CMOv4 wins if it has lower cost AND lower latency
+                    if cmov4_cost <= baseline['cost'] and cmov4_latency <= baseline['latency']:
+                        total_wins += 1
+                    # Baseline wins if it dominates CMOv4
+                    elif baseline['cost'] < cmov4_cost and baseline['latency'] < cmov4_latency:
+                        wins_per_baseline[name] += 1
+        
+        # Calculate Pareto-specific metrics
+        pareto_metrics = {}
+        if pareto_solutions and len(pareto_solutions) > 1:
+            # Hypervolume indicator (simplified - area under Pareto curve)
+            sorted_pareto = sorted(pareto_solutions, key=lambda s: s.cost)
+            hypervolume = 0
+            for i in range(len(sorted_pareto) - 1):
+                width = sorted_pareto[i+1].cost - sorted_pareto[i].cost
+                height = sorted_pareto[i].latency
+                hypervolume += width * height
+            
+            # Solution diversity (cost and latency ranges)
+            costs = [s.cost for s in pareto_solutions]
+            latencies = [s.latency for s in pareto_solutions]
+            cost_diversity = max(costs) - min(costs)
+            latency_diversity = max(latencies) - min(latencies)
+            
+            pareto_metrics = {
+                'hypervolume': round(hypervolume, 2),
+                'cost_range': round(cost_diversity, 2),
+                'latency_range': round(latency_diversity, 2),
+                'avg_cost': round(sum(costs) / len(costs), 2),
+                'avg_latency': round(sum(latencies) / len(latencies), 2)
+            }
+        
+        # Prepare response
+        response = {
+            'cmov4_pareto': {
+                'success': cmov4_success,
+                'cost': round(cmov4_cost, 2) if cmov4_success else 0,
+                'latency': round(cmov4_latency, 2) if cmov4_success else 0,
+                'providers': cmov4_providers,
+                'execution_time_ms': round(cmov4_time_ms, 2),
+                'pareto_count': pareto_count,
+                'pareto_metrics': pareto_metrics,
+                'frontier': [
+                    {
+                        'cost': round(s.cost, 2),
+                        'latency': round(s.latency, 2),
+                        'providers': len(set(s.configuration.values()))
+                    }
+                    for s in pareto_solutions[:20]  # Limit to first 20 for performance
+                ] if pareto_solutions else []
+            },
+            'baselines': baselines,
+            'comparison': {
+                'total_wins': total_wins,
+                'wins_per_baseline': wins_per_baseline,
+                'baseline_success_rate': sum(1 for b in baselines.values() if b['success']) / len(baselines),
+                'cmov4_advantage': {
+                    'cost_vs_best_baseline': round(cmov4_cost - min([b['cost'] for b in baselines.values() if b['success']], default=cmov4_cost), 2) if cmov4_success else None,
+                    'latency_vs_best_baseline': round(cmov4_latency - min([b['latency'] for b in baselines.values() if b['success']], default=cmov4_latency), 2) if cmov4_success else None,
+                    'speed_multiplier': round(max([b['execution_time_ms'] for b in baselines.values()]) / cmov4_time_ms, 2) if cmov4_time_ms > 0 else None
+                }
+            },
+            'scenario': {
+                'components': len(components),
+                'max_budget': max_budget,
+                'max_latency': max_latency,
+                'max_providers': max_providers
+            }
+        }
+        
+        return jsonify(response)
+        
+    except Exception as e:
+        import traceback
+        error_details = traceback.format_exc()
+        print(f"[ERROR] CMOv4 Baseline Comparison failed: {error_details}", file=sys.stderr)
+        return jsonify({
+            'error': f'Baseline comparison failed: {str(e)}',
+            'details': error_details
+        }), 500
+
 if __name__ == "__main__":
     import os
     debug_mode = os.environ.get('FLASK_DEBUG', 'False') == 'True'
