@@ -338,13 +338,28 @@
         
         setLoadingBaselines(true);
         try {
-          // Prepare scenario parameters
+          // Extract actual components from the benchmark results
+          const actualComponents = results.topSolution.configuration 
+            ? Object.keys(results.topSolution.configuration) 
+            : (mode === 'custom' ? customComponents : ['web', 'compute', 'database', 'cache', 'monitoring']);
+          
+          console.log('Benchmark results:', results);
+          console.log('Extracted components:', actualComponents);
+          console.log('Max budget:', maxBudget, 'Max latency:', maxLatency);
+          console.log('Pareto frontier from benchmark:', results.paretoFrontier);
+          console.log('Pareto solutions array:', results.paretoFrontier?.solutions);
+          
+          // Prepare scenario parameters using actual benchmark constraints
           const scenario = {
-            components: mode === 'custom' ? customComponents : ['web', 'compute', 'database', 'cache', 'monitoring'],
+            components: actualComponents,
             maxBudget: Number(maxBudget) || 10000,
             maxLatency: Number(maxLatency) || 150,
-            maxProviders: 3
+            maxProviders: 3,
+            // Send the existing Pareto frontier solutions array from the benchmark
+            paretoFrontier: results.paretoFrontier?.solutions || []
           };
+          
+          console.log('Sending scenario to backend:', scenario);
 
           const res = await fetch(`${API_BASE}/api/cmov4/compare-baselines`, {
             method: 'POST',
