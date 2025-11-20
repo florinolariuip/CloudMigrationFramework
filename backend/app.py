@@ -1164,13 +1164,11 @@ def compare_cmov4_baselines():
             sys.path.insert(0, backend_dir)
         
         from engines.baselines import (
-            run_random_selection,
-            run_greedy_cost,
-            run_greedy_latency,
-            run_genetic_algorithm,
-            run_weighted_sum,
-            calculate_config_cost,
-            calculate_config_latency
+            baseline_random,
+            baseline_greedy_cost,
+            baseline_greedy_latency,
+            baseline_genetic_algorithm,
+            baseline_weighted_sum
         )
         from engines.pareto import calculate_pareto_frontier
         from models import Constraints, Solution
@@ -1190,9 +1188,9 @@ def compare_cmov4_baselines():
         
         # Create constraints
         constraints = Constraints(
-            max_budget=max_budget,
-            max_latency=max_latency,
-            max_providers=max_providers
+            maxBudget=max_budget,
+            maxLatency=max_latency,
+            maxProviders=max_providers
         )
         
         print(f"[CMOv4 Baseline Comparison] Components: {len(components)}, Budget: ${max_budget}, Latency: {max_latency}ms, Max Providers: {max_providers}")
@@ -1281,7 +1279,7 @@ def compare_cmov4_baselines():
         baselines = {}
         
         # 1. Random Selection
-        result = run_random_selection(components, constraints)
+        result = baseline_random(constraints)
         baselines['random'] = {
             'success': result.success,
             'cost': result.solution.cost if result.solution else 0,
@@ -1292,7 +1290,7 @@ def compare_cmov4_baselines():
         }
         
         # 2. Greedy Cost
-        result = run_greedy_cost(components, constraints)
+        result = baseline_greedy_cost(constraints)
         baselines['greedy_cost'] = {
             'success': result.success,
             'cost': result.solution.cost if result.solution else 0,
@@ -1303,7 +1301,7 @@ def compare_cmov4_baselines():
         }
         
         # 3. Greedy Latency
-        result = run_greedy_latency(components, constraints)
+        result = baseline_greedy_latency(constraints)
         baselines['greedy_latency'] = {
             'success': result.success,
             'cost': result.solution.cost if result.solution else 0,
@@ -1314,7 +1312,7 @@ def compare_cmov4_baselines():
         }
         
         # 4. Genetic Algorithm
-        result = run_genetic_algorithm(components, constraints)
+        result = baseline_genetic_algorithm(constraints)
         baselines['genetic_algorithm'] = {
             'success': result.success,
             'cost': result.solution.cost if result.solution else 0,
@@ -1325,7 +1323,7 @@ def compare_cmov4_baselines():
         }
         
         # 5. Weighted Sum
-        result = run_weighted_sum(components, constraints)
+        result = baseline_weighted_sum(constraints)
         baselines['weighted_sum'] = {
             'success': result.success,
             'cost': result.solution.cost if result.solution else 0,
