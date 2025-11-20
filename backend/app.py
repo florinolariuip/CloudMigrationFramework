@@ -1146,6 +1146,24 @@ def generate_academic_benchmark_report():
             'details': error_details
         }), 500
 
+def count_unique_providers(configuration):
+    """
+    Count unique cloud providers in a service configuration.
+    
+    Args:
+        configuration: Dictionary mapping components to services
+    
+    Returns:
+        Number of unique providers
+    """
+    if not configuration:
+        return 0
+    providers = {
+        service.split()[0] if ' ' in service else service.split('-')[0]
+        for service in configuration.values()
+    }
+    return len(providers)
+
 @app.route('/api/cmov4/compare-baselines', methods=['POST'])
 def compare_cmov4_baselines():
     """
@@ -1284,7 +1302,7 @@ def compare_cmov4_baselines():
             'success': result.success,
             'cost': result.solution.cost if result.solution else 0,
             'latency': result.solution.latency if result.solution else 0,
-            'providers': len(set(result.solution.configuration.values())) if result.solution else 0,
+            'providers': count_unique_providers(result.solution.configuration) if result.solution else 0,
             'execution_time_ms': result.execution_time_ms,
             'reason': result.reason
         }
@@ -1295,7 +1313,7 @@ def compare_cmov4_baselines():
             'success': result.success,
             'cost': result.solution.cost if result.solution else 0,
             'latency': result.solution.latency if result.solution else 0,
-            'providers': len(set(result.solution.configuration.values())) if result.solution else 0,
+            'providers': count_unique_providers(result.solution.configuration) if result.solution else 0,
             'execution_time_ms': result.execution_time_ms,
             'reason': result.reason
         }
@@ -1306,7 +1324,7 @@ def compare_cmov4_baselines():
             'success': result.success,
             'cost': result.solution.cost if result.solution else 0,
             'latency': result.solution.latency if result.solution else 0,
-            'providers': len(set(result.solution.configuration.values())) if result.solution else 0,
+            'providers': count_unique_providers(result.solution.configuration) if result.solution else 0,
             'execution_time_ms': result.execution_time_ms,
             'reason': result.reason
         }
@@ -1317,7 +1335,7 @@ def compare_cmov4_baselines():
             'success': result.success,
             'cost': result.solution.cost if result.solution else 0,
             'latency': result.solution.latency if result.solution else 0,
-            'providers': len(set(result.solution.configuration.values())) if result.solution else 0,
+            'providers': count_unique_providers(result.solution.configuration) if result.solution else 0,
             'execution_time_ms': result.execution_time_ms,
             'reason': result.reason
         }
@@ -1328,7 +1346,7 @@ def compare_cmov4_baselines():
             'success': result.success,
             'cost': result.solution.cost if result.solution else 0,
             'latency': result.solution.latency if result.solution else 0,
-            'providers': len(set(result.solution.configuration.values())) if result.solution else 0,
+            'providers': count_unique_providers(result.solution.configuration) if result.solution else 0,
             'execution_time_ms': result.execution_time_ms,
             'reason': result.reason
         }
