@@ -40,7 +40,13 @@
 
   <div class="wrap">
     <div style="margin-bottom:24px; display:flex; gap:8px; flex-wrap:wrap;">
-  <button class="btn" data-doc="NEWS.md">News & Updates</button>
+  <button class="btn" data-doc="NEWS.md" style="background: linear-gradient(135deg, #10b981 0%, #059669 100%); border-color: #10b981; color: white; font-weight: 600; position: relative;">
+    <span style="position: absolute; top: -8px; right: -8px; background: #ef4444; color: white; font-size: 10px; padding: 2px 6px; border-radius: 999px; font-weight: 700;">NEW</span>
+    News & Updates
+  </button>
+  <button class="btn" data-doc="TEST_RESULTS.md" style="background: linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%); border-color: #3b82f6; color: white; font-weight: 600;">
+    ✓ Test Results
+  </button>
   <button class="btn" data-doc="EXPLANATION.md">General Explanation</button>
   <button class="btn" data-doc="SCALABILITY_IMPLEMENTATION.md">Scalability Implementation</button>
   <button class="btn" data-doc="PARETO_IMPLEMENTATION.md">Pareto Implementation</button>
@@ -69,18 +75,32 @@
       const params = new URLSearchParams(location.search);
       const contentEl = document.getElementById('content');
       const docButtons = Array.from(document.querySelectorAll('[data-doc]'));
-      const defaultDoc = 'EXPLANATION.md';
+      const defaultDoc = 'NEWS.md';
       let initialDoc = params.get('doc') || defaultDoc;
 
       function setHTML(html) { contentEl.innerHTML = html; }
       function escapeHTML(s) { return s.replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
 
       async function load(mdFile, updateURL = true) {
-  // Always fetch from backend for dynamic docs (use /api/docs/)
-  const url = `https://migration-framework-c77589bc07d3.herokuapp.com/api/docs/${mdFile}`;
+  // Fetch from local backend for development, fallback to Heroku for production
+  const localUrl = `http://localhost:5055/api/docs/${mdFile}`;
+  const prodUrl = `https://migration-framework-c77589bc07d3.herokuapp.com/api/docs/${mdFile}`;
+  
+  // Try local first, fallback to production
+  let url = localUrl;
+  let usedFallback = false;
+  
         try {
           setHTML('<div class="loading">Loading documentation…</div>');
-          const res = await fetch(url, { credentials: 'omit' });
+          let res = await fetch(url, { credentials: 'omit' });
+          
+          // If local fails (404 or network error), try production
+          if (!res.ok && !usedFallback) {
+            url = prodUrl;
+            usedFallback = true;
+            res = await fetch(url, { credentials: 'omit' });
+          }
+          
           if (!res.ok) throw new Error(`HTTP ${res.status}`);
           const md = await res.text();
           // Render markdown with marked, sanitize with DOMPurify

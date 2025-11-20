@@ -9,3 +9,4 @@ experta==1.9.4
 pymoo==0.6.0.1
 gunicorn
 numpy==1.26.4
+reportlab==4.4.5

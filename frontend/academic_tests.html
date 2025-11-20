@@ -644,6 +644,7 @@
 
     // Modal to display detailed charts for a specific run
   function ChartModal({ open, onClose, payload }) {
+      const paretoRef = React.useRef(null);
       React.useEffect(() => {
         function onKey(e){ if (e.key === 'Escape') onClose(); }
         if (open) window.addEventListener('keydown', onKey);
@@ -653,7 +654,6 @@
   const { size, runIndex, run } = payload;
   const divId = `modal_sankey_${size}_${runIndex}`;
   const fullDivId = `sankey_${divId}`; // matches SankeyMini internal id
-  const paretoRef = React.useRef(null);
       return (
         <div className="fixed inset-0 z-50 flex items-center justify-center">
           <div className="absolute inset-0 bg-black/60" onClick={onClose}></div>

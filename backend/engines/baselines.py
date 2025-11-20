@@ -459,30 +459,42 @@ def run_all_baselines(constraints: Constraints) -> Dict[str, BaselineResult]:
     
     Returns dictionary mapping algorithm name to BaselineResult
     """
+    import concurrent.futures
+    import time
+    print("Running baseline comparisons in parallel...")
     results = {}
-    
-    print("Running baseline comparisons...")
-    
-    # Run each baseline
-    results["Random"] = baseline_random(constraints, max_attempts=1000)
-    print(f"  ✓ Random: {results['Random'].success}")
-    
-    results["Greedy-Cost"] = baseline_greedy_cost(constraints)
-    print(f"  ✓ Greedy-Cost: {results['Greedy-Cost'].success}")
-    
-    results["Greedy-Latency"] = baseline_greedy_latency(constraints)
-    print(f"  ✓ Greedy-Latency: {results['Greedy-Latency'].success}")
-    
-    results["Genetic-Algorithm"] = baseline_genetic_algorithm(
-        constraints,
-        population_size=30,
-        generations=50
-    )
-    print(f"  ✓ Genetic Algorithm: {results['Genetic-Algorithm'].success}")
-    
-    results["Weighted-Sum"] = baseline_weighted_sum(constraints)
-    print(f"  ✓ Weighted Sum: {results['Weighted-Sum'].success}")
-    
+    timings = {}
+    with concurrent.futures.ProcessPoolExecutor() as executor:
+        future_to_name = {}
+        start_times = {}
+        # Submit each baseline and record start time
+        for fn, args, name in [
+            (baseline_random, (constraints, 1000), "Random"),
+            (baseline_greedy_cost, (constraints,), "Greedy-Cost"),
+            (baseline_greedy_latency, (constraints,), "Greedy-Latency"),
+            (baseline_genetic_algorithm, (constraints, 30, 50), "Genetic-Algorithm"),
+            (baseline_weighted_sum, (constraints,), "Weighted-Sum")
+        ]:
+            start_times[name] = time.time()
+            future = executor.submit(fn, *args)
+            future_to_name[future] = name
+        # Collect results and timing
+        for future in concurrent.futures.as_completed(future_to_name):
+            name = future_to_name[future]
+            try:
+                result = future.result()
+                elapsed = time.time() - start_times[name]
+                timings[name] = elapsed
+                results[name] = result
+                print(f"  ✓ {name}: {getattr(result, 'success', None)} (time: {elapsed:.2f}s)")
+            except Exception as exc:
+                elapsed = time.time() - start_times[name]
+                timings[name] = elapsed
+                print(f"  ✗ {name} generated an exception after {elapsed:.2f}s: {exc}")
+                results[name] = None
+    print("Baseline timings:")
+    for name, t in timings.items():
+        print(f"    {name}: {t:.2f}s")
     return results
 
 

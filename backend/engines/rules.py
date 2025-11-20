@@ -19,43 +19,64 @@ class SolutionFact(Fact):
     evaluation_log = Field(list, default=[])
 
 class SolutionScoringEngine(KnowledgeEngine):
-    def __init__(self, preferences, rules_config, weights):
+    def __init__(self, preferences, rules_config, weights, max_budget=None):
         super().__init__()
         self.preferences = preferences
         self.rules_config = rules_config
         self.weights = weights
+        self.max_budget = max_budget
         self.final_score = 100
         self.evaluation_log = []
 
     @Rule(SolutionFact(cost=MATCH.cost))
     def high_cost_penalty(self, cost):
-        if cost > self.rules_config["cost_high_threshold"]:
+        # If max_budget is provided, use it to calculate threshold (90% of budget)
+        # Otherwise, use the configured absolute threshold
+        threshold = (
+            self.max_budget * 0.90 if self.max_budget 
+            else self.rules_config["cost_high_threshold"]
+        )
+        if cost > threshold:
             impact = self.rules_config["cost_high_penalty"] * self.weights["cost_weight"]
             self.final_score += impact
             self.evaluation_log.append({
-                "rule": f"High cost penalty (>${self.rules_config['cost_high_threshold']})",
+                "rule": f"High cost penalty (>${threshold:.0f})",
                 "impact": round(impact, 1),
                 "weight": self.weights["cost_weight"],
             })
 
     @Rule(SolutionFact(cost=MATCH.cost))
     def moderate_cost_penalty(self, cost):
-        if cost > self.rules_config["cost_moderate_threshold"] and cost <= self.rules_config["cost_high_threshold"]:
+        # Use budget-relative thresholds if available
+        high_threshold = (
+            self.max_budget * 0.90 if self.max_budget 
+            else self.rules_config["cost_high_threshold"]
+        )
+        moderate_threshold = (
+            self.max_budget * 0.70 if self.max_budget 
+            else self.rules_config["cost_moderate_threshold"]
+        )
+        if cost > moderate_threshold and cost <= high_threshold:
             impact = self.rules_config["cost_moderate_penalty"] * self.weights["cost_weight"]
             self.final_score += impact
             self.evaluation_log.append({
-                "rule": f"Moderate cost penalty (>${self.rules_config['cost_moderate_threshold']})",
+                "rule": f"Moderate cost penalty (>${moderate_threshold:.0f})",
                 "impact": round(impact, 1),
                 "weight": self.weights["cost_weight"],
             })
 
     @Rule(SolutionFact(cost=MATCH.cost))
     def low_cost_reward(self, cost):
-        if cost < self.rules_config["cost_low_threshold"]:
+        # Use budget-relative threshold if available (50% of budget)
+        threshold = (
+            self.max_budget * 0.50 if self.max_budget 
+            else self.rules_config["cost_low_threshold"]
+        )
+        if cost < threshold:
             impact = self.rules_config["cost_low_reward"] * self.weights["cost_weight"]
             self.final_score += impact
             self.evaluation_log.append({
-                "rule": f"Low cost reward (<${self.rules_config['cost_low_threshold']})",
+                "rule": f"Low cost reward (<${threshold:.0f})",
                 "impact": round(impact, 1),
                 "weight": self.weights["cost_weight"],
             })
@@ -131,11 +152,13 @@ class SolutionScoringEngine(KnowledgeEngine):
     @Rule(SolutionFact(latency=MATCH.latency))
     def caching_performance_boost(self, latency):
         """Reward solutions with cache components that achieve low latency"""
-        if latency < 8.0:  # Cache typically reduces latency significantly
-            impact = 8 * self.weights["performance_weight"]
+        threshold = self.rules_config.get("cache_latency_threshold", 8.0)
+        reward = self.rules_config.get("cache_latency_reward", 8)
+        if latency < threshold:
+            impact = reward * self.weights["performance_weight"]
             self.final_score += impact
             self.evaluation_log.append({
-                "rule": "Caching performance boost (<8ms)",
+                "rule": f"Caching performance boost (<{threshold:g}ms)",
                 "impact": round(impact, 1),
                 "weight": self.weights["performance_weight"],
             })
@@ -143,11 +166,13 @@ class SolutionScoringEngine(KnowledgeEngine):
     @Rule(SolutionFact(latency=MATCH.latency))
     def cdn_latency_reduction(self, latency):
         """Reward CDN usage for content delivery optimization"""
-        if latency < 9.0:  # CDN edge locations reduce latency
-            impact = 6 * self.weights["performance_weight"]
+        threshold = self.rules_config.get("cdn_latency_threshold", 9.0)
+        reward = self.rules_config.get("cdn_latency_reward", 6)
+        if latency < threshold:
+            impact = reward * self.weights["performance_weight"]
             self.final_score += impact
             self.evaluation_log.append({
-                "rule": "CDN latency reduction (<9ms)",
+                "rule": f"CDN latency reduction (<{threshold:g}ms)",
                 "impact": round(impact, 1),
                 "weight": self.weights["performance_weight"],
             })
@@ -155,11 +180,13 @@ class SolutionScoringEngine(KnowledgeEngine):
     @Rule(SolutionFact(cost=MATCH.cost))
     def monitoring_overhead_penalty(self, cost):
         """Penalize excessive monitoring costs"""
-        if cost > 2700:  # Monitoring adds operational costs
-            impact = -8 * self.weights["cost_weight"]
+        threshold = self.rules_config.get("monitoring_cost_threshold", 2700)
+        penalty = self.rules_config.get("monitoring_cost_penalty", -8)
+        if cost > threshold:
+            impact = penalty * self.weights["cost_weight"]
             self.final_score += impact
             self.evaluation_log.append({
-                "rule": "Monitoring overhead penalty (>$2700)",
+                "rule": f"Monitoring overhead penalty (>${threshold:g})",
                 "impact": round(impact, 1),
                 "weight": self.weights["cost_weight"],
             })
@@ -167,11 +194,13 @@ class SolutionScoringEngine(KnowledgeEngine):
     @Rule(SolutionFact(cost=MATCH.cost))
     def backup_redundancy_reward(self, cost):
         """Reward solutions with backup services for data protection"""
-        if cost < 2900:  # Backup services with reasonable cost
-            impact = 7 * self.weights["strategic_weight"]
+        threshold = self.rules_config.get("backup_cost_threshold", 2900)
+        reward = self.rules_config.get("backup_cost_reward", 7)
+        if cost < threshold:
+            impact = reward * self.weights["strategic_weight"]
             self.final_score += impact
             self.evaluation_log.append({
-                "rule": "Backup redundancy reward (<$2900)",
+                "rule": f"Backup redundancy reward (<${threshold:g})",
                 "impact": round(impact, 1),
                 "weight": self.weights["strategic_weight"],
             })
@@ -179,7 +208,8 @@ class SolutionScoringEngine(KnowledgeEngine):
     @Rule(SolutionFact(providers=MATCH.providers))
     def encryption_compliance_bonus(self, providers):
         """Reward encryption services for security compliance"""
-        impact = 9 * self.weights["strategic_weight"]
+        reward = self.rules_config.get("encryption_compliance_reward", 9)
+        impact = reward * self.weights["strategic_weight"]
         self.final_score += impact
         self.evaluation_log.append({
             "rule": "Encryption compliance bonus",
@@ -190,11 +220,14 @@ class SolutionScoringEngine(KnowledgeEngine):
     @Rule(SolutionFact(cost=MATCH.cost, latency=MATCH.latency))
     def container_orchestration_balance(self, cost, latency):
         """Reward container solutions with balanced cost/performance"""
-        if cost < 2800 and latency < 10.5:
-            impact = 10 * self.weights["strategic_weight"]
+        cost_threshold = self.rules_config.get("container_cost_threshold", 2800)
+        latency_threshold = self.rules_config.get("container_latency_threshold", 10.5)
+        reward = self.rules_config.get("container_balance_reward", 10)
+        if cost < cost_threshold and latency < latency_threshold:
+            impact = reward * self.weights["strategic_weight"]
             self.final_score += impact
             self.evaluation_log.append({
-                "rule": "Container orchestration balance (<$2800, <10.5ms)",
+                "rule": f"Container orchestration balance (<${cost_threshold:g}, <{latency_threshold:g}ms)",
                 "impact": round(impact, 1),
                 "weight": self.weights["strategic_weight"],
             })
@@ -202,23 +235,27 @@ class SolutionScoringEngine(KnowledgeEngine):
     @Rule(SolutionFact(latency=MATCH.latency))
     def serverless_efficiency(self, latency):
         """Reward serverless compute for efficiency and scalability"""
-        if latency < 9.5:
-            impact = 7 * self.weights["performance_weight"]
+        threshold = self.rules_config.get("serverless_latency_threshold", 9.5)
+        reward = self.rules_config.get("serverless_efficiency_reward", 7)
+        if latency < threshold:
+            impact = reward * self.weights["performance_weight"]
             self.final_score += impact
             self.evaluation_log.append({
-                "rule": "Serverless efficiency (<9.5ms)",
+                "rule": f"Serverless efficiency (<{threshold:g}ms)",
                 "impact": round(impact, 1),
                 "weight": self.weights["performance_weight"],
             })
 
     @Rule(SolutionFact(cost=MATCH.cost))
     def message_queue_reliability(self, cost):
-        """Reward message queue inclusion for decoupled architecture"""
-        if cost < 2600:
-            impact = 6 * self.weights["strategic_weight"]
+        """Reward message_queue for asynchronous processing reliability"""
+        threshold = self.rules_config.get("message_queue_cost_threshold", 2600)
+        reward = self.rules_config.get("message_queue_reliability_reward", 6)
+        if cost < threshold:
+            impact = reward * self.weights["strategic_weight"]
             self.final_score += impact
             self.evaluation_log.append({
-                "rule": "Message queue reliability (<$2600)",
+                "rule": f"Message queue reliability (<${threshold:g})",
                 "impact": round(impact, 1),
                 "weight": self.weights["strategic_weight"],
             })
@@ -226,11 +263,13 @@ class SolutionScoringEngine(KnowledgeEngine):
     @Rule(SolutionFact(cost=MATCH.cost))
     def load_balancer_availability(self, cost):
         """Reward load balancer for high availability"""
-        if cost < 2750:
-            impact = 8 * self.weights["strategic_weight"]
+        threshold = self.rules_config.get("load_balancer_cost_threshold", 2750)
+        reward = self.rules_config.get("load_balancer_availability_reward", 8)
+        if cost < threshold:
+            impact = reward * self.weights["strategic_weight"]
             self.final_score += impact
             self.evaluation_log.append({
-                "rule": "Load balancer availability (<$2750)",
+                "rule": f"Load balancer availability (<${threshold:g})",
                 "impact": round(impact, 1),
                 "weight": self.weights["strategic_weight"],
             })
@@ -273,7 +312,7 @@ def deduplicate_solutions(solutions: List[Solution]) -> List[Solution]:
     return unique_solutions
 
 
-def evaluate_solutions(solutions: List[Solution], preferences: Preferences) -> List[Solution]:
+def evaluate_solutions(solutions: List[Solution], preferences: Preferences, max_budget: Optional[float] = None) -> List[Solution]:
     # Note: Deduplication now happens at the API endpoint level before this function is called
     if not solutions:
         return []
@@ -283,7 +322,7 @@ def evaluate_solutions(solutions: List[Solution], preferences: Preferences) -> L
     ranked = []
     for sol in solutions:
         main_provider = get_main_provider(sol.configuration)
-        engine = SolutionScoringEngine(preferences, rules_config, weights)
+        engine = SolutionScoringEngine(preferences, rules_config, weights, max_budget)
         # Ensure cost is a valid float
         try:
             cost = float(sol.cost)

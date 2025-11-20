@@ -125,6 +125,13 @@
 
     function CloudMigrationOptimizer() {
   const [constraints, setConstraints] = useState({ maxBudget: 5000, maxLatency: 12, maxProviders: 2 });
+    // Workload Profile state
+    const [requestsPerMonth, setRequestsPerMonth] = useState(10000000);
+    const [crossAzGb, setCrossAzGb] = useState(500);
+    const [internetEgressGb, setInternetEgressGb] = useState(1000);
+    const [ebsGb, setEbsGb] = useState(100);
+    const [rdsBackupGb, setRdsBackupGb] = useState(150);
+    const [s3Gb, setS3Gb] = useState(500);
         // Helper to suggest minimum budget and provider count for feasible solutions
         function getSuggestion() {
           if (!serviceData || !serviceData.services || !serviceData.services.costs) return null;
@@ -272,14 +279,23 @@
               "cache", "message_queue", "cdn", "load_balancer", "monitoring", "backup", "encryption", "containers", "serverless_compute"
             ];
           }
+          // Build workload profile
+          const usageProfile = {
+            requests_per_month: Number(requestsPerMonth),
+            cross_az_gb: Number(crossAzGb),
+            internet_egress_gb: Number(internetEgressGb),
+            ebs_gb: Number(ebsGb),
+            rds_backup_gb: Number(rdsBackupGb),
+            s3_gb: Number(s3Gb)
+          };
           const res = await fetch(`${API_BASE}/api/optimize`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ 
               constraints: constraintsPayload, 
               preferences,
-              // Pass current CSP strategy so the run uses what the user selected even if not saved
               csp: academicConfig?.csp || undefined,
+              usage_profile: usageProfile
             }),
           });
           const data = await res.json();
@@ -304,10 +320,19 @@
               "cache", "message_queue", "cdn", "load_balancer", "monitoring", "backup", "encryption", "containers", "serverless_compute"
             ];
           }
+          // Build workload profile
+          const usageProfile = {
+            requests_per_month: Number(requestsPerMonth),
+            cross_az_gb: Number(crossAzGb),
+            internet_egress_gb: Number(internetEgressGb),
+            ebs_gb: Number(ebsGb),
+            rds_backup_gb: Number(rdsBackupGb),
+            s3_gb: Number(s3Gb)
+          };
           const res = await fetch(`${API_BASE}/api/compare-baselines`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ constraints: constraintsPayload, preferences }),
+            body: JSON.stringify({ constraints: constraintsPayload, preferences, usage_profile: usageProfile }),
           });
           const data = await res.json();
           setBaselineComparison(data);
@@ -326,6 +351,62 @@
         const url = URL.createObjectURL(new Blob([dataStr], { type: 'application/json' }));
         const link = document.createElement('a');
         link.href = url; link.download = 'cloud-migration-results.json'; link.click();
+      };
+
+      const downloadAcademicReport = async () => {
+        if (!results) {
+          alert('No benchmark results available. Please run an optimization first.');
+          return;
+        }
+        
+        try {
+          // Prepare complete benchmark data
+          const benchmarkData = {
+            v3: results.v3_data || {},
+            v4: {
+              solutions: results.rankedSolutions || [],
+              pareto_frontier: results.paretoFrontier?.solutions || [],
+              pareto_metrics: results.paretoFrontier?.metrics || {},
+              deduplication_stats: results.deduplicationStats || {},
+              metadata: {
+                execution_time_ms: results.metrics?.total_time_ms || 0,
+                timestamp: new Date().toISOString()
+              }
+            },
+            metrics: results.metrics || {},
+            constraints: constraints,
+            preferences: preferences
+          };
+
+          // Call academic report endpoint
+          const response = await fetch(`${API_BASE}/api/benchmark/academic-report`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ 
+              benchmark_data: benchmarkData,
+              charts_data: null  // TODO: Can add chart exports here
+            }),
+          });
+
+          if (!response.ok) {
+            const errorData = await response.json().catch(() => ({ error: response.statusText }));
+            throw new Error(errorData.error || `Report generation failed: ${response.statusText}`);
+          }
+
+          // Download the PDF
+          const blob = await response.blob();
+          const url = window.URL.createObjectURL(blob);
+          const a = document.createElement('a');
+          a.href = url;
+          a.download = `Academic_Report_${new Date().toISOString().replace(/[:.]/g, '-')}.pdf`;
+          document.body.appendChild(a);
+          a.click();
+          window.URL.revokeObjectURL(url);
+          document.body.removeChild(a);
+        } catch (error) {
+          console.error('Academic report download error:', error);
+          alert(`Failed to download academic report: ${error.message}`);
+        }
       };
 
       return (
@@ -369,6 +450,9 @@
                   </a>
                     <a href="index_normalized.html" target="_blank" className="px-4 py-2 rounded-lg transition bg-white/10 text-green-200 hover:bg-white/20 flex items-center gap-2">
                       🧮 Normalized Scoring
+                    </a>
+                    <a href="cmov4.html" className="px-4 py-2 rounded-lg transition bg-gradient-to-r from-cyan-600 to-blue-600 text-white hover:from-cyan-700 hover:to-blue-700 flex items-center gap-2 font-semibold shadow-lg">
+                      ⚡ CMOv4
                     </a>
                 </div>
               </div>
@@ -539,7 +623,36 @@
                       <ComponentMultiSelect constraints={constraints} setConstraints={setConstraints} serviceData={serviceData} />
                     </div>
                   </div>
-
+                  {/* Workload Profile Section */}
+                  <div className="mt-8 bg-yellow-500/10 rounded-lg p-4 border border-yellow-500/30">
+                    <h3 className="text-lg font-semibold text-yellow-400 mb-2 flex items-center gap-2">Workload Profile</h3>
+                    <div className="grid md:grid-cols-3 gap-4">
+                      <div>
+                        <label className="block text-sm font-medium text-yellow-200 mb-2">Requests per Month</label>
+                        <input type="number" value={requestsPerMonth} onChange={e => setRequestsPerMonth(e.target.value)} className="w-full px-4 py-2 bg-white/5 border border-yellow-500/30 rounded-lg text-white focus:outline-none focus:border-yellow-400" />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-yellow-200 mb-2">Cross-AZ Transfer (GB)</label>
+                        <input type="number" value={crossAzGb} onChange={e => setCrossAzGb(e.target.value)} className="w-full px-4 py-2 bg-white/5 border border-yellow-500/30 rounded-lg text-white focus:outline-none focus:border-yellow-400" />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-yellow-200 mb-2">Internet Egress (GB)</label>
+                        <input type="number" value={internetEgressGb} onChange={e => setInternetEgressGb(e.target.value)} className="w-full px-4 py-2 bg-white/5 border border-yellow-500/30 rounded-lg text-white focus:outline-none focus:border-yellow-400" />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-yellow-200 mb-2">EBS Storage (GB)</label>
+                        <input type="number" value={ebsGb} onChange={e => setEbsGb(e.target.value)} className="w-full px-4 py-2 bg-white/5 border border-yellow-500/30 rounded-lg text-white focus:outline-none focus:border-yellow-400" />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-yellow-200 mb-2">RDS Backup (GB)</label>
+                        <input type="number" value={rdsBackupGb} onChange={e => setRdsBackupGb(e.target.value)} className="w-full px-4 py-2 bg-white/5 border border-yellow-500/30 rounded-lg text-white focus:outline-none focus:border-yellow-400" />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-yellow-200 mb-2">S3 Storage (GB)</label>
+                        <input type="number" value={s3Gb} onChange={e => setS3Gb(e.target.value)} className="w-full px-4 py-2 bg-white/5 border border-yellow-500/30 rounded-lg text-white focus:outline-none focus:border-yellow-400" />
+                      </div>
+                    </div>
+                  </div>
                 </div>
 
                 <div className="bg-white/10 backdrop-blur-md rounded-xl p-6 border border-blue-500/20">
@@ -1171,6 +1284,27 @@
                           </div>
                         ))}
                       </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* Academic Report Download Button */}
+                {results && (
+                  <div className="bg-gradient-to-r from-indigo-500/20 to-purple-500/20 backdrop-blur-md rounded-xl p-6 border border-indigo-500/30">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <h2 className="text-xl font-bold text-white mb-2">📚 Academic Research Report</h2>
+                        <p className="text-indigo-200 text-sm">Comprehensive PDF with mathematical foundations, algorithms, state-of-the-art comparison, and limitations analysis</p>
+                      </div>
+                      <button 
+                        onClick={() => downloadAcademicReport()}
+                        className="bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white px-6 py-3 rounded-lg font-semibold shadow-lg hover:shadow-xl transition-all duration-200 flex items-center gap-2 whitespace-nowrap"
+                      >
+                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
+                        </svg>
+                        Download Academic Report
+                      </button>
                     </div>
                   </div>
                 )}

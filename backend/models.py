@@ -1,7 +1,16 @@
 from __future__ import annotations
-
-
 from dataclasses import dataclass
+
+# UsageProfile for dynamic cost modeling
+@dataclass
+class UsageProfile:
+    requests_per_month: int = 10000000
+    cross_az_gb: int = 500
+    internet_egress_gb: int = 1000
+    ebs_gb: int = 100
+    rds_backup_gb: int = 150
+    s3_gb: int = 500
+
 from typing import Dict, List, Any, Optional
 
 

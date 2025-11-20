@@ -1,4 +1,17 @@
 from __future__ import annotations
+from flask import request
+from backend.cmov4.benchmark import SCENARIOS, run_benchmark, run_single_benchmark
+# Benchmark API for frontend
+from flask import Flask, jsonify
+import time
+
+# Simulated provider status (replace with real API checks if available)
+PROVIDER_STATUS = {
+    'aws': True,
+    'azure': True,
+    'gcp': True
+}
+LAST_UPDATE = time.strftime('%I:%M:%S %p')
 
 # All required imports must come next
 import os
@@ -58,6 +71,78 @@ CORS(app)
 
 # Lightweight internal version identifier (update on meaningful backend changes)
 APP_VERSION = "2025-11-15-seed-diagnostics-1"
+
+# CMOv4 Benchmark endpoints
+@app.route('/api/service-data')
+def service_data():
+    return jsonify({
+        'aws': PROVIDER_STATUS['aws'],
+        'azure': PROVIDER_STATUS['azure'],
+        'gcp': PROVIDER_STATUS['gcp'],
+        'last_updated': LAST_UPDATE
+    })
+
+@app.route('/api/benchmark')
+def api_benchmark():
+    import sys
+    print("[DEBUG] /api/benchmark called", file=sys.stderr)
+    scenario_idx = int(request.args.get('scenario', 0))
+    print(f"[DEBUG] scenario_idx: {scenario_idx}", file=sys.stderr)
+    if scenario_idx < 0 or scenario_idx >= len(SCENARIOS):
+        print("[ERROR] Invalid scenario index", file=sys.stderr)
+        return jsonify({'error': 'Invalid scenario index.'}), 400
+    scenario = SCENARIOS[scenario_idx].copy()
+    print(f"[DEBUG] scenario: {scenario}", file=sys.stderr)
+    
+    # Extract usage profile
+    usage_profile = {}
+    for key in ['requests_per_month', 'cross_az_gb', 'internet_egress_gb', 'ebs_gb', 'rds_backup_gb', 's3_gb']:
+        if key in request.args:
+            usage_profile[key] = float(request.args.get(key))
+    print(f"[DEBUG] usage_profile: {usage_profile}", file=sys.stderr)
+    if usage_profile:
+        scenario['usage_profile'] = usage_profile
+    
+    # Extract preferences
+    preferences = {}
+    if 'preferred_provider' in request.args and request.args.get('preferred_provider'):
+        preferences['preferredProvider'] = request.args.get('preferred_provider')
+    if 'prioritize_cost' in request.args:
+        preferences['prioritizeCost'] = request.args.get('prioritize_cost') == '1'
+    if 'prioritize_performance' in request.args:
+        preferences['prioritizePerformance'] = request.args.get('prioritize_performance') == '1'
+    print(f"[DEBUG] preferences: {preferences}", file=sys.stderr)
+    if preferences:
+        scenario['preferences'] = preferences
+    
+    print(f"[DEBUG] scenario with usage_profile and preferences: {scenario}", file=sys.stderr)
+    results = run_benchmark([scenario])
+    print(f"[DEBUG] results: {results}", file=sys.stderr)
+    result = results[0]
+    print(f"[DEBUG] result: {result}", file=sys.stderr)
+    return jsonify({
+        'v3': result.get('v3', {}),
+        'v4': result.get('v4', {}),
+        'scenario': result.get('scenario', {})
+    })
+
+# Dynamic benchmark endpoint for smart scenario selection
+@app.route('/api/benchmark/dynamic', methods=['POST'])
+def api_benchmark_dynamic():
+    """
+    Accepts a scenario payload (architecture, constraints, pricing) and runs a benchmark.
+    Enables smart selection and dynamic benchmarking from the frontend.
+    """
+    payload = request.get_json(force=True, silent=True) or {}
+    scenario = payload.get('scenario')
+    if not scenario:
+        return jsonify({'error': 'Missing scenario payload.'}), 400
+    result = run_single_benchmark(scenario)
+    return jsonify({
+        'v3': result.get('v3', {}),
+        'v4': result.get('v4', {}),
+        'scenario': result.get('scenario', {})
+    })
 
 @app.get("/api/version")
 def version():
@@ -201,7 +286,7 @@ def experiment_normalized():
             prioritizeCost=bool(payload.get("prioritizeCost", False)),
             prioritizePerformance=bool(payload.get("prioritizePerformance", False)),
         )
-        results = evaluate_solutions(feasible, preferences)
+        results = evaluate_solutions(feasible, preferences, constraints.maxBudget)
         return jsonify({
             "results": [asdict(s) for s in results],
             "normalization": None
@@ -610,13 +695,13 @@ def optimize():
 
         # PHASE 2: Expert System - Rank by business rules
         expert_start = time.time()
-        ranked = evaluate_solutions(feasible, preferences)
+        ranked = evaluate_solutions(feasible, preferences, constraints.maxBudget)
         expert_duration = time.time() - expert_start
 
         # MULTI-OBJECTIVE: Calculate Pareto frontier (now on deduplicated solutions)
         pareto_start = time.time()
         pareto_frontier = calculate_pareto_frontier(feasible, objectives=['cost', 'latency'])
-        pareto_ranked = evaluate_solutions(pareto_frontier, preferences)  # Rank Pareto solutions
+        pareto_ranked = evaluate_solutions(pareto_frontier, preferences, constraints.maxBudget)  # Rank Pareto solutions
         pareto_metrics = calculate_pareto_metrics(feasible, pareto_frontier)
         extreme_solutions = get_extreme_solutions(pareto_frontier)
         pareto_duration = time.time() - pareto_start
@@ -804,7 +889,7 @@ def compare_baselines():
     csp_time = (time.time() - csp_start) * 1000
     
     expert_start = time.time()
-    ranked = evaluate_solutions(feasible, preferences)
+    ranked = evaluate_solutions(feasible, preferences, constraints.maxBudget)
     expert_time = (time.time() - expert_start) * 1000
     
     csp_solution = ranked[0] if ranked else None
@@ -959,7 +1044,103 @@ def serve_documentation(filename):
     
     return send_file(doc_path, mimetype='text/markdown')
 
+@app.route('/api/cmov4/generate-pdf', methods=['POST'])
+def generate_cmov4_pdf_report():
+    """Generate a detailed PDF report for the best CMOv4 solution."""
+    try:
+        from flask import send_file
+        import datetime
+        import traceback
+        import sys
+        import os
+        
+        # Add backend directory to path if not already there
+        backend_dir = os.path.dirname(os.path.abspath(__file__))
+        if backend_dir not in sys.path:
+            sys.path.insert(0, backend_dir)
+        
+        # Import the report generator
+        from cmov4.report_generator import generate_cmov4_report
+        
+        data = request.json
+        if not data or 'solution' not in data or 'scenario_info' not in data:
+            return jsonify({
+                'error': 'Missing required fields: solution and scenario_info'
+            }), 400
+        
+        solution = data['solution']
+        scenario_info = data['scenario_info']
+        
+        # Generate PDF
+        pdf_buffer = generate_cmov4_report(solution, scenario_info)
+        
+        # Create filename with timestamp
+        timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+        filename = f"CMOv4_Report_{timestamp}.pdf"
+        
+        # Send PDF file
+        pdf_buffer.seek(0)
+        return send_file(
+            pdf_buffer,
+            mimetype='application/pdf',
+            as_attachment=True,
+            download_name=filename
+        )
+        
+    except Exception as e:
+        import traceback
+        error_details = traceback.format_exc()
+        print(f"PDF Generation Error: {error_details}", file=sys.stderr)
+        return jsonify({
+            'error': f'Failed to generate PDF: {str(e)}',
+            'details': error_details
+        }), 500
+
+@app.route('/api/benchmark/academic-report', methods=['POST'])
+def generate_academic_benchmark_report():
+    """Generate a comprehensive academic PDF report for benchmark results."""
+    try:
+        from academic_report_generator import generate_academic_report
+        from flask import send_file
+        import datetime
+        import traceback
+        import sys
+        
+        data = request.json
+        if not data or 'benchmark_data' not in data:
+            return jsonify({
+                'error': 'Missing required field: benchmark_data'
+            }), 400
+        
+        benchmark_data = data['benchmark_data']
+        charts_data = data.get('charts_data', None)
+        
+        # Generate academic PDF
+        pdf_buffer = generate_academic_report(benchmark_data, charts_data)
+        
+        # Create filename with timestamp
+        timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+        filename = f"Academic_Report_{timestamp}.pdf"
+        
+        # Send PDF file
+        pdf_buffer.seek(0)
+        return send_file(
+            pdf_buffer,
+            mimetype='application/pdf',
+            as_attachment=True,
+            download_name=filename
+        )
+        
+    except Exception as e:
+        import traceback
+        error_details = traceback.format_exc()
+        print(f"Academic PDF Generation Error: {error_details}", file=sys.stderr)
+        return jsonify({
+            'error': f'Failed to generate academic PDF: {str(e)}',
+            'details': error_details
+        }), 500
+
 if __name__ == "__main__":
     import os
     debug_mode = os.environ.get('FLASK_DEBUG', 'False') == 'True'
-    pass
+    app.run(host="0.0.0.0", port=5055, debug=debug_mode)
