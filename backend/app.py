@@ -1199,10 +1199,16 @@ def compare_cmov4_baselines():
         
         # Extract scenario parameters
         scenario = data.get('scenario', {})
-        components = scenario.get('components', list(COMPONENTS.keys())[:5])  # Default to first 5
+        # Fix: handle both list and dict for components
+        if isinstance(scenario.get('components'), list):
+            components = scenario['components']
+        else:
+            # COMPONENTS is a list, not a dict
+            components = COMPONENTS[:5]  # Default to first 5
         max_budget = float(scenario.get('maxBudget', 5000))
         max_latency = float(scenario.get('maxLatency', 200))
         max_providers = int(scenario.get('maxProviders', 3))
+        provided_pareto = scenario.get('paretoFrontier', [])  # Use existing Pareto frontier if provided
         
         # Create constraints
         constraints = Constraints(
@@ -1212,85 +1218,130 @@ def compare_cmov4_baselines():
         )
         
         print(f"[CMOv4 Baseline Comparison] Components: {len(components)}, Budget: ${max_budget}, Latency: {max_latency}ms, Max Providers: {max_providers}")
+        print(f"[CMOv4 Baseline Comparison] Provided Pareto frontier: {len(provided_pareto)} solutions")
         
-        # Run CMOv4 Pareto optimization (sample-based approach)
+        # Run CMOv4 Pareto optimization (or use provided Pareto frontier)
         start_time = time.time()
-        try:
-            # Generate diverse solutions using multiple strategies
-            all_solutions = []
-            options = get_service_options()
-            costs = get_service_costs()
-            latencies = get_service_latency()
-            
-            # Helper to create solution from config
-            def make_solution(config):
-                cost = sum(costs.get(service, 0) for service in config.values())
-                latency = sum(latencies.get(service, 0) for service in config.values()) / len(config)
-                providers_count = len(set(config.values()))
+        pareto_solutions = []
+        
+        if provided_pareto and len(provided_pareto) > 0:
+            # Use the provided Pareto frontier from the benchmark
+            print(f"[CMOv4] Using provided Pareto frontier with {len(provided_pareto)} solutions")
+            try:
+                for sol_data in provided_pareto:
+                    if isinstance(sol_data, dict):
+                        # Extract required fields
+                        config = sol_data.get('configuration', {})
+                        cost = float(sol_data.get('cost', 0))
+                        latency = float(sol_data.get('latency', 0))
+                        providers = int(sol_data.get('providers', 0))
+                        provider_dist = sol_data.get('providerDistribution', {})
+                        
+                        solution = Solution(
+                            configuration=config,
+                            cost=cost,
+                            latency=latency,
+                            providers=providers,
+                            providerDistribution=provider_dist,
+                            score=sol_data.get('score'),
+                            evaluationLog=sol_data.get('evaluationLog')
+                        )
+                        pareto_solutions.append(solution)
+                    else:
+                        pareto_solutions.append(sol_data)
+                print(f"[CMOv4] Successfully loaded {len(pareto_solutions)} Pareto solutions")
+            except Exception as e:
+                print(f"[ERROR] Failed to load provided Pareto frontier: {str(e)}")
+                import traceback
+                traceback.print_exc()
+                provided_pareto = []
+                pareto_solutions = []
+        
+        # Generate new Pareto frontier if not provided or loading failed
+        if not pareto_solutions:
+            print(f"[CMOv4] Generating new Pareto frontier")
+            try:
+                # Generate diverse solutions using multiple strategies
+                all_solutions = []
+                options = get_service_options()
+                costs = get_service_costs()
+                latencies = get_service_latency()
                 
-                # Check constraints
-                if cost <= max_budget and latency <= max_latency and providers_count <= max_providers:
-                    return Solution(
-                        configuration=config,
-                        cost=cost,
-                        latency=latency,
-                        providers=providers_count,
-                        score=100  # Default score
-                    )
-                return None
-            
-            # Strategy 1: Greedy variations (cost-focused, latency-focused, balanced)
-            for _ in range(50):
-                config = {}
-                for comp in components:
-                    if comp in options and options[comp]:
-                        # Mix of cost and latency preferences
-                        services = options[comp]
-                        weights = [1.0 / (costs.get(s, 1000) + latencies.get(s, 100)) for s in services]
-                        total = sum(weights)
-                        weights = [w/total for w in weights]
-                        config[comp] = random.choices(services, weights=weights)[0]
+                # Helper to create solution from config
+                def make_solution(config):
+                    cost = sum(costs.get(service, 0) for service in config.values())
+                    latency = sum(latencies.get(service, 0) for service in config.values()) / len(config) if config else 0
+                    
+                    # Count unique PROVIDERS (not services)
+                    providers = {service.split()[0] if ' ' in service else service.split('-')[0] 
+                                for service in config.values()}
+                    providers_count = len(providers)
+                    
+                    # Calculate provider distribution
+                    provider_dist = {}
+                    for service in config.values():
+                        provider = service.split()[0] if ' ' in service else service.split('-')[0]
+                        provider_dist[provider] = provider_dist.get(provider, 0) + 1
+                    
+                    # Check constraints
+                    if cost <= max_budget and latency <= max_latency and providers_count <= max_providers:
+                        return Solution(
+                            configuration=config,
+                            cost=cost,
+                            latency=latency,
+                            providers=providers_count,
+                            providerDistribution=provider_dist,  # Required field!
+                            score=100  # Default score
+                        )
+                    return None
                 
-                sol = make_solution(config)
-                if sol:
-                    all_solutions.append(sol)
-            
-            # Strategy 2: Random sampling
-            for _ in range(50):
-                config = {comp: random.choice(options.get(comp, ['AWS-EC2'])) for comp in components}
-                sol = make_solution(config)
-                if sol:
-                    all_solutions.append(sol)
-            
-            # Calculate Pareto frontier from generated solutions
-            pareto_solutions = calculate_pareto_frontier(all_solutions, objectives=['cost', 'latency'])
-            cmov4_time_ms = (time.time() - start_time) * 1000
-            
-            # Get best solution (lowest cost from Pareto frontier)
-            if pareto_solutions:
-                best_pareto = min(pareto_solutions, key=lambda s: s.cost)
-                cmov4_success = True
-                cmov4_cost = best_pareto.cost
-                cmov4_latency = best_pareto.latency
-                cmov4_providers = len(set(best_pareto.configuration.values()))
-            else:
-                cmov4_success = False
-                cmov4_cost = 0
-                cmov4_latency = 0
-                cmov4_providers = 0
-                best_pareto = None
-            
-            pareto_count = len(pareto_solutions)
-            
-        except Exception as e:
-            print(f"[ERROR] CMOv4 Pareto optimization failed: {str(e)}")
+                # Strategy 1: Greedy variations (cost-focused, latency-focused, balanced)
+                for _ in range(50):
+                    config = {}
+                    for comp in components:
+                        if comp in options and options[comp]:
+                            # Mix of cost and latency preferences
+                            services = options[comp]
+                            weights = [1.0 / (costs.get(s, 1000) + latencies.get(s, 100)) for s in services]
+                            total = sum(weights)
+                            weights = [w/total for w in weights]
+                            config[comp] = random.choices(services, weights=weights)[0]
+                    
+                    sol = make_solution(config)
+                    if sol:
+                        all_solutions.append(sol)
+                
+                # Strategy 2: Random sampling
+                for _ in range(50):
+                    config = {comp: random.choice(options.get(comp, ['AWS-EC2'])) for comp in components}
+                    sol = make_solution(config)
+                    if sol:
+                        all_solutions.append(sol)
+                
+                # Calculate Pareto frontier from generated solutions
+                pareto_solutions = calculate_pareto_frontier(all_solutions, objectives=['cost', 'latency'])
+                
+            except Exception as e:
+                print(f"[ERROR] CMOv4 Pareto optimization generation failed: {str(e)}")
+                import traceback
+                traceback.print_exc()
+                pareto_solutions = []
+        
+        # Calculate timing and get best solution
+        cmov4_time_ms = (time.time() - start_time) * 1000
+        pareto_count = len(pareto_solutions)
+        
+        if pareto_solutions:
+            best_pareto = min(pareto_solutions, key=lambda s: s.cost)
+            cmov4_success = True
+            cmov4_cost = best_pareto.cost
+            cmov4_latency = best_pareto.latency
+            cmov4_providers = count_unique_providers(best_pareto.configuration)
+        else:
             cmov4_success = False
             cmov4_cost = 0
             cmov4_latency = 0
             cmov4_providers = 0
-            cmov4_time_ms = 0
-            pareto_count = 0
-            pareto_solutions = []
             best_pareto = None
         
         # Run baseline algorithms
