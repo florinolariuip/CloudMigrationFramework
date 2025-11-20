@@ -1,6 +1,12 @@
 from __future__ import annotations
 from flask import request
-from backend.cmov4.benchmark import SCENARIOS, run_benchmark, run_single_benchmark
+
+# Import CMOv4 benchmark (works in both local and Heroku)
+try:
+    from cmov4.benchmark import SCENARIOS, run_benchmark, run_single_benchmark
+except ImportError:
+    from backend.cmov4.benchmark import SCENARIOS, run_benchmark, run_single_benchmark
+
 # Benchmark API for frontend
 from flask import Flask, jsonify
 import time
