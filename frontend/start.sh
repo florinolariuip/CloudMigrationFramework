@@ -87,13 +87,17 @@ else
   log "Starting backend (Flask) on port ${BACKEND_PORT}..."
   export FLASK_DEBUG="${FLASK_DEBUG_ENV}"
   export SKIP_EXPERIMENTS=1
-  (
-    cd "$ROOT_DIR"
-    # Run Flask app in background; log to file (disable reloader for stability)
-    "$PY_BIN" -m flask --app backend.app:app run --host 127.0.0.1 --port "${BACKEND_PORT}" --no-reload > "${BACKEND_DIR}/.backend.log" 2>&1 & echo $! > "${BACKEND_DIR}/.backend.pid"
-  )
-  BE_PID="$(cat "${BACKEND_DIR}/.backend.pid" 2>/dev/null || true)"
-  trap 'log "Stopping services"; kill_if_running "$FE_PID"; kill_if_running "$BE_PID"' EXIT INT TERM
+  
+  # Create the start_be.command file first
+  cat > "${ROOT_DIR}/start_be.command" <<EOF
+#!/bin/bash
+cd "${ROOT_DIR}"
+"${PY_BIN}" -m flask --app backend.app:app run --host 127.0.0.1 --port "${BACKEND_PORT}" --no-reload
+EOF
+  chmod +x "${ROOT_DIR}/start_be.command"
+  
+  # Start backend in a new Terminal window (console only, no log file)
+  open -a Terminal "${ROOT_DIR}/start_be.command"
 
   log "Waiting for backend health at ${HEALTH_URL}..."
   if ! wait_for_health "$HEALTH_URL" 60 0.5; then
@@ -105,9 +109,17 @@ fi
 
 # --- Frontend ---
 log "Serving frontend from ${FRONTEND_DIR} on http://localhost:${FRONTEND_PORT}"
-cd "$FRONTEND_DIR"
-"$PY_BIN" -m http.server "$FRONTEND_PORT" --bind 127.0.0.1 &
-FE_PID=$!
+
+# Create the start_fe.command file first
+cat > "$FRONTEND_DIR/start_fe.command" <<EOF
+#!/bin/bash
+cd "${FRONTEND_DIR}"
+"${PY_BIN}" -m http.server "$FRONTEND_PORT" --bind 127.0.0.1
+EOF
+chmod +x "$FRONTEND_DIR/start_fe.command"
+
+# Start frontend in a new Terminal window, ensuring correct working directory
+open -a Terminal "$FRONTEND_DIR/start_fe.command"
 
 # Give the server a moment, then open the browser
 FRONTEND_URL="http://localhost:${FRONTEND_PORT}"
@@ -117,7 +129,4 @@ if [[ "$OPEN_BROWSER" == "1" ]]; then
   command -v open >/dev/null 2>&1 && open "$FRONTEND_URL" || true
 fi
 
-log "Both servers started. Press Ctrl+C to stop."
-
-# Wait on frontend to keep the script running
-wait "$FE_PID"
+log "Both servers started in separate Terminal windows."

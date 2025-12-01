@@ -55,18 +55,20 @@ def optimize_architecture(arch: dict, constraints: dict, config: dict = None) ->
     CMOv4 optimization with timeout protection for academic benchmarking.
     """
     import time
-    import os
+    import threading
     
     try:
         start_time = time.time()
         
-        # Cross-platform timeout setup
-        if os.name != 'nt':  # Unix/Mac
-            import signal
-            def timeout_handler(signum, frame):
-                raise TimeoutError("CMOv4 optimization timeout")
-            signal.signal(signal.SIGALRM, timeout_handler)
-            signal.alarm(10)
+        # Thread-safe timeout using threading.Timer (Flask-compatible)
+        timeout_flag = {'exceeded': False}
+        
+        def timeout_handler():
+            timeout_flag['exceeded'] = True
+            print("[CMOv4] Timeout reached - stopping optimization")
+        
+        timer = threading.Timer(10.0, timeout_handler)
+        timer.start()
         
         print(f"[CMOv4] Starting optimization with timeout protection...")
         print(f"[CMOv4] Constraints: Budget=${constraints.get('maxBudget', 10000)}, Latency={constraints.get('maxLatency', 150)}ms, Providers={constraints.get('maxProviders', 3)}")
@@ -152,22 +154,25 @@ def optimize_architecture(arch: dict, constraints: dict, config: dict = None) ->
         # Simple ranking by score
         ranked_solutions = sorted(feasible_solutions, key=lambda s: s.score, reverse=True)
         
-        # Simple Pareto frontier (non-dominated solutions)
-        pareto_solutions = []
-        for sol in feasible_solutions:
-            dominated = False
-            for other in feasible_solutions:
-                if other.cost <= sol.cost and other.latency <= sol.latency and (other.cost < sol.cost or other.latency < sol.latency):
-                    dominated = True
-                    break
-            if not dominated:
-                pareto_solutions.append(sol)
+        # Calculate Pareto frontier using backend library (more accurate)
+        from backend.engines.pareto import calculate_pareto_frontier, calculate_pareto_metrics, get_extreme_solutions
+        pareto_solutions = calculate_pareto_frontier(feasible_solutions, objectives=['cost', 'latency'])
         
-        # Cancel alarm on Unix/Mac
-        if os.name != 'nt':
-            signal.alarm(0)
+        # Calculate Pareto metrics (hypervolume, spacing, coverage)
+        pareto_metrics = {}
+        if pareto_solutions and feasible_solutions:
+            max_cost = max(s.cost for s in feasible_solutions)
+            max_latency = max(s.latency for s in feasible_solutions)
+            reference_point = (max_cost * 1.1, max_latency * 1.1)
+            pareto_metrics = calculate_pareto_metrics(feasible_solutions, pareto_solutions, reference_point)
+        
+        # Cancel timeout timer
+        timer.cancel()
             
         print(f"[CMOv4] Pareto frontier: {len(pareto_solutions)} solutions")
+        if pareto_metrics:
+            print(f"[CMOv4] Hypervolume: {pareto_metrics.get('hypervolume', 0):.2f}")
+            print(f"[CMOv4] Coverage: {pareto_metrics.get('coverage_rate', 0):.2f}%")
         
         from dataclasses import asdict
         
@@ -209,7 +214,10 @@ def optimize_architecture(arch: dict, constraints: dict, config: dict = None) ->
             'metrics': {
                 'feasible_count': len(feasible_solutions),
                 'pareto_count': len(pareto_solutions),
-                'components_mapped': len(selected_components) if selected_components else 0
+                'components_mapped': len(selected_components) if selected_components else 0,
+                'hypervolume': pareto_metrics.get('hypervolume', 0) if pareto_metrics else 0,
+                'spacing': pareto_metrics.get('spacing', 0) if pareto_metrics else 0,
+                'coverage_rate': pareto_metrics.get('coverage_rate', 0) if pareto_metrics else 0
             }
         }
     except TimeoutError:
