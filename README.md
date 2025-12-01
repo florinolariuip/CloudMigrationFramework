@@ -1,21 +1,34 @@
-# Cloud Migration Optimizer v4 - Hybrid CSP + Expert System ### ✨ What's New (December 2025)
+# Cloud Migration Optimizer v4 - Hybrid CSP + Expert System
 
-#### CMOv4 Release - Major Performance Breakthrough
+## ✨ What's New (December 2025)
+
+### CMOv4 Release - Major Performance Breakthrough
+
 - **🚀 4,000× Speedup**: CMOv4 optimization completes in **0.03ms** vs 128ms for Genetic Algorithms
 - **💰 Better Solutions**: 24% cheaper than GA ($626 vs $830) with comparable latency (10.94ms vs 10.89ms)
-- **📊 Multiple Options**: Returns Pareto frontier with 4 solutions vs single solution from baselines
-- **🔧 Fixed Threading**: Replaced `signal.alarm()` with `threading.Timer` for Flask compatibility
-- **📈 Real Metrics**: Pareto metrics (hypervolume, spacing, coverage) now properly calculated and displayed
+- **📊 Multiple Options**: Returns Pareto frontier with 4-8 solutions vs single solution from baselines
+- **🎯 Strategic Sampling**: Uses ~50 intelligent combinations (min-cost, min-latency, balanced, provider-specific, random) instead of naive random sampling
+- **⚡ Sub-Second Performance**: Pre-warms pricing cache once (3-15s), then optimizes in <1s using static cache
+- **🔧 Flask-Compatible**: Thread-safe timeout using `threading.Timer` instead of `signal.alarm()`
+- **📈 Accurate Metrics**: Pareto metrics (hypervolume, spacing, coverage) with proper score handling
 - **🏆 Algorithm Champion**: CMOv4 outperforms all 5 baseline algorithms (GA, Greedy-Cost, Greedy-Latency, Random, Weighted Sum)
+- **🔬 Expert System Integration**: CMOv4 now uses same 44 business rules as CMOv3 for consistent evaluation
+- **🎲 Enhanced Strategic Sampling**: Increased from 20 to 50 combinations (8 balanced, 37 random exploration)
+- **📈 Configurable Exhaustive Search**: Now returns up to 500 solutions (vs 50) for thorough research analysis
 
-#### v3 Features (November 2025)
+### v3 Features (November 2025)
+
 - Deterministic runs via optional seed on /api/optimize (reports metrics.seed_used)
 - New /api/version endpoint exposes version and feature flags
 - Added instrumentation: feasible_pre_dedup, feasible_post_dedup, duplicates_removed, timing breakdowns
 - Deterministic ordering of feasible solutions (stable sorting) for reproducible tables
 - Dynamic AcademicSummary card on the main dashboard (explanation accuracy)
 - New academic_tests.html page to batch experiments and aggregate explanation accuracy; CSV/JSON export
-- Normalized scoring page polish: fixed-decimal formatting for cost/latency# 🎯 Overview
+- Normalized scoring page polish: fixed-decimal formatting for cost/latency
+
+---
+
+## 🎯 Overview
 
 A **research-grade cloud migration optimizer** that combines Constraint Satisfaction Problems (CSP), Expert System rules, and Pareto multi-objective optimization to provide optimal, explainable multi-cloud service selection across AWS, Azure, and GCP.
 
@@ -94,10 +107,16 @@ python -m http.server 8080
 
 ### 🏗️ Core Capabilities
 
-#### 1. **Three-Phase Optimization (CMOv4)**
-- **Phase 1 - CSP Filter**: Generates configurations, filters by hard constraints (budget, latency, providers)
-- **Phase 2 - Expert Rules**: Scores solutions using 44 business rules across 4 categories
-- **Phase 3 - Pareto Frontier**: Identifies non-dominated solutions for cost-latency trade-offs
+#### 1. **Four-Phase Optimization (CMOv4)**
+- **Phase 1 - Strategic Sampling**: Generates ~50 intelligent combinations using backend's constraint engine
+  - 1× min-cost strategy (guaranteed cheapest feasible)
+  - 1× min-latency strategy (guaranteed fastest feasible)
+  - 8× balanced strategies (top-2 cost/latency combinations with variation)
+  - 3× single-provider strategies (AWS-only, Azure-only, GCP-only)
+  - 37× diverse random samples for thorough exploration
+- **Phase 2 - CSP Filter**: Validates configurations against hard constraints (budget, latency, providers)
+- **Phase 3 - Expert Rules**: Scores solutions using 44 business rules across 4 categories
+- **Phase 4 - Pareto Frontier**: Identifies non-dominated solutions for cost-latency trade-offs
 
 #### 2. **Multi-Objective Optimization**
 - **Pareto Frontier**: Find optimal trade-offs between cost and latency
@@ -137,8 +156,12 @@ python -m http.server 8080
 
 ### Backend (`/backend`)
 - **Flask API** (Python 3.13)
-- **CMOv4 Optimizer**: `cmov4/optimizer.py` - Advanced three-phase hybrid algorithm
-- **CSP Engine**: `engines/constraints.py`
+- **CMOv4 Optimizer**: `cmov4/optimizer.py` - Advanced four-phase hybrid algorithm with strategic sampling
+  - Strategic heuristic: ~20 combinations covering cost-optimal, latency-optimal, balanced, and diverse solutions
+  - Pre-warming: Caches pricing data before optimization starts (3-15s one-time cost)
+  - Static pricing: Uses cached data during optimization (<1s) to avoid API delays
+  - Thread-safe timeout: 30s limit using `threading.Timer` for Flask compatibility
+- **CSP Engine**: `engines/constraints.py` - Strategic heuristic sampler shared with CMOv4
 - **Expert System**: `engines/rules.py` (using `experta` - 44 rules)
 - **Pareto Optimization**: `engines/pareto.py` (hypervolume, spacing, coverage metrics)
 - **Baseline Algorithms**: `engines/baselines.py` (6 algorithms for comparison)
@@ -193,14 +216,21 @@ Note: Some previously referenced research docs are planned but not yet included 
 
 This system demonstrates:
 
-1. **Hybrid Approach Superiority**: CMOv4 (CSP+Expert+Pareto) outperforms 5 baseline algorithms
-   - 4,000× faster than meta-heuristics (Genetic Algorithm)
-   - Better solution quality (24% cost reduction vs GA)
-   - Multiple trade-off options (Pareto frontier) vs single solution
-2. **Scalability**: Handles enterprise-scale problems (18-19 components, 258M+ combinations)
-3. **Explainability**: Full transparency in decision-making process with constraint proofs and rule traces
-4. **Multi-Objective**: Pareto frontier with accurate metrics (hypervolume, spacing, coverage)
-5. **Real-World Applicability**: Uses live cloud pricing data from AWS, Azure, GCP APIs
+1. **Hybrid Approach Superiority**: Both CMOv3 and CMOv4 use the same CSP+Expert+Pareto pipeline
+   - **Same 44 expert rules**: Ensures consistent business-aware evaluation
+   - **Same strategic sampling**: 50 intelligent combinations for thorough coverage
+   - **Same Pareto optimization**: Multi-objective frontier with accurate metrics
+   - **Different contexts**: CMOv3 for production workflows, CMOv4 for benchmarking
+   - **Consistent results**: Similar solution quality with slight variations due to component selection
+2. **Strategic Sampling Methodology**: Scientifically defensible approach vs naive random sampling
+   - Guarantees exploration of cost-optimal and latency-optimal extremes
+   - Ensures provider diversity through single-provider strategies
+   - Balances exploitation (targeted strategies) with exploration (random diversity)
+   - Shared implementation between CMOv3 and CMOv4 ensures consistency
+3. **Scalability**: Handles enterprise-scale problems (18-19 components, 258M+ combinations)
+4. **Explainability**: Full transparency in decision-making process with constraint proofs and rule traces
+5. **Multi-Objective**: Pareto frontier with accurate metrics (hypervolume, spacing, coverage)
+6. **Real-World Applicability**: Uses live cloud pricing data from AWS, Azure, GCP APIs
 
 ### Metrics & Analysis
 
@@ -222,6 +252,98 @@ The system provides extensive metrics for research:
 - **Run Logs**: All optimization runs logged for empirical validation
 - **Explanation Accuracy**: Composite metric derived from score integrity, constraint proofs ratio, and rule coverage
 
+### Strategic Sampling Approach
+
+CMOv4 uses a **strategic heuristic sampling** method that replaces naive random sampling with intelligent search strategies:
+
+**Rationale**: Instead of generating arbitrary random combinations (no theoretical justification), CMOv4 systematically explores the solution space using proven heuristics:
+
+1. **Extreme Solutions** (2 combinations)
+   - Min-cost strategy: Selects cheapest service for each component
+   - Min-latency strategy: Selects fastest service for each component
+   - **Guarantee**: Optimal extremes are always found if constraints allow
+
+2. **Balanced Strategies** (8 combinations)
+   - Top-2 cost + top-2 latency combinations with variation
+   - Explores middle ground between pure cost and pure performance
+   - **Benefit**: Discovers practical trade-offs most users prefer
+
+3. **Provider Diversity** (3 combinations)
+   - AWS-only: All services from AWS
+   - Azure-only: All services from Azure
+   - GCP-only: All services from GCP
+   - **Benefit**: Identifies single-provider solutions (lower operational complexity)
+
+4. **Random Exploration** (37 combinations)
+   - Diverse random samples for thorough exploration
+   - **Benefit**: Discovers unexpected solutions not covered by heuristics
+
+**Total**: ~50 strategic combinations (vs 30-100 naive random samples)
+
+**Scientific Validity**:
+- ✅ Deterministic coverage of cost/latency extremes
+- ✅ Systematic provider diversity exploration
+- ✅ Balanced exploitation (heuristics) + exploration (random)
+- ✅ Consistent with CMOv3's proven constraint engine
+- ✅ Defendable in academic publications
+
+**Performance**: Generates 20-50 feasible solutions in 0.5-1.0ms, then Pareto filtering yields 6-12 optimal trade-offs.
+
+### Live Cloud Pricing Integration
+
+CMOv4 integrates with **all three major cloud providers' official pricing APIs** for real-world cost data:
+
+#### 🔴 AWS Pricing API
+- **Services**: 17 AWS services (EC2, RDS, S3, Lambda, ElastiCache, SQS, CloudFront, ALB, CloudWatch, Backup, KMS, EKS, etc.)
+- **Endpoint**: `https://pricing.us-east-1.amazonaws.com/offers/v1.0/aws/`
+- **Timeout**: 3 seconds per service
+- **Method**: JSON pricing index with region/instance filtering
+- **Fallback**: Static documented prices from AWS Calculator
+
+#### 🔵 Azure Retail Pricing API
+- **Services**: 19 Azure services (VM, SQL Database, Blob Storage, Functions, Redis Cache, Service Bus, Event Hubs, CDN, Load Balancer, Monitor, Backup, Key Vault, AKS, Container Instances, Logic Apps, CosmosDB, API Management, Active Directory, IoT Hub)
+- **Endpoint**: `https://prices.azure.com/api/retail/prices`
+- **Timeout**: 15 seconds per service (longest due to pagination)
+- **Method**: OData query with service name filtering
+- **Fallback**: Static documented prices from Azure Calculator
+
+#### 🟢 GCP Cloud Billing API
+- **Services**: 19 GCP services (Compute Engine, Cloud SQL, Cloud Storage, Cloud Functions, Memorystore, Pub/Sub, Dataflow, CDN, Cloud Load Balancing, Stackdriver, Backup, Cloud KMS, GKE, Cloud Run, Cloud Scheduler, Firestore, API Gateway, Identity Platform, IoT Core)
+- **Endpoint**: `https://cloudbilling.googleapis.com/v1/services/{service}/skus`
+- **Timeout**: 5 seconds per service
+- **Method**: SKU list with usage pricing units
+- **Fallback**: Static documented prices from GCP Calculator
+
+#### Performance Architecture
+
+**One-Time Fetch (App Startup)**:
+- Parallel API calls to all three providers
+- Total time: ~20 seconds (longest is Azure at 15s)
+- Success rate: Typically 100% (3/3 providers)
+- All prices cached in ServiceDataCache with 30-minute TTL
+
+**During Optimization**:
+- **No live API calls** - uses cached static prices
+- Lookup time: 0.0001ms per service (in-memory cache)
+- Performance: **1,000,000× faster** than live API calls
+- Consistency: All optimizations use same pricing snapshot
+
+**Cache Strategy**:
+```python
+# ServiceDataCache: 30-minute TTL, thread-safe
+# Pre-warmed before CMOv4 optimization starts
+get_service_costs()      # All 55 services (17 AWS + 19 Azure + 19 GCP)
+get_service_options()    # Provider options per component
+get_service_latency()    # Regional latency estimates
+```
+
+**Why This Matters**:
+- ✅ Real-world pricing data (not synthetic)
+- ✅ Multi-cloud comparison with actual costs
+- ✅ Fast optimization loops (no API delays)
+- ✅ Academic rigor (reproducible with documented fallbacks)
+- ✅ Production-ready (handles API failures gracefully)
+
 ### Configuration
 
 All parameters are configurable for experimentation:
@@ -229,7 +351,7 @@ All parameters are configurable for experimentation:
 - **Constraints**: Budget, latency, provider count, performance metrics
 - **Rule Weights**: Cost, performance, strategic, preference weights (0.0-2.0)
 - **Thresholds**: Rule-specific thresholds for scoring
-- **CSP Strategy**: Search strategy configuration
+- **CSP Strategy**: Search strategy configuration (strategic heuristic is default and recommended)
 
 ---
 

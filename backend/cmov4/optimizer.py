@@ -60,14 +60,24 @@ def optimize_architecture(arch: dict, constraints: dict, config: dict = None) ->
     try:
         start_time = time.time()
         
+        # Pre-warm pricing cache BEFORE starting timeout timer
+        # This prevents API delays from counting against optimization time
+        print(f"[CMOv4] Pre-warming pricing cache...")
+        from backend.services.pricing import get_service_costs, get_service_options, get_service_latency
+        get_service_costs()  # Cache all costs
+        get_service_options()  # Cache all options
+        get_service_latency()  # Cache all latencies
+        print(f"[CMOv4] Pricing cache ready")
+        
         # Thread-safe timeout using threading.Timer (Flask-compatible)
+        # Set to 30s to allow for pricing API delays (Azure can take 10-15s)
         timeout_flag = {'exceeded': False}
         
         def timeout_handler():
             timeout_flag['exceeded'] = True
-            print("[CMOv4] Timeout reached - stopping optimization")
+            print("[CMOv4] Timeout reached (30s) - stopping optimization")
         
-        timer = threading.Timer(10.0, timeout_handler)
+        timer = threading.Timer(30.0, timeout_handler)
         timer.start()
         
         print(f"[CMOv4] Starting optimization with timeout protection...")
@@ -100,59 +110,104 @@ def optimize_architecture(arch: dict, constraints: dict, config: dict = None) ->
         if min_cost > constraints.get('maxBudget', 10000):
             print(f"[CMOv4] WARNING: Minimum cost exceeds budget!")
         
-        # Fast CMOv4-specific CSP implementation
+        # Smart CMOv4 CSP: Use backend's heuristic engine for strategic sampling
         from backend.services.pricing import get_service_options, get_service_costs, get_service_latency
-        from backend.models import Solution
+        from backend.models import Solution, Constraints as CSPConstraints
+        from backend.engines.constraints import generate_feasible_solutions
         import random
         
-        options = get_service_options()
-        costs = get_service_costs()
-        latencies = get_service_latency()
+        # Build CSP constraints object
+        csp_constraints = CSPConstraints(
+            maxBudget=constraints.get('maxBudget', 10000),
+            maxLatency=constraints.get('maxLatency', 150),
+            maxProviders=constraints.get('maxProviders', 3),
+            selected_components=selected_components
+        )
         
-        max_budget = constraints.get('maxBudget', 10000)
-        max_latency = constraints.get('maxLatency', 150)
-        max_providers = constraints.get('maxProviders', 3)
+        # Use backend's strategic heuristic sampler (generates ~50 smart combinations)
+        print(f"[CMOv4] Using strategic heuristic sampling (backend engine)...")
+        feasible_solutions = generate_feasible_solutions(csp_constraints)
+        print(f"[CMOv4] Strategic sampling found {len(feasible_solutions)} feasible solutions")
         
-        feasible_solutions = []
+        # Apply Expert System rules (same as CMOv3) for business-aware scoring
+        print(f"[CMOv4] Applying Expert System rules...")
+        from backend.engines.rules import evaluate_solutions_with_expert_system
+        from backend.config import EXPERT_RULES_CONFIG
         
-        # Generate smart combinations with early termination (adjusted for 18 components)
-        max_attempts = 100
-        target_solutions = 30
-        for attempt in range(max_attempts):
-            if len(feasible_solutions) >= target_solutions:
-                break
-            config = {}
-            for comp in selected_components:
-                if comp in options:
-                    config[comp] = random.choice(options[comp])
+        # Get user preferences from constraints
+        user_preferences = constraints.get('preferences', {})
+        
+        # Evaluate solutions with expert system (same as CMOv3)
+        try:
+            evaluated_solutions = evaluate_solutions_with_expert_system(
+                feasible_solutions, 
+                csp_constraints,
+                user_preferences,
+                EXPERT_RULES_CONFIG
+            )
+            print(f"[CMOv4] Expert System evaluated {len(evaluated_solutions)} solutions")
+            feasible_solutions = evaluated_solutions
+        except Exception as e:
+            print(f"[CMOv4] Expert System failed: {e}, falling back to simple scoring")
+            # Fallback: Add simple scores if expert system fails
+            max_budget = constraints.get('maxBudget', 10000)
+            max_latency = constraints.get('maxLatency', 150)
+            for sol in feasible_solutions:
+                if not hasattr(sol, 'score') or sol.score is None:
+                    sol.score = 100 - (sol.cost/max_budget)*50 - (sol.latency/max_latency)*50
+        
+        # If we got very few solutions, supplement with random sampling
+        if len(feasible_solutions) < 10:
+            print(f"[CMOv4] Supplementing with random sampling to reach target diversity...")
+            options = get_service_options()
+            costs = get_service_costs()
+            latencies = get_service_latency()
             
-            # Calculate metrics
-            total_cost = sum(costs.get(svc, 0) for svc in config.values())
-            avg_latency = sum(latencies.get(svc, 0) for svc in config.values()) / len(config) if config else 0
-            providers = len(set(svc.split()[0] for svc in config.values()))
+            max_budget = constraints.get('maxBudget', 10000)
+            max_latency = constraints.get('maxLatency', 150)
+            max_providers = constraints.get('maxProviders', 3)
             
-            # Check constraints
-            if total_cost <= max_budget and avg_latency <= max_latency and providers <= max_providers:
-                # Calculate proper provider distribution
-                provider_dist = {}
-                for svc in config.values():
-                    provider = svc.split()[0]
-                    provider_dist[provider] = provider_dist.get(provider, 0) + 1
+            max_attempts = 50
+            target_supplement = 20 - len(feasible_solutions)
+            for attempt in range(max_attempts):
+                # Check timeout flag
+                if timeout_flag['exceeded']:
+                    print(f"[CMOv4] Timeout during random supplementing, stopping early")
+                    break
+                if len(feasible_solutions) >= 20:
+                    break
+                config = {}
+                for comp in selected_components:
+                    if comp in options:
+                        config[comp] = random.choice(options[comp])
                 
-                solution = Solution(
-                    configuration=config,
-                    cost=total_cost,
-                    latency=avg_latency,
-                    providers=providers,
-                    providerDistribution=provider_dist,
-                    score=100 - (total_cost/max_budget)*50 - (avg_latency/max_latency)*50
-                )
-                feasible_solutions.append(solution)
+                # Calculate metrics
+                total_cost = sum(costs.get(svc, 0) for svc in config.values())
+                avg_latency = sum(latencies.get(svc, 0) for svc in config.values()) / len(config) if config else 0
+                providers = len(set(svc.split()[0] for svc in config.values()))
+                
+                # Check constraints
+                if total_cost <= max_budget and avg_latency <= max_latency and providers <= max_providers:
+                    # Calculate proper provider distribution
+                    provider_dist = {}
+                    for svc in config.values():
+                        provider = svc.split()[0]
+                        provider_dist[provider] = provider_dist.get(provider, 0) + 1
+                    
+                    solution = Solution(
+                        configuration=config,
+                        cost=total_cost,
+                        latency=avg_latency,
+                        providers=providers,
+                        providerDistribution=provider_dist,
+                        score=100 - (total_cost/max_budget)*50 - (avg_latency/max_latency)*50
+                    )
+                    feasible_solutions.append(solution)
+            
+            print(f"[CMOv4] Total feasible solutions after supplementing: {len(feasible_solutions)}")
         
-        print(f"[CMOv4] Fast CSP generated {len(feasible_solutions)} feasible solutions")
-        
-        # Simple ranking by score
-        ranked_solutions = sorted(feasible_solutions, key=lambda s: s.score, reverse=True)
+        # Simple ranking by score (handle None scores safely)
+        ranked_solutions = sorted(feasible_solutions, key=lambda s: s.score if s.score is not None else 0, reverse=True)
         
         # Calculate Pareto frontier using backend library (more accurate)
         from backend.engines.pareto import calculate_pareto_frontier, calculate_pareto_metrics, get_extreme_solutions
@@ -221,12 +276,12 @@ def optimize_architecture(arch: dict, constraints: dict, config: dict = None) ->
             }
         }
     except TimeoutError:
-        print("[CMOv4] Optimization timed out (10s limit)")
+        print("[CMOv4] Optimization timed out (30s limit)")
         return {
             'solutions': [],
             'pareto_frontier': [],
-            'suggestions': ["Optimization timed out - try reducing components or relaxing constraints", "💡 Check if latency threshold is too restrictive for your use case"],
-            'explanations': ["CMOv4 optimization timed out - academic comparison preserved"],
+            'suggestions': ["Optimization timed out after 30s - try reducing components or relaxing constraints", "💡 Check if Azure pricing API is slow (may need to use cached data)"],
+            'explanations': ["CMOv4 optimization timed out - pricing API delays possible"],
             'metrics': {'timeout': True}
         }
     except Exception as e:

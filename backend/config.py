@@ -95,4 +95,5 @@ CSP_CONFIG = {
     "sample_size": 100,
     "enable_early_termination": False,
     "early_termination_count": 100,
+    "max_feasible_solutions": 500,  # Maximum feasible solutions to find (50-1000 recommended)
 }

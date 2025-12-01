@@ -2393,8 +2393,12 @@ def _resolve_service_key(service_name: str) -> str:
 
 
 def get_cost_for_service(service_name: str, provider=None, region=None) -> float:
-    """Main entry point for cost lookup with live API integration"""
-    return get_smart_cost_for_service(service_name, provider, region)
+    """
+    Main entry point for cost lookup.
+    Uses cached static prices to avoid live API calls during optimization.
+    """
+    # Always use static cache for performance - live API is too slow for optimization loops
+    return get_static_cost_for_service(service_name, provider, region)
 def get_static_cost_for_service(service_name, provider=None, region=None):
     """Lookup static price table for a service/component."""
     key = _resolve_service_key(service_name)

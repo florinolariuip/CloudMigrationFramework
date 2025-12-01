@@ -208,8 +208,8 @@ def generate_feasible_solutions(constraints: Constraints) -> List[Solution]:
         if all(sorted_by_latency[c] for c in selected_components):
             heuristic_picks.append([sorted_by_latency[c][0] for c in selected_components])
 
-        # Strategy 3-5: Balanced - pick from top 2 options (simplified)
-        for _ in range(3):
+        # Strategy 3-10: Balanced - pick from top 2 options (increased from 3 to 8)
+        for _ in range(8):
             pick = []
             for c in selected_components:
                 cost_opts = sorted_by_cost[c][:2]
@@ -222,7 +222,7 @@ def generate_feasible_solutions(constraints: Constraints) -> List[Solution]:
             if len(pick) == len(selected_components):
                 heuristic_picks.append(pick)
 
-        # Strategy 6-8: Single-provider solutions (simplified)
+        # Strategy 11-13: Single-provider solutions (AWS, Azure, GCP)
         for provider in ['AWS', 'Azure', 'GCP']:
             pick = []
             for c in selected_components:
@@ -234,8 +234,8 @@ def generate_feasible_solutions(constraints: Constraints) -> List[Solution]:
             if len(pick) == len(selected_components):
                 heuristic_picks.append(pick)
 
-        # Strategy 9-20: Random sampling (reduced from 40 to 12 for speed)
-        for _ in range(12):
+        # Strategy 14-50: Random sampling (increased from 12 to 37 for better coverage)
+        for _ in range(37):
             pick = []
             for c in selected_components:
                 opts = service_options.get(c, [])
@@ -286,8 +286,10 @@ def generate_feasible_solutions(constraints: Constraints) -> List[Solution]:
             )
             
         # Early termination if we have enough solutions
-        if len(solutions) >= 50:  # Limit to 50 feasible solutions for performance
-            print(f"[TIMING] Early termination: found {len(solutions)} feasible solutions")
+        # Configurable limit: 500 for research, 50 for production
+        max_solutions = CSP_CONFIG.get("max_feasible_solutions", 500)
+        if len(solutions) >= max_solutions:
+            print(f"[TIMING] Early termination: found {len(solutions)} feasible solutions (limit: {max_solutions})")
             break
     
     total_time = time.time() - start_time
