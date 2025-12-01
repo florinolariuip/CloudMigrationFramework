@@ -359,15 +359,23 @@
           console.log('Max budget:', maxBudget, 'Max latency:', maxLatency);
           console.log('Pareto frontier from benchmark:', results.paretoFrontier);
           console.log('Pareto solutions array:', results.paretoFrontier?.solutions);
+          console.log('Timing data:', results.timing);
           
-          // Prepare scenario parameters using actual benchmark constraints
+          // Prepare scenario parameters using actual benchmark constraints and timing
           const scenario = {
             components: actualComponents,
             maxBudget: Number(maxBudget) || 10000,
             maxLatency: Number(maxLatency) || 150,
             maxProviders: 3,
             // Send the existing Pareto frontier solutions array from the benchmark
-            paretoFrontier: results.paretoFrontier?.solutions || []
+            paretoFrontier: results.paretoFrontier?.solutions || [],
+            // Send accurate timing data from CMOv4 optimization
+            timing: {
+              csp_time_ms: results.timing?.csp_time_ms || 0,
+              expert_time_ms: results.timing?.expert_time_ms || 0,
+              pareto_time_ms: results.timing?.pareto_time_ms || 0,
+              total_time_ms: results.timing?.total_time_ms || 0
+            }
           };
           
           console.log('Sending scenario to backend:', scenario);

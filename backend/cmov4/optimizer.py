@@ -134,12 +134,13 @@ def optimize_architecture(arch: dict, constraints: dict, config: dict = None) ->
         from backend.engines.rules import evaluate_solutions
         from backend.models import Preferences
         
-        # Build Preferences object from constraints
+        # Build Preferences object from constraints (frozen dataclass - must pass values in constructor)
         user_prefs = constraints.get('preferences', {})
-        preferences = Preferences()
-        preferences.preferredProvider = user_prefs.get('preferredProvider')
-        preferences.prioritizeCost = user_prefs.get('prioritizeCost', False)
-        preferences.prioritizePerformance = user_prefs.get('prioritizePerformance', False)
+        preferences = Preferences(
+            preferredProvider=user_prefs.get('preferredProvider'),
+            prioritizeCost=user_prefs.get('prioritizeCost', False),
+            prioritizePerformance=user_prefs.get('prioritizePerformance', False)
+        )
         
         # Evaluate solutions with expert system (same as CMOv3)
         try:

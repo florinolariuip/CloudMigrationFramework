@@ -329,10 +329,30 @@
             rds_backup_gb: Number(rdsBackupGb),
             s3_gb: Number(s3Gb)
           };
+          
+          // Pass provided solution and timing data if available (Option 1: accurate)
+          const payload = {
+            constraints: constraintsPayload,
+            preferences,
+            usage_profile: usageProfile
+          };
+          
+          // If we have results from recent optimization, pass them for accurate timing
+          if (results && results.rankedSolutions && results.rankedSolutions[0]) {
+            payload.providedSolution = results.rankedSolutions[0];
+            payload.providedTiming = {
+              csp_time_ms: results.timing?.csp_time_ms || 0,
+              expert_time_ms: results.timing?.expert_time_ms || 0,
+              pareto_time_ms: results.timing?.pareto_time_ms || 0,
+              total_time_ms: results.timing?.total_time_ms || 0
+            };
+            payload.providedParetoFrontier = results.paretoFrontier?.solutions || [];
+          }
+          
           const res = await fetch(`${API_BASE}/api/compare-baselines`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ constraints: constraintsPayload, preferences, usage_profile: usageProfile }),
+            body: JSON.stringify(payload),
           });
           const data = await res.json();
           setBaselineComparison(data);
