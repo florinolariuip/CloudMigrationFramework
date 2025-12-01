@@ -105,6 +105,7 @@ python -m http.server 8080
 - **AWS**: Public pricing rates (2024-2025)
 - **Azure**: Live Retail Pricing API
 - **GCP**: Public pricing rates (2024-2025)
+- **Workload-Based Costs**: Usage-driven pricing for realistic estimates
 - **Real-Time Data**: Cached with 1-hour TTL
 
 ---
@@ -278,8 +279,9 @@ journalimplementationver2 3/
 
 - **Backend**: Flask, experta (expert system), NumPy (Pareto calculations)
 - **Frontend**: React 18 (UMD), TailwindCSS, Plotly.js, marked.js
-- **APIs**: Azure Retail Pricing API
+- **Live APIs**: AWS Pricing API, Azure Retail Pricing API, GCP Compute API
 - **Visualization**: Plotly.js Sankey diagrams
+- **Monitoring**: Real-time API success tracking and fallback management
 
 ### Adding New Components
 
@@ -430,7 +432,8 @@ For research questions, refer to the academic papers and documentation.
 ## 🔌 API Summary
 
 - POST `/api/optimize`
-    - Body: `{ constraints: {...}, preferences: {...}, seed?: number }`
+    - Body: `{ constraints: {...}, preferences: {...}, workload?: {...}, seed?: number }`
+    - Workload: `{ requests_per_month, cross_az_gb, internet_egress_gb, ebs_gb, rds_backup_gb, s3_gb }`
     - Returns: results, paretoFrontier, explainability, and `metrics` including `search_space_size`, `feasible_pre_dedup`, `feasible_post_dedup`, `duplicates_removed`, `pareto_frontier_size`, timings, and `seed_used`.
 
 - GET `/api/version`

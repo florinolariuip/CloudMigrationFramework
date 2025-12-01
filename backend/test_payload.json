@@ -1,0 +1,26 @@
+{
+  "scenario": {
+    "components": ["Compute", "Storage"],
+    "maxBudget": 1000,
+    "maxLatency": 200.0,
+    "maxProviders": 3,
+    "paretoFrontier": [
+      {
+        "configuration": {"Compute": "AWS EC2", "Storage": "Azure Storage"},
+        "cost": 500,
+        "latency": 100.0,
+        "providers": 2,
+        "providerDistribution": {"AWS": 1, "Azure": 1},
+        "score": 95.0
+      },
+      {
+        "configuration": {"Compute": "GCP Compute Engine", "Storage": "AWS S3"},
+        "cost": 700,
+        "latency": 150.0,
+        "providers": 2,
+        "providerDistribution": {"GCP": 1, "AWS": 1},
+        "score": 90.0
+      }
+    ]
+  }
+}

@@ -18,22 +18,22 @@ Component {
 ```
 
 **Component Types Available:**
-
-* Web Frontend
-* Application Server
-* Database
-* Cache
-* Monitoring
-* Message Queue
-* Object Storage
-* Load Balancer
-* Backup
-* Security / Secrets
-* CDN
-* Analytics
-* Encryption / KMS
-* Container Runtime
-* Serverless / Lambda
+- `web` → API Gateway
+- `compute` → Application Server  
+- `database` → Database
+- `cache` → Cache (Redis/Memcached)
+- `monitoring` → Monitoring (CloudWatch/Prometheus)
+- `message_queue` → Message Queue (SQS/Pub/Sub)
+- `storage` → Object Storage (S3/Blob)
+- `load_balancer` → Load Balancer
+- `backup` → Backup Service
+- `security` → Encryption/Security
+- `cdn` → Content Delivery Network
+- `analytics` → Analytics Service
+- `encryption` → Key Management
+- `containers` → Container Orchestration (EKS/AKS/GKE)
+- `serverless_compute` → Serverless Functions (Lambda/Functions)
+- `identity` → Identity Management (IAM)
 
 ### 2. **Architecture** (Overall Design)
 Architecture is the collection of components with their relationships:

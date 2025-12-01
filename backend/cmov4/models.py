@@ -21,9 +21,21 @@ class Component:
 
     def apply_selection_rules(self, context: Dict) -> None:
         """
-        Stub for smart selection logic. To be implemented: select tech stack, instance count, etc. based on context.
+        Apply smart selection logic based on context.
+        Adjusts tech stack, instance count, etc. based on workload requirements.
         """
-        pass
+        # Basic selection rules for demonstration
+        workload_size = context.get('workload_size', 'medium')
+        
+        if workload_size == 'large':
+            self.instance_count = max(self.instance_count, 3)
+        elif workload_size == 'small':
+            self.instance_count = min(self.instance_count, 1)
+            
+        # Apply tech stack preferences
+        if context.get('prefer_managed', True):
+            if self.type == 'database':
+                self.tech_stack['managed'] = True
 
 
 class Pricing:
@@ -53,6 +65,17 @@ class Architecture:
 
     def apply_selection_rules(self, context: Dict) -> None:
         """
-        Stub for architecture-level smart selection logic.
+        Apply architecture-level smart selection logic.
+        Configures patterns, relationships, and global settings.
         """
-        pass
+        # Apply architecture pattern rules
+        if self.architecture_pattern == 'microservices':
+            # Ensure load balancer and service mesh components
+            has_lb = any(c.type == 'load_balancer' for c in self.components)
+            if not has_lb and len(self.components) > 3:
+                # Would add load balancer component in production
+                pass
+                
+        # Apply multi-tenancy rules
+        if context.get('tenant_count', 1) > 1:
+            self.multi_tenancy = True

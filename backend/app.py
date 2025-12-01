@@ -45,7 +45,7 @@ from backend.config import (
     CSP_CONFIG,
 )
 from backend.models import Constraints, Preferences
-from backend.services.pricing import get_total_combinations
+from backend.services.pricing import get_total_combinations, COMPONENTS
 from backend.engines.constraints import generate_feasible_solutions
 from backend.engines.rules import evaluate_solutions, calculate_statistics, evaluate_solutions_normalized
 from backend.engines.pareto import (
@@ -68,6 +68,10 @@ from backend.engines.explainability import (
 from backend.engines.sankey import (
     generate_sankey_data,
     generate_latency_sankey
+)
+from backend.engines.terraform_generator import (
+    generate_terraform_for_solution,
+    generate_deployment_script
 )
 
 
@@ -539,13 +543,18 @@ def reset_config():
 @app.get("/api/services")
 def get_services():
     """
-    Returns current service data including costs, latency, and options.
-    Supports optional force_refresh parameter to bypass cache.
+    Returns current service data with live API integration status.
+    Enhanced to show real-time pricing source information.
     """
     from backend.services.pricing import service_cache
     
     force_refresh = request.args.get('refresh', 'false').lower() == 'true'
     data = service_cache.get_service_data(force_refresh=force_refresh)
+    
+    # Extract API integration metrics
+    pricing_sources = data.get("pricing_sources", {})
+    api_status = data.get("api_status", {})
+    live_percentage = data.get("live_data_percentage", 0)
     
     return jsonify({
         "services": data,
@@ -557,7 +566,58 @@ def get_services():
         "pricing": {
             "azure_region": DEFAULT_PRICING.get("azure_region", "westeurope"),
             "currency": DEFAULT_PRICING.get("currency", "USD")
+        },
+        "live_api_status": {
+            "success_rate": pricing_sources.get("success_rate", "0%"),
+            "live_services": pricing_sources.get("live_services", 0),
+            "fallback_services": pricing_sources.get("fallback_services", 0),
+            "live_data_percentage": live_percentage,
+            "provider_status": {
+                "aws": "✅ Live" if api_status.get("aws") else "❌ Fallback",
+                "azure": "✅ Live" if api_status.get("azure") else "❌ Fallback", 
+                "gcp": "✅ Live" if api_status.get("gcp") else "❌ Fallback"
+            },
+            "integration_quality": (
+                "Excellent" if live_percentage >= 80 else
+                "Good" if live_percentage >= 60 else
+                "Partial" if live_percentage >= 30 else
+                "Poor"
+            )
         }
+    })
+
+@app.get("/api/pricing-status")
+def get_pricing_status():
+    """
+    Dedicated endpoint for live API integration monitoring.
+    Useful for health checks and debugging.
+    """
+    from backend.services.pricing import service_cache
+    
+    data = service_cache.get_service_data()
+    sources = data.get("sources", {})
+    
+    # Count services by source type
+    live_count = sum(1 for source in sources.values() if "Live" in source)
+    fallback_count = sum(1 for source in sources.values() if "Fallback" in source)
+    total_count = len(sources)
+    
+    return jsonify({
+        "timestamp": datetime.now().isoformat(),
+        "total_services": total_count,
+        "live_services": live_count,
+        "fallback_services": fallback_count,
+        "live_percentage": round(live_count / total_count * 100, 1) if total_count > 0 else 0,
+        "api_status": data.get("api_status", {}),
+        "pricing_sources": data.get("pricing_sources", {}),
+        "service_breakdown": {
+            service: source for service, source in sources.items()
+        },
+        "recommendations": [
+            "✅ Excellent API integration" if live_count >= total_count * 0.8 else
+            "⚠️ Some APIs failing, check network/credentials" if live_count >= total_count * 0.5 else
+            "❌ Most APIs failing, using fallback data"
+        ]
     })
 
 
@@ -588,6 +648,107 @@ def update_pricing_settings():
         "pricing": DEFAULT_PRICING
     })
 
+
+@app.post("/api/multi-cloud-analysis")
+def analyze_multi_cloud():
+    """
+    Analyze multi-cloud configuration for latency, cost, and operational concerns.
+    Provides recommendations for addressing cross-cloud issues.
+    """
+    try:
+        payload = request.get_json(force=True, silent=True) or {}
+        config = payload.get("configuration", {})
+        
+        if not config:
+            return jsonify({"error": "No configuration provided"}), 400
+        
+        # Analyze provider distribution
+        providers = {}
+        for component, service in config.items():
+            provider = service.split(' ')[0]
+            if provider not in providers:
+                providers[provider] = []
+            providers[provider].append(component)
+        
+        # Calculate cross-cloud penalties
+        from backend.engines.constraints import calculate_cross_cloud_penalty, calculate_data_transfer_cost
+        latency_penalty = calculate_cross_cloud_penalty(config)
+        transfer_cost = calculate_data_transfer_cost(config, 100)  # 100GB/month
+        
+        # Generate recommendations
+        recommendations = []
+        if len(providers) > 1:
+            recommendations.extend([
+                "Consider regional co-location to reduce latency",
+                "Implement caching to minimize cross-cloud data transfer",
+                "Use dedicated network connections (VPN/peering)",
+                "Monitor data transfer costs closely"
+            ])
+        
+        if len(providers) > 2:
+            recommendations.append("Consider reducing to 2 providers to minimize operational complexity")
+        
+        # Operational complexity assessment
+        complexity_factors = {
+            "multiple_consoles": len(providers),
+            "billing_systems": len(providers),
+            "security_models": len(providers),
+            "api_integrations": len(config)
+        }
+        
+        complexity_score = (
+            len(providers) * 2 +  # Provider complexity
+            len(config) * 0.1 +   # Service complexity
+            (len(providers) - 1) * 1.5  # Cross-cloud complexity
+        )
+        
+        return jsonify({
+            "provider_analysis": {
+                "providers": providers,
+                "provider_count": len(providers),
+                "is_multi_cloud": len(providers) > 1
+            },
+            "latency_analysis": {
+                "cross_cloud_penalty_ms": round(latency_penalty, 2),
+                "impact_level": "High" if latency_penalty > 15 else "Medium" if latency_penalty > 8 else "Low"
+            },
+            "cost_analysis": {
+                "monthly_transfer_cost": round(transfer_cost, 2),
+                "annual_transfer_cost": round(transfer_cost * 12, 2)
+            },
+            "operational_complexity": {
+                "complexity_score": round(complexity_score, 1),
+                "complexity_level": "High" if complexity_score > 8 else "Medium" if complexity_score > 4 else "Low",
+                "factors": complexity_factors
+            },
+            "recommendations": recommendations,
+            "mitigation_strategies": {
+                "latency": [
+                    "Deploy services in same regions (e.g., us-east-1, East US, us-east1)",
+                    "Use CDN for static content delivery",
+                    "Implement local caching layers"
+                ],
+                "cost": [
+                    "Compress data transfers",
+                    "Batch API calls",
+                    "Use message queues for async communication"
+                ],
+                "complexity": [
+                    "Use Terraform for unified infrastructure management",
+                    "Implement consistent monitoring across clouds",
+                    "Standardize security policies and tagging"
+                ]
+            }
+        })
+    
+    except Exception as e:
+        import traceback
+        error_detail = traceback.format_exc()
+        print(f"Multi-cloud analysis error: {error_detail}")
+        return jsonify({
+            "error": str(e),
+            "detail": error_detail
+        }), 500
 
 @app.post("/api/optimize")
 def optimize():
@@ -641,13 +802,54 @@ def optimize():
     prefs = payload.get("preferences", {})
 
     # Parse input constraints (for CSP phase)
+    # Handle component selection - convert UI strings to component names
+    selected_components = cons.get("selected_components")
+    if selected_components and isinstance(selected_components, list):
+        # Map UI component names to internal component names
+        component_mapping = {
+            'Web Frontend': 'api_gateway',
+            'Application Server': 'application_server', 
+            'Database': 'database',
+            'Cache': 'cache',
+            'Monitoring': 'monitoring',
+            'Storage': 'storage',
+            'Message Queue': 'message_queue',
+            'CDN': 'cdn',
+            'Load Balancer': 'load_balancer',
+            'Backup': 'backup',
+            'Encryption': 'encryption',
+            'Containers': 'containers',
+            'Serverless Compute': 'serverless_compute',
+            'Identity Management': 'identity_management',
+            'Analytics': 'analytics'
+        }
+        mapped_components = []
+        for comp in selected_components:
+            if comp in component_mapping:
+                mapped_components.append(component_mapping[comp])
+            elif comp.lower() in [c.lower() for c in COMPONENTS]:
+                mapped_components.append(comp.lower())
+        selected_components = mapped_components if mapped_components else None
+        print(f"[DEBUG] UI components: {cons.get('selected_components')}")
+        print(f"[DEBUG] Mapped components: {selected_components}")
 
     constraints = Constraints(
         maxBudget=int(cons.get("maxBudget", DEFAULT_CONSTRAINTS["maxBudget"])),
         maxLatency=float(cons.get("maxLatency", DEFAULT_CONSTRAINTS["maxLatency"])),
         maxProviders=int(cons.get("maxProviders", DEFAULT_CONSTRAINTS["maxProviders"])),
-        selected_components=cons.get("selected_components", None)
+        selected_components=selected_components
     )
+    # Add workload profile if provided
+    workload = payload.get("workload")
+    if workload:
+        constraints.workload_profile = {
+            'requests_per_month': int(workload.get('requests_per_month', 0)),
+            'cross_az_gb': int(workload.get('cross_az_gb', 0)),
+            'internet_egress_gb': int(workload.get('internet_egress_gb', 0)),
+            'ebs_gb': int(workload.get('ebs_gb', 0)),
+            'rds_backup_gb': int(workload.get('rds_backup_gb', 0)),
+            's3_gb': int(workload.get('s3_gb', 0))
+        }
     # Academic extension: add performance metric to constraints
     setattr(constraints, "performanceMetric", cons.get("performanceMetric", DEFAULT_CONSTRAINTS.get("performanceMetric", "avg_latency")))
 
@@ -677,9 +879,11 @@ def optimize():
                             pass
 
         # PHASE 1: CSP - Generate feasible solutions
+        print(f"[TIMING] Starting CSP phase with constraints: Budget=${constraints.maxBudget}, Latency={constraints.maxLatency}ms, Providers={constraints.maxProviders}")
         csp_start = time.time()
         feasible = generate_feasible_solutions(constraints)
         csp_duration = time.time() - csp_start
+        print(f"[TIMING] CSP phase completed: {csp_duration*1000:.1f}ms")
 
         # Capture pre-dedup count for research reproducibility
         pre_dedup_count = len(feasible)
@@ -692,6 +896,32 @@ def optimize():
         if duplicates_removed > 0:
             print(f"[OPTIMIZE] Removed {duplicates_removed} duplicate solutions from CSP results (pre={pre_dedup_count}, post={post_dedup_count})")
 
+        # Generate suggestions if no feasible solutions
+        if not feasible:
+            suggestions = []
+            component_count = len(constraints.selected_components) if constraints.selected_components else 5
+            
+            if constraints.maxBudget < component_count * 1000:
+                suggestions.append(f"Increase budget to ${component_count * 1500}/month (${component_count * 1500 - constraints.maxBudget} more)")
+            
+            if constraints.maxLatency < 100:
+                suggestions.append(f"Increase max latency to 200-400ms (currently {constraints.maxLatency}ms)")
+            
+            if component_count > 6:
+                suggestions.append(f"Reduce components to 4-6 (currently {component_count} selected)")
+            
+            if constraints.maxProviders == 1:
+                suggestions.append("Allow 2-3 providers for more service options")
+            
+            return jsonify({
+                "error": "No feasible solutions found",
+                "suggestions": suggestions,
+                "totalCombinations": get_total_combinations(),
+                "feasibleSolutions": 0,
+                "solutions": [],
+                "metrics": {"feasible_count": 0}
+            })
+
         # Deterministic ordering: sort solutions to eliminate ordering noise between runs
         feasible.sort(key=lambda s: (
             round(s.cost, 4),
@@ -700,19 +930,24 @@ def optimize():
         ))
 
         # PHASE 2: Expert System - Rank by business rules
+        print(f"[TIMING] Starting Expert System phase with {len(feasible)} solutions")
         expert_start = time.time()
         ranked = evaluate_solutions(feasible, preferences, constraints.maxBudget)
         expert_duration = time.time() - expert_start
+        print(f"[TIMING] Expert System completed: {expert_duration*1000:.1f}ms, ranked {len(ranked)} solutions")
 
         # MULTI-OBJECTIVE: Calculate Pareto frontier (now on deduplicated solutions)
+        print(f"[TIMING] Starting Pareto frontier calculation")
         pareto_start = time.time()
         pareto_frontier = calculate_pareto_frontier(feasible, objectives=['cost', 'latency'])
         pareto_ranked = evaluate_solutions(pareto_frontier, preferences, constraints.maxBudget)  # Rank Pareto solutions
         pareto_metrics = calculate_pareto_metrics(feasible, pareto_frontier)
         extreme_solutions = get_extreme_solutions(pareto_frontier)
         pareto_duration = time.time() - pareto_start
+        print(f"[TIMING] Pareto frontier completed: {pareto_duration*1000:.1f}ms, found {len(pareto_frontier)} optimal solutions")
 
         # EXPLAINABILITY: Generate transparency data for best solution (Priority 3)
+        print(f"[TIMING] Starting explainability generation")
         explainability_start = time.time()
         best_solution = ranked[0] if ranked else None
         explainability_data = None
@@ -753,9 +988,12 @@ def optimize():
             }
 
         explainability_duration = time.time() - explainability_start
+        print(f"[TIMING] Explainability completed: {explainability_duration*1000:.1f}ms")
 
         total_combinations = get_total_combinations()
         total_duration = time.time() - start_time
+        print(f"[TIMING] TOTAL OPTIMIZATION: {total_duration*1000:.1f}ms")
+        print(f"[TIMING] Performance breakdown - CSP: {csp_duration*1000:.1f}ms ({(csp_duration/total_duration)*100:.1f}%), Expert: {expert_duration*1000:.1f}ms ({(expert_duration/total_duration)*100:.1f}%), Pareto: {pareto_duration*1000:.1f}ms ({(pareto_duration/total_duration)*100:.1f}%), Explain: {explainability_duration*1000:.1f}ms ({(explainability_duration/total_duration)*100:.1f}%)")
 
         # Academic metrics for research/analysis
         metrics = {
@@ -764,6 +1002,7 @@ def optimize():
             "expert_time_ms": round(expert_duration * 1000, 2),
             "pareto_time_ms": round(pareto_duration * 1000, 2),
             "explainability_time_ms": round(explainability_duration * 1000, 2),
+            "sankey_time_ms": round(sankey_duration * 1000, 2) if 'sankey_duration' in locals() else 0,
             "search_space_size": total_combinations,
             # Feasible set sizes (pre & post dedup) for variance analysis in experiments
             "feasible_pre_dedup": pre_dedup_count,
@@ -791,8 +1030,10 @@ def optimize():
         })
 
         # SANKEY DIAGRAM: Generate visualization data for solution flows
+        sankey_start = time.time()
         sankey_data = None
         latency_sankey_data = None
+        terraform_preview = None
         if best_solution:
             from backend.services.pricing import get_service_costs, get_service_latency
             services_info = {
@@ -801,6 +1042,17 @@ def optimize():
             }
             sankey_data = generate_sankey_data(best_solution, services_info)
             latency_sankey_data = generate_latency_sankey(best_solution, services_info)
+            
+            # Generate Terraform preview for multi-cloud solutions
+            if best_solution.providers > 1:
+                try:
+                    terraform_preview = generate_terraform_for_solution(best_solution)[:500] + "..." # Preview only
+                except Exception as e:
+                    print(f"[WARNING] Terraform preview generation failed: {e}")
+                    terraform_preview = None
+        
+        sankey_duration = time.time() - sankey_start
+        print(f"[TIMING] Sankey diagrams: {sankey_duration*1000:.1f}ms")
 
         resp = {
             "totalCombinations": total_combinations,
@@ -835,6 +1087,13 @@ def optimize():
             "sankeyDiagram": {
                 "costFlow": sankey_data,
                 "latencyFlow": latency_sankey_data
+            },
+            # Multi-cloud operational insights
+            "multiCloudInsights": {
+                "terraformPreview": terraform_preview,
+                "crossCloudLatency": calculate_cross_cloud_penalty(best_solution.configuration) if best_solution else 0,
+                "dataTransferCost": calculate_data_transfer_cost(best_solution.configuration, 100) if best_solution else 0,
+                "operationalComplexity": "High" if best_solution and best_solution.providers > 2 else "Medium" if best_solution and best_solution.providers > 1 else "Low"
             }
         }
         return jsonify(resp)
@@ -845,6 +1104,9 @@ def optimize():
     finally:
         # Restore global CSP config to avoid leaking per-request overrides
         CSP_CONFIG.update(old_csp)
+        
+# Import cross-cloud penalty functions at module level
+from backend.engines.constraints import calculate_cross_cloud_penalty, calculate_data_transfer_cost
 
 
 @app.post("/api/compare-baselines")
@@ -1164,6 +1426,66 @@ def count_unique_providers(configuration):
     }
     return len(providers)
 
+@app.post("/api/terraform")
+def generate_terraform():
+    """
+    Generate Terraform Infrastructure-as-Code for a solution.
+    Addresses operational complexity by providing unified IaC templates.
+    """
+    try:
+        payload = request.get_json(force=True, silent=True) or {}
+        
+        # Get solution configuration
+        config = payload.get("configuration", {})
+        if not config:
+            return jsonify({"error": "No solution configuration provided"}), 400
+        
+        # Create a temporary solution object
+        from backend.models import Solution
+        solution = Solution(
+            configuration=config,
+            cost=payload.get("cost", 0),
+            latency=payload.get("latency", 0),
+            providers=payload.get("providers", 1),
+            providerDistribution=payload.get("providerDistribution", {})
+        )
+        
+        # Generate Terraform configuration
+        terraform_config = generate_terraform_for_solution(solution)
+        deployment_script = generate_deployment_script(solution)
+        
+        # Calculate estimated deployment time and complexity
+        providers = set(service.split(' ')[0] for service in config.values())
+        complexity_score = len(providers) * 2 + len(config) * 0.5
+        estimated_time_minutes = max(10, int(complexity_score * 3))
+        
+        return jsonify({
+            "terraform_config": terraform_config,
+            "deployment_script": deployment_script,
+            "metadata": {
+                "providers": list(providers),
+                "services_count": len(config),
+                "complexity_score": round(complexity_score, 1),
+                "estimated_deployment_time_minutes": estimated_time_minutes,
+                "multi_cloud": len(providers) > 1,
+                "recommendations": [
+                    "Review provider credentials before deployment",
+                    "Test in staging environment first",
+                    "Set up monitoring and alerting",
+                    "Configure backup and disaster recovery"
+                ] + (["Consider VPN/peering for cross-cloud connectivity"] if len(providers) > 1 else [])
+            }
+        })
+    
+    except Exception as e:
+        import traceback
+        error_detail = traceback.format_exc()
+        print(f"Terraform generation error: {error_detail}")
+        return jsonify({
+            "error": str(e),
+            "detail": error_detail
+        }), 500
+
 @app.route('/api/cmov4/compare-baselines', methods=['POST'])
 def compare_cmov4_baselines():
     """
@@ -1190,7 +1512,7 @@ def compare_cmov4_baselines():
         )
         from engines.pareto import calculate_pareto_frontier
         from models import Constraints, Solution
-        from services.pricing import COMPONENTS, get_service_options, get_service_costs, get_service_latency
+        from services.pricing import COMPONENTS, get_service_options, get_service_costs, get_service_latency, _resolve_service_key, get_cost_for_service, get_latency_for_service
         import itertools
         
         data = request.json
@@ -1204,7 +1526,7 @@ def compare_cmov4_baselines():
             components = scenario['components']
         else:
             # COMPONENTS is a list, not a dict
-            components = COMPONENTS[:5]  # Default to first 5
+            components = COMPONENTS  # Use all 18 components by default
         max_budget = float(scenario.get('maxBudget', 5000))
         max_latency = float(scenario.get('maxLatency', 200))
         max_providers = int(scenario.get('maxProviders', 3))
@@ -1269,8 +1591,9 @@ def compare_cmov4_baselines():
                 
                 # Helper to create solution from config
                 def make_solution(config):
-                    cost = sum(costs.get(service, 0) for service in config.values())
-                    latency = sum(latencies.get(service, 0) for service in config.values()) / len(config) if config else 0
+                    # Resolve costs/latency using safe lookup to allow alias names (hyphens/underscores)
+                    cost = sum(get_cost_for_service(service) for service in config.values())
+                    latency = sum(get_latency_for_service(service) for service in config.values()) / len(config) if config else 0
                     
                     # Count unique PROVIDERS (not services)
                     providers = {service.split()[0] if ' ' in service else service.split('-')[0] 
@@ -1302,7 +1625,8 @@ def compare_cmov4_baselines():
                         if comp in options and options[comp]:
                             # Mix of cost and latency preferences
                             services = options[comp]
-                            weights = [1.0 / (costs.get(s, 1000) + latencies.get(s, 100)) for s in services]
+                            # Use safe lookups for cost/latency when computing weights
+                            weights = [1.0 / (get_cost_for_service(s) + get_latency_for_service(s) + 1e-9) for s in services]
                             total = sum(weights)
                             weights = [w/total for w in weights]
                             config[comp] = random.choices(services, weights=weights)[0]
@@ -1313,7 +1637,7 @@ def compare_cmov4_baselines():
                 
                 # Strategy 2: Random sampling
                 for _ in range(50):
-                    config = {comp: random.choice(options.get(comp, ['AWS-EC2'])) for comp in components}
+                    config = {comp: random.choice(options.get(comp, ['AWS EC2'])) for comp in components}
                     sol = make_solution(config)
                     if sol:
                         all_solutions.append(sol)

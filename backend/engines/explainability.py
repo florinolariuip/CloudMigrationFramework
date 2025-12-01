@@ -132,7 +132,8 @@ def generate_constraint_proof(
 def generate_rule_trace(
     solution: Solution,
     preferences: Preferences,
-    rule_weights: Dict[str, float]
+    rule_weights: Dict[str, float],
+    constraints: Constraints = None
 ) -> List[RuleFiring]:
     """
     Generate detailed trace of expert rules that fired
@@ -144,9 +145,22 @@ def generate_rule_trace(
     """
     firings = []
     
-    # Cost optimization rules
+    # Handle missing constraints - use fallback thresholds
+    if constraints is None:
+        cost_threshold_high = 4000  # Default fallback
+        cost_threshold_low = 3000   # Default fallback
+        latency_threshold_high = 120  # Default fallback
+        latency_threshold_low = 90    # Default fallback
+    else:
+        cost_threshold_high = constraints.maxBudget * 0.8  # 80% of budget
+        cost_threshold_low = constraints.maxBudget * 0.6   # 60% of budget
+        latency_threshold_high = constraints.maxLatency * 0.8  # 80% of max latency
+        latency_threshold_low = constraints.maxLatency * 0.6   # 60% of max latency
+    
+    # Cost optimization rules (dynamic thresholds based on constraints)
     cost_score = 0
-    if solution.cost < 1000:
+    
+    if solution.cost < cost_threshold_high:
         contribution = 20 * rule_weights.get("cost_weight", 1.0)
         cost_score += contribution
         firings.append(RuleFiring(
@@ -155,11 +169,11 @@ def generate_rule_trace(
             weight=rule_weights.get("cost_weight", 1.0),
             condition_met=True,
             score_contribution=contribution,
-            reasoning="Solution cost is under $1000, indicating efficient resource usage",
-            evidence={"cost": solution.cost, "threshold": 1000}
+            reasoning=f"Solution cost is under 80% of budget (${cost_threshold_high:.0f}), indicating efficient resource usage",
+            evidence={"cost": solution.cost, "threshold": cost_threshold_high, "budget_utilization": f"{(solution.cost/cost_threshold_high*0.8)*100:.1f}%" if constraints else "N/A"}
         ))
     
-    if solution.cost < 800:
+    if solution.cost < cost_threshold_low:
         contribution = 10 * rule_weights.get("cost_weight", 1.0)
         cost_score += contribution
         firings.append(RuleFiring(
@@ -168,13 +182,14 @@ def generate_rule_trace(
             weight=rule_weights.get("cost_weight", 1.0),
             condition_met=True,
             score_contribution=contribution,
-            reasoning="Exceptional cost efficiency - under $800",
-            evidence={"cost": solution.cost, "threshold": 800}
+            reasoning=f"Exceptional cost efficiency - under 60% of budget (${cost_threshold_low:.0f})",
+            evidence={"cost": solution.cost, "threshold": cost_threshold_low, "budget_utilization": f"{(solution.cost/cost_threshold_low*0.6)*100:.1f}%" if constraints else "N/A"}
         ))
     
-    # Performance rules
+    # Performance rules (dynamic thresholds based on constraints)
     perf_score = 0
-    if solution.latency < 15:
+    
+    if solution.latency < latency_threshold_high:
         contribution = 20 * rule_weights.get("performance_weight", 1.0)
         perf_score += contribution
         firings.append(RuleFiring(
@@ -183,11 +198,11 @@ def generate_rule_trace(
             weight=rule_weights.get("performance_weight", 1.0),
             condition_met=True,
             score_contribution=contribution,
-            reasoning="Solution latency under 15ms ensures responsive user experience",
-            evidence={"latency": solution.latency, "threshold": 15}
+            reasoning=f"Solution latency under 80% of limit ({latency_threshold_high:.1f}ms) ensures responsive user experience",
+            evidence={"latency": solution.latency, "threshold": latency_threshold_high, "latency_utilization": f"{(solution.latency/latency_threshold_high*0.8)*100:.1f}%" if constraints else "N/A"}
         ))
     
-    if solution.latency < 12:
+    if solution.latency < latency_threshold_low:
         contribution = 10 * rule_weights.get("performance_weight", 1.0)
         perf_score += contribution
         firings.append(RuleFiring(
@@ -196,8 +211,8 @@ def generate_rule_trace(
             weight=rule_weights.get("performance_weight", 1.0),
             condition_met=True,
             score_contribution=contribution,
-            reasoning="Excellent latency - under 12ms for high-performance applications",
-            evidence={"latency": solution.latency, "threshold": 12}
+            reasoning=f"Excellent latency - under 60% of limit ({latency_threshold_low:.1f}ms) for high-performance applications",
+            evidence={"latency": solution.latency, "threshold": latency_threshold_low, "latency_utilization": f"{(solution.latency/latency_threshold_low*0.6)*100:.1f}%" if constraints else "N/A"}
         ))
     
     # Preference rules
@@ -244,13 +259,18 @@ def generate_rule_trace(
             evidence={"provider_count": solution.providers, "providers": list(solution.providerDistribution.keys())}
         ))
     
-    # Balanced configuration
-    if 2 <= solution.providers <= 3:
+    # Balanced configuration (dynamic threshold based on total components)
+    max_providers = constraints.maxProviders if constraints else 3
+    if 2 <= solution.providers <= max_providers:
         aws_count = solution.providerDistribution.get("AWS", 0)
         azure_count = solution.providerDistribution.get("Azure", 0)
         gcp_count = solution.providerDistribution.get("GCP", 0)
         
-        if max(aws_count, azure_count, gcp_count) <= 4:  # No provider dominates
+        # Dynamic threshold: no provider should have more than 60% of components
+        total_components = len(COMPONENTS)
+        max_per_provider = int(total_components * 0.6)
+        
+        if max(aws_count, azure_count, gcp_count) <= max_per_provider and solution.providers <= max_providers:
             contribution = 10 * rule_weights.get("strategic_weight", 1.0)
             strategic_score += contribution
             firings.append(RuleFiring(
@@ -259,8 +279,8 @@ def generate_rule_trace(
                 weight=rule_weights.get("strategic_weight", 1.0),
                 condition_met=True,
                 score_contribution=contribution,
-                reasoning="Well-balanced distribution across providers reduces vendor lock-in risk",
-                evidence={"distribution": solution.providerDistribution}
+                reasoning=f"Well-balanced distribution across providers (max {max_per_provider}/{total_components} per provider) reduces vendor lock-in risk",
+                evidence={"distribution": solution.providerDistribution, "max_per_provider": max_per_provider, "total_components": total_components}
             ))
     
     return firings

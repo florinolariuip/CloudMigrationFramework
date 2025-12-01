@@ -3,8 +3,8 @@ from __future__ import annotations
 # --- Defaults and Academic Configuration ---
 DEFAULT_CONSTRAINTS = {
     "maxBudget": 5000,
-    "maxLatency": 12,
-    "maxProviders": 2,
+    "maxLatency": 150,
+    "maxProviders": 3,
     # Performance metric used by CSP feasibility check
     "performanceMetric": "avg_latency",  # avg_latency | tail_latency | throughput
 }
@@ -19,7 +19,7 @@ DEFAULT_PRICING = {
 
 # Service interdependency rules
 SERVICE_DEPENDENCIES = [
-    # Simplified dependencies to allow more feasible solutions for 15-component optimization
+    # Simplified dependencies to allow more feasible solutions for 18-component optimization
     # Original dependency (kept simple)
     {"if": "AWS RDS", "requires": "AWS EC2"},
     
@@ -30,43 +30,55 @@ SERVICE_DEPENDENCIES = [
 
 # Expert System Rule Parameters
 EXPERT_RULES_CONFIG = {
-    # Main cost/latency rules
-    "cost_high_threshold": 2800,
+    # Main cost/latency rules (adjusted for $5k budget, 150ms latency)
+    "cost_high_threshold": 4000,
     "cost_high_penalty": -25,
-    "cost_moderate_threshold": 2500,
+    "cost_moderate_threshold": 3000,
     "cost_moderate_penalty": -20,
     "cost_low_threshold": 2000,
     "cost_low_reward": 12,
-    "latency_excellent_threshold": 10,
+    "latency_excellent_threshold": 80,
     "latency_excellent_reward": 15,
-    "latency_poor_threshold": 11.5,
+    "latency_poor_threshold": 120,
     "latency_poor_penalty": -10,
     "single_provider_bonus": 10,
     "preferred_provider_bonus": 8,
-    "cost_priority_threshold": 2600,
+    "cost_priority_threshold": 3500,
     "cost_priority_bonus": 5,
-    "performance_priority_threshold": 10.5,
+    "performance_priority_threshold": 100,
     "performance_priority_bonus": 5,
     
-    # Component-specific rules (new for 15-component support)
-    "cache_latency_threshold": 8.0,
+    # Component-specific rules (updated for 18-component support)
+    "cache_latency_threshold": 60.0,
     "cache_latency_reward": 8,
-    "cdn_latency_threshold": 9.0,
+    "cdn_latency_threshold": 70.0,
     "cdn_latency_reward": 6,
-    "monitoring_cost_threshold": 2700,
+    "monitoring_cost_threshold": 3750,
     "monitoring_cost_penalty": -8,
-    "backup_cost_threshold": 2900,
+    "backup_cost_threshold": 4250,
     "backup_cost_reward": 7,
-    "container_cost_threshold": 2800,
-    "container_latency_threshold": 10.5,
+    "container_cost_threshold": 4000,
+    "container_latency_threshold": 90.0,
     "container_balance_reward": 10,
-    "serverless_latency_threshold": 9.5,
+    "serverless_latency_threshold": 75.0,
     "serverless_efficiency_reward": 7,
-    "message_queue_cost_threshold": 2600,
+    "message_queue_cost_threshold": 3250,
     "message_queue_reliability_reward": 6,
-    "load_balancer_cost_threshold": 2750,
+    "load_balancer_cost_threshold": 3500,
     "load_balancer_availability_reward": 8,
     "encryption_compliance_reward": 9,
+    "nosql_cost_threshold": 3000,
+    "nosql_performance_reward": 8,
+    "event_streaming_latency_threshold": 50.0,
+    "event_streaming_reward": 10,
+    "iot_cost_threshold": 2500,
+    "iot_efficiency_reward": 7,
+    
+    # Multi-cloud operational rules
+    "multi_cloud_penalty": -5,  # Penalty per additional provider
+    "colocation_latency_threshold": 12.0,  # Good latency indicating regional co-location
+    "colocation_bonus": 8,  # Reward for good multi-cloud latency
+    "diversification_reward": 6,  # Reward for 2-provider risk diversification
 }
 
 # Scoring Weights

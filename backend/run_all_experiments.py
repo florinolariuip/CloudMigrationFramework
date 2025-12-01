@@ -5,7 +5,7 @@ Aggregates results and saves to backend/results/ for figure/table generation.
 import os
 from engines.baselines import run_all_baselines
 from engines.pymoo_runners import run_nsga2, run_moead
-from services.pricing import COMPONENTS, get_service_options, get_service_costs, get_service_latency
+from services.pricing import COMPONENTS, get_service_options, get_service_costs, get_service_latency, get_cost_for_service, get_latency_for_service
 from engines.experiment_harness import run_with_time_budget, aggregate_metrics
 # from engines.oracle import run_oracle_exhaustive  # To be implemented
 
@@ -52,9 +52,9 @@ components = [
 costs = get_service_costs()
 latencies = get_service_latency()
 def cost_objective(config):
-    return sum(costs.get(service, 0) for service in config.values())
+    return sum(get_cost_for_service(service) for service in config.values())
 def latency_objective(config):
-    return sum(latencies.get(service, 0) for service in config.values()) / len(config) if config else 0.0
+    return sum(get_latency_for_service(service) for service in config.values()) / len(config) if config else 0.0
 objectives = {'cost': cost_objective, 'latency': latency_objective}
 
 

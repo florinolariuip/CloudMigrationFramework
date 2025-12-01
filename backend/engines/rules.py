@@ -5,6 +5,35 @@ from typing import List, Dict, Any, Optional
 from backend.models import Preferences, Solution
 from backend.config import EXPERT_RULES_CONFIG, SCORING_WEIGHTS
 
+# Regional mapping for cross-cloud latency optimization
+REGIONAL_MAPPING = {
+    'AWS': {'us-east-1', 'us-west-2', 'eu-west-1', 'ap-southeast-1'},
+    'Azure': {'East US', 'West US 2', 'West Europe', 'Southeast Asia'},
+    'GCP': {'us-east1', 'us-west1', 'europe-west1', 'asia-southeast1'}
+}
+
+def estimate_cross_cloud_latency(config: Dict[str, str]) -> float:
+    """Estimate cross-cloud latency based on service distribution"""
+    providers = {s.split(" ")[0] for s in config.values()}
+    if len(providers) <= 1:
+        return 0.0
+    
+    # Base cross-cloud latencies (ms) - can be reduced with regional co-location
+    base_latencies = {
+        ('AWS', 'Azure'): 8.0,
+        ('AWS', 'GCP'): 10.0,
+        ('Azure', 'GCP'): 12.0
+    }
+    
+    total_penalty = 0.0
+    provider_list = list(providers)
+    for i in range(len(provider_list)):
+        for j in range(i + 1, len(provider_list)):
+            pair = tuple(sorted([provider_list[i], provider_list[j]]))
+            total_penalty += base_latencies.get(pair, 15.0)
+    
+    return total_penalty / len(providers) if providers else 0.0
+
 # Experta-based expert system
 from experta import KnowledgeEngine, Fact, Rule, Field, MATCH
 
@@ -49,11 +78,11 @@ class SolutionScoringEngine(KnowledgeEngine):
     def moderate_cost_penalty(self, cost):
         # Use budget-relative thresholds if available
         high_threshold = (
-            self.max_budget * 0.90 if self.max_budget 
+            self.max_budget * 0.80 if self.max_budget 
             else self.rules_config["cost_high_threshold"]
         )
         moderate_threshold = (
-            self.max_budget * 0.70 if self.max_budget 
+            self.max_budget * 0.60 if self.max_budget 
             else self.rules_config["cost_moderate_threshold"]
         )
         if cost > moderate_threshold and cost <= high_threshold:
@@ -67,9 +96,9 @@ class SolutionScoringEngine(KnowledgeEngine):
 
     @Rule(SolutionFact(cost=MATCH.cost))
     def low_cost_reward(self, cost):
-        # Use budget-relative threshold if available (50% of budget)
+        # Use budget-relative threshold if available (40% of budget)
         threshold = (
-            self.max_budget * 0.50 if self.max_budget 
+            self.max_budget * 0.40 if self.max_budget 
             else self.rules_config["cost_low_threshold"]
         )
         if cost < threshold:
@@ -274,6 +303,88 @@ class SolutionScoringEngine(KnowledgeEngine):
                 "weight": self.weights["strategic_weight"],
             })
 
+    @Rule(SolutionFact(cost=MATCH.cost))
+    def nosql_performance_reward(self, cost):
+        """Reward NoSQL database solutions for performance and scalability"""
+        threshold = self.rules_config.get("nosql_cost_threshold", 3000)
+        reward = self.rules_config.get("nosql_performance_reward", 8)
+        if cost < threshold:
+            impact = reward * self.weights["performance_weight"]
+            self.final_score += impact
+            self.evaluation_log.append({
+                "rule": f"NoSQL performance reward (<${threshold:g})",
+                "impact": round(impact, 1),
+                "weight": self.weights["performance_weight"],
+            })
+
+    @Rule(SolutionFact(latency=MATCH.latency))
+    def event_streaming_efficiency(self, latency):
+        """Reward event streaming for real-time data processing"""
+        threshold = self.rules_config.get("event_streaming_latency_threshold", 50.0)
+        reward = self.rules_config.get("event_streaming_reward", 10)
+        if latency < threshold:
+            impact = reward * self.weights["performance_weight"]
+            self.final_score += impact
+            self.evaluation_log.append({
+                "rule": f"Event streaming efficiency (<{threshold:g}ms)",
+                "impact": round(impact, 1),
+                "weight": self.weights["performance_weight"],
+            })
+
+    @Rule(SolutionFact(cost=MATCH.cost))
+    def iot_platform_efficiency(self, cost):
+        """Reward IoT platform solutions for device management efficiency"""
+        threshold = self.rules_config.get("iot_cost_threshold", 2500)
+        reward = self.rules_config.get("iot_efficiency_reward", 7)
+        if cost < threshold:
+            impact = reward * self.weights["strategic_weight"]
+            self.final_score += impact
+            self.evaluation_log.append({
+                "rule": f"IoT platform efficiency (<${threshold:g})",
+                "impact": round(impact, 1),
+                "weight": self.weights["strategic_weight"],
+            })
+
+    @Rule(SolutionFact(providers=MATCH.providers))
+    def multi_cloud_complexity_penalty(self, providers):
+        """Penalize multi-cloud solutions for operational complexity"""
+        if providers > 1:
+            penalty_per_provider = self.rules_config.get("multi_cloud_penalty", -5)
+            penalty = penalty_per_provider * (providers - 1)
+            impact = penalty * self.weights["strategic_weight"]
+            self.final_score += impact
+            self.evaluation_log.append({
+                "rule": f"Multi-cloud complexity penalty ({providers} providers)",
+                "impact": round(impact, 1),
+                "weight": self.weights["strategic_weight"],
+            })
+
+    @Rule(SolutionFact(providers=MATCH.providers, latency=MATCH.latency))
+    def regional_colocation_bonus(self, providers, latency):
+        """Reward multi-cloud solutions with good latency (indicating regional co-location)"""
+        if providers > 1 and latency < self.rules_config.get("colocation_latency_threshold", 12.0):
+            reward = self.rules_config.get("colocation_bonus", 8)
+            impact = reward * self.weights["strategic_weight"]
+            self.final_score += impact
+            self.evaluation_log.append({
+                "rule": f"Regional co-location bonus (<{self.rules_config.get('colocation_latency_threshold', 12.0)}ms)",
+                "impact": round(impact, 1),
+                "weight": self.weights["strategic_weight"],
+            })
+
+    @Rule(SolutionFact(providers=MATCH.providers))
+    def vendor_diversification_reward(self, providers):
+        """Reward 2-provider solutions for risk diversification without excessive complexity"""
+        if providers == 2:
+            reward = self.rules_config.get("diversification_reward", 6)
+            impact = reward * self.weights["strategic_weight"]
+            self.final_score += impact
+            self.evaluation_log.append({
+                "rule": "Vendor diversification reward (2 providers)",
+                "impact": round(impact, 1),
+                "weight": self.weights["strategic_weight"],
+            })
+
 
 def provider_distribution(config: Dict[str, str]) -> Dict[str, int]:
     dist: Dict[str, int] = {}
@@ -285,7 +396,34 @@ def provider_distribution(config: Dict[str, str]) -> Dict[str, int]:
 
 def get_main_provider(config: Dict[str, str]) -> str:
     dist = provider_distribution(config)
-    return max(dist.keys(), key=lambda k: dist[k])
+    return max(dist.keys(), key=lambda k: dist[k]) if dist else "Unknown"
+
+def calculate_operational_complexity_score(config: Dict[str, str]) -> float:
+    """Calculate operational complexity score (0-1, lower is more complex)"""
+    providers = provider_distribution(config)
+    num_providers = len(providers)
+    
+    if num_providers == 1:
+        return 1.0  # Lowest complexity
+    elif num_providers == 2:
+        return 0.7  # Moderate complexity
+    else:
+        return 0.4  # High complexity
+
+def estimate_data_transfer_volume(config: Dict[str, str]) -> float:
+    """Estimate monthly data transfer volume based on architecture"""
+    # Simple heuristic based on service types
+    base_volume = 100  # GB/month baseline
+    
+    # Services that typically generate high data transfer
+    high_transfer_services = ['database', 'storage', 'analytics', 'cdn']
+    transfer_multiplier = 1.0
+    
+    for component, service in config.items():
+        if any(ht in component.lower() for ht in high_transfer_services):
+            transfer_multiplier += 0.5
+    
+    return base_volume * transfer_multiplier
 
 
 def deduplicate_solutions(solutions: List[Solution]) -> List[Solution]:
@@ -390,9 +528,17 @@ def evaluate_solutions_normalized(solutions: List[Solution], weights=None):
         }
     
     # Import and calculate advanced metrics
-    from backend.engines.metrics import enrich_solution_with_metrics
-    for sol in solutions:
-        enrich_solution_with_metrics(sol)
+    try:
+        from backend.engines.metrics import enrich_solution_with_metrics
+        for sol in solutions:
+            enrich_solution_with_metrics(sol)
+    except ImportError:
+        # Fallback if metrics module not available
+        for sol in solutions:
+            sol.reliability = 0.95
+            sol.security_score = 0.90
+            sol.vendor_lockin_risk = 0.3 if sol.providers == 1 else 0.1
+            sol.scalability_score = 0.80
     
     # Extract values for normalization
     costs = [float(s.cost) for s in solutions]

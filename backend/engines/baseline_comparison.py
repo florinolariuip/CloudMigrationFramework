@@ -11,7 +11,7 @@ from typing import Dict, List, Tuple, Optional, Any
 from dataclasses import asdict
 
 from models import Constraints, Solution
-from services.pricing import get_service_options, get_service_costs, get_service_latency
+from services.pricing import get_service_options, get_service_costs, get_service_latency, get_cost_for_service, get_latency_for_service
 from engines.pareto import calculate_pareto_frontier
 from engines.baselines import (
     baseline_random,
@@ -143,8 +143,8 @@ def generate_pareto_frontier(
     
     def make_solution(config: Dict[str, str]) -> Optional[Solution]:
         """Create a Solution from configuration if it satisfies constraints."""
-        cost = sum(costs.get(service, 0) for service in config.values())
-        latency = sum(latencies.get(service, 0) for service in config.values()) / len(config) if config else 0
+        cost = sum(get_cost_for_service(service) for service in config.values())
+        latency = sum(get_latency_for_service(service) for service in config.values()) / len(config) if config else 0
         
         # Count unique providers
         providers = count_unique_providers(config)
@@ -176,7 +176,7 @@ def generate_pareto_frontier(
             if comp in options and options[comp]:
                 services = options[comp]
                 # Weight by inverse of cost + latency
-                weights = [1.0 / (costs.get(s, 1000) + latencies.get(s, 100)) for s in services]
+                weights = [1.0 / (get_cost_for_service(s) + get_latency_for_service(s) + 1e-9) for s in services]
                 total = sum(weights)
                 weights = [w / total for w in weights]
                 config[comp] = random.choices(services, weights=weights)[0]
@@ -188,7 +188,7 @@ def generate_pareto_frontier(
     # Strategy 2: Random sampling
     for _ in range(RANDOM_SAMPLE_COUNT):
         config = {
-            comp: random.choice(options.get(comp, ['AWS-EC2']))
+            comp: random.choice(options.get(comp, ['AWS EC2']))
             for comp in components
         }
         sol = make_solution(config)

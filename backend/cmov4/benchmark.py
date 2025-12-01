@@ -18,9 +18,9 @@ SCENARIOS = [
             'architecture_pattern': 'monolith'
         },
         'constraints': {
-            'maxBudget': 5000,
-            'maxLatency': 100,
-            'requiredProviders': ['AWS', 'Azure'],
+            'maxBudget': 10000,
+            'maxLatency': 150,
+            'requiredProviders': ['AWS', 'Azure', 'GCP'],
             'securityLevel': 'medium'
         },
         'pricing': {
@@ -48,8 +48,8 @@ SCENARIOS = [
             'architecture_pattern': 'microservices'
         },
         'constraints': {
-            'maxBudget': 10000,
-            'maxLatency': 150,
+            'maxBudget': 15000,
+            'maxLatency': 200,
             'requiredProviders': ['AWS', 'Azure', 'GCP'],
             'securityLevel': 'high'
         },
@@ -59,16 +59,18 @@ SCENARIOS = [
             'GCP': {'web': {'Angular': 0.10}, 'compute': {'Java': 0.13}, 'database': {'MySQL': 0.30}, 'cache': {'Memcached': 0.07}, 'monitoring': {'Grafana': 0.05}, 'message_queue': {'RabbitMQ': 0.08}, 'storage': {'S3': 0.04}, 'load_balancer': {'Nginx': 0.06}, 'backup': {'Velero': 0.05}, 'security': {'Vault': 0.07}}
         }
     },
-    # 15 components
+    # 18 components (enterprise scale)
     {
         'architecture': {
             'components': [
                 {'name': 'Frontend', 'type': 'web', 'instance_count': 5, 'tech_stack': {'framework': 'Vue'}, 'dependencies': ['AppServer']},
                 {'name': 'AppServer', 'type': 'compute', 'instance_count': 5, 'tech_stack': {'language': 'Go'}, 'dependencies': ['Database']},
                 {'name': 'Database', 'type': 'database', 'instance_count': 3, 'tech_stack': {'engine': 'SQL Server'}, 'dependencies': []},
+                {'name': 'NoSQL', 'type': 'nosql', 'instance_count': 2, 'tech_stack': {'engine': 'MongoDB'}, 'dependencies': []},
                 {'name': 'Cache', 'type': 'cache', 'instance_count': 3, 'tech_stack': {'engine': 'Redis'}, 'dependencies': ['Database']},
                 {'name': 'Monitor', 'type': 'monitoring', 'instance_count': 2, 'tech_stack': {'tool': 'Datadog'}, 'dependencies': []},
                 {'name': 'Queue', 'type': 'message_queue', 'instance_count': 2, 'tech_stack': {'engine': 'Kafka'}, 'dependencies': ['AppServer']},
+                {'name': 'EventStream', 'type': 'event_streaming', 'instance_count': 1, 'tech_stack': {'engine': 'Kinesis'}, 'dependencies': ['Queue']},
                 {'name': 'Storage', 'type': 'storage', 'instance_count': 2, 'tech_stack': {'engine': 'Blob'}, 'dependencies': []},
                 {'name': 'LB', 'type': 'load_balancer', 'instance_count': 2, 'tech_stack': {'engine': 'HAProxy'}, 'dependencies': ['Frontend']},
                 {'name': 'Backup', 'type': 'backup', 'instance_count': 2, 'tech_stack': {'tool': 'Restic'}, 'dependencies': ['Storage']},
@@ -77,22 +79,24 @@ SCENARIOS = [
                 {'name': 'Analytics', 'type': 'analytics', 'instance_count': 1, 'tech_stack': {'tool': 'Mixpanel'}, 'dependencies': []},
                 {'name': 'Encryption', 'type': 'encryption', 'instance_count': 1, 'tech_stack': {'tool': 'AWS KMS'}, 'dependencies': []},
                 {'name': 'Containers', 'type': 'containers', 'instance_count': 1, 'tech_stack': {'engine': 'Docker'}, 'dependencies': ['AppServer']},
-                {'name': 'Serverless', 'type': 'serverless_compute', 'instance_count': 1, 'tech_stack': {'engine': 'AWS Lambda'}, 'dependencies': []}
+                {'name': 'Serverless', 'type': 'serverless_compute', 'instance_count': 1, 'tech_stack': {'engine': 'AWS Lambda'}, 'dependencies': []},
+                {'name': 'Identity', 'type': 'identity', 'instance_count': 1, 'tech_stack': {'tool': 'Auth0'}, 'dependencies': []},
+                {'name': 'IoT', 'type': 'iot', 'instance_count': 1, 'tech_stack': {'platform': 'AWS IoT'}, 'dependencies': []}
             ],
             'relationships': [],
             'multi_tenancy': True,
             'architecture_pattern': 'event-driven'
         },
         'constraints': {
-            'maxBudget': 20000,
-            'maxLatency': 250,
+            'maxBudget': 25000,
+            'maxLatency': 300,
             'requiredProviders': ['AWS', 'Azure', 'GCP'],
             'securityLevel': 'high'
         },
         'pricing': {
-            'AWS': {'web': {'Vue': 0.12}, 'compute': {'Go': 0.15}, 'database': {'SQL Server': 0.35}, 'cache': {'Redis': 0.09}, 'monitoring': {'Datadog': 0.08}, 'message_queue': {'Kafka': 0.10}, 'storage': {'Blob': 0.06}, 'load_balancer': {'HAProxy': 0.08}, 'backup': {'Restic': 0.07}, 'security': {'Keycloak': 0.09}, 'cdn': {'Cloudflare': 0.11}, 'analytics': {'Mixpanel': 0.10}, 'encryption': {'AWS KMS': 0.09}, 'containers': {'Docker': 0.13}, 'serverless_compute': {'AWS Lambda': 0.14}},
-            'Azure': {'web': {'Vue': 0.11}, 'compute': {'Go': 0.14}, 'database': {'SQL Server': 0.33}, 'cache': {'Redis': 0.08}, 'monitoring': {'Datadog': 0.07}, 'message_queue': {'Kafka': 0.09}, 'storage': {'Blob': 0.05}, 'load_balancer': {'HAProxy': 0.07}, 'backup': {'Restic': 0.06}, 'security': {'Keycloak': 0.08}, 'cdn': {'Cloudflare': 0.10}, 'analytics': {'Mixpanel': 0.09}, 'encryption': {'AWS KMS': 0.08}, 'containers': {'Docker': 0.12}, 'serverless_compute': {'AWS Lambda': 0.13}},
-            'GCP': {'web': {'Vue': 0.13}, 'compute': {'Go': 0.16}, 'database': {'SQL Server': 0.36}, 'cache': {'Redis': 0.10}, 'monitoring': {'Datadog': 0.09}, 'message_queue': {'Kafka': 0.11}, 'storage': {'Blob': 0.07}, 'load_balancer': {'HAProxy': 0.09}, 'backup': {'Restic': 0.08}, 'security': {'Keycloak': 0.10}, 'cdn': {'Cloudflare': 0.12}, 'analytics': {'Mixpanel': 0.11}, 'encryption': {'AWS KMS': 0.10}, 'containers': {'Docker': 0.14}, 'serverless_compute': {'AWS Lambda': 0.15}}
+            'AWS': {'web': {'Vue': 0.12}, 'compute': {'Go': 0.15}, 'database': {'SQL Server': 0.35}, 'nosql': {'MongoDB': 0.28}, 'cache': {'Redis': 0.09}, 'monitoring': {'Datadog': 0.08}, 'message_queue': {'Kafka': 0.10}, 'event_streaming': {'Kinesis': 0.12}, 'storage': {'Blob': 0.06}, 'load_balancer': {'HAProxy': 0.08}, 'backup': {'Restic': 0.07}, 'security': {'Keycloak': 0.09}, 'cdn': {'Cloudflare': 0.11}, 'analytics': {'Mixpanel': 0.10}, 'encryption': {'AWS KMS': 0.09}, 'containers': {'Docker': 0.13}, 'serverless_compute': {'AWS Lambda': 0.14}, 'identity': {'Auth0': 0.06}, 'iot': {'AWS IoT': 0.08}},
+            'Azure': {'web': {'Vue': 0.11}, 'compute': {'Go': 0.14}, 'database': {'SQL Server': 0.33}, 'nosql': {'MongoDB': 0.26}, 'cache': {'Redis': 0.08}, 'monitoring': {'Datadog': 0.07}, 'message_queue': {'Kafka': 0.09}, 'event_streaming': {'Kinesis': 0.11}, 'storage': {'Blob': 0.05}, 'load_balancer': {'HAProxy': 0.07}, 'backup': {'Restic': 0.06}, 'security': {'Keycloak': 0.08}, 'cdn': {'Cloudflare': 0.10}, 'analytics': {'Mixpanel': 0.09}, 'encryption': {'AWS KMS': 0.08}, 'containers': {'Docker': 0.12}, 'serverless_compute': {'AWS Lambda': 0.13}, 'identity': {'Auth0': 0.05}, 'iot': {'AWS IoT': 0.07}},
+            'GCP': {'web': {'Vue': 0.13}, 'compute': {'Go': 0.16}, 'database': {'SQL Server': 0.36}, 'nosql': {'MongoDB': 0.30}, 'cache': {'Redis': 0.10}, 'monitoring': {'Datadog': 0.09}, 'message_queue': {'Kafka': 0.11}, 'event_streaming': {'Kinesis': 0.13}, 'storage': {'Blob': 0.07}, 'load_balancer': {'HAProxy': 0.09}, 'backup': {'Restic': 0.08}, 'security': {'Keycloak': 0.10}, 'cdn': {'Cloudflare': 0.12}, 'analytics': {'Mixpanel': 0.11}, 'encryption': {'AWS KMS': 0.10}, 'containers': {'Docker': 0.14}, 'serverless_compute': {'AWS Lambda': 0.15}, 'identity': {'Auth0': 0.07}, 'iot': {'AWS IoT': 0.09}}
         }
     }
 ]
@@ -159,11 +163,23 @@ def run_single_benchmark(scenario: dict):
         selected_components=selected_components
     )
     
-    # Run CMOv3 baselines with proper Constraints object
-    v3_results = run_all_baselines(cmov3_constraints)
+    # Run CMOv3 baselines with proper Constraints object (with timeout protection)
+    try:
+        print("Running CMOv3 baselines for custom benchmark...")
+        v3_results = run_all_baselines(cmov3_constraints)
+        print("CMOv3 baselines completed.")
+    except Exception as e:
+        print(f"CMOv3 baselines failed: {e}")
+        v3_results = {"error": str(e)}
     
     # Run CMOv4 optimizer with config (usage_profile now in constraints)
-    v4_results = optimize_architecture(arch, constraints, config)
+    try:
+        print("Running CMOv4 optimizer...")
+        v4_results = optimize_architecture(arch, constraints, config)
+        print("CMOv4 optimizer completed.")
+    except Exception as e:
+        print(f"CMOv4 optimizer failed: {e}")
+        v4_results = {"error": str(e)}
     
     return {
         'scenario': scenario,

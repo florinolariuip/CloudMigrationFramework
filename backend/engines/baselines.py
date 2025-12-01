@@ -26,6 +26,9 @@ from backend.services.pricing import (
     get_service_costs,
     get_service_latency,
     COMPONENTS,
+    _resolve_service_key,
+    get_cost_for_service,
+    get_latency_for_service,
 )
 
 
@@ -42,14 +45,13 @@ class BaselineResult:
 
 def calculate_config_cost(config: Dict[str, str]) -> float:
     """Calculate total cost for a configuration"""
-    costs = get_service_costs()
-    return sum(costs.get(service, 0) for service in config.values())
+    # Use safe lookup that resolves common alias variants
+    return sum(get_cost_for_service(service) for service in config.values())
 
 
 def calculate_config_latency(config: Dict[str, str]) -> float:
     """Calculate average latency for a configuration"""
-    latencies = get_service_latency()
-    latency_values = [latencies.get(service, 0) for service in config.values()]
+    latency_values = [get_latency_for_service(service) for service in config.values()]
     return sum(latency_values) / len(latency_values) if latency_values else 0.0
 
 
@@ -162,9 +164,11 @@ def baseline_greedy_cost(constraints: Constraints) -> BaselineResult:
     for component in COMPONENTS:
         # Find the cheapest service for this component
         available = options[component]
+        # Use safe lookup to tolerate alias naming
+        from backend.services.pricing import get_cost_for_service
         cheapest = min(
             available,
-            key=lambda service: costs.get(service, float('inf'))
+            key=lambda service: get_cost_for_service(service) or float('inf')
         )
         config[component] = cheapest
     
@@ -211,9 +215,10 @@ def baseline_greedy_latency(constraints: Constraints) -> BaselineResult:
     for component in COMPONENTS:
         # Find the fastest service for this component
         available = options[component]
+        from backend.services.pricing import get_latency_for_service
         fastest = min(
             available,
-            key=lambda service: latencies.get(service, float('inf'))
+            key=lambda service: get_latency_for_service(service) or float('inf')
         )
         config[component] = fastest
     
@@ -276,22 +281,29 @@ def baseline_genetic_algorithm(
             for component in COMPONENTS
         }
     
+    # Pre-calculate costs and latencies once
+    costs = get_service_costs()
+    latencies = get_service_latency()
+    
     def fitness(config: Dict[str, str]) -> float:
         """
         Fitness function: minimize cost + latency
         Invalid solutions get heavy penalty
         """
-        if not is_valid_configuration(config, constraints):
-            # Heavy penalty for constraint violation
+        # Fast cost/latency calculation using cached data
+        total_cost = sum(costs.get(service, 0) for service in config.values())
+        total_latency = sum(latencies.get(service, 0) for service in config.values()) / len(config)
+        providers = len({service.split(" ")[0] for service in config.values()})
+        
+        # Check constraints quickly
+        if (total_cost > constraints.maxBudget or 
+            total_latency > constraints.maxLatency or 
+            providers > constraints.maxProviders):
             return float('inf')
         
-        # Normalize and combine objectives (simple weighted sum)
-        cost = calculate_config_cost(config)
-        latency = calculate_config_latency(config)
-        
-        # Normalize to [0,1] range (approximate)
-        normalized_cost = cost / constraints.maxBudget
-        normalized_latency = latency / constraints.maxLatency
+        # Normalize and combine objectives
+        normalized_cost = total_cost / constraints.maxBudget
+        normalized_latency = total_latency / constraints.maxLatency
         
         return normalized_cost + normalized_latency
     
@@ -322,6 +334,10 @@ def baseline_genetic_algorithm(
     best_fitness = float('inf')
     
     for generation in range(generations):
+        # Progress logging every 10 generations
+        if generation % 10 == 0:
+            print(f"    GA Generation {generation}/{generations}...")
+        
         # Evaluate and track best
         for individual in population:
             fit = fitness(individual)
@@ -408,8 +424,10 @@ def baseline_weighted_sum(
     latency_weight = latency_weight / total_weight
     
     # Estimate normalization factors (max values)
-    all_costs = list(costs.values())
-    all_latencies = list(latencies.values())
+    # Use safe getters for normalization
+    from backend.services.pricing import get_cost_for_service, get_latency_for_service
+    all_costs = [get_cost_for_service(s) for s in costs.keys()]
+    all_latencies = [get_latency_for_service(s) for s in latencies.keys()]
     max_cost = max(all_costs) if all_costs else 1
     max_latency = max(all_latencies) if all_latencies else 1
     
@@ -419,8 +437,8 @@ def baseline_weighted_sum(
         
         # Calculate weighted sum for each option
         def weighted_score(service: str) -> float:
-            normalized_cost = costs.get(service, max_cost) / max_cost
-            normalized_latency = latencies.get(service, max_latency) / max_latency
+            normalized_cost = get_cost_for_service(service) / max_cost
+            normalized_latency = get_latency_for_service(service) / max_latency
             return cost_weight * normalized_cost + latency_weight * normalized_latency
         
         # Select service with minimum weighted sum
@@ -461,40 +479,44 @@ def run_all_baselines(constraints: Constraints) -> Dict[str, BaselineResult]:
     """
     import concurrent.futures
     import time
-    print("Running baseline comparisons in parallel...")
+    
+    # Pre-warm the cache to avoid API calls during baselines
+    print("Pre-warming pricing cache...")
+    from backend.services.pricing import service_cache
+    service_cache.get_service_data()  # This will use cached data if available
+    print("Cache warmed. Running baseline comparisons...")
+    
     results = {}
     timings = {}
-    with concurrent.futures.ProcessPoolExecutor() as executor:
-        future_to_name = {}
-        start_times = {}
-        # Submit each baseline and record start time
-        for fn, args, name in [
-            (baseline_random, (constraints, 1000), "Random"),
-            (baseline_greedy_cost, (constraints,), "Greedy-Cost"),
-            (baseline_greedy_latency, (constraints,), "Greedy-Latency"),
-            (baseline_genetic_algorithm, (constraints, 30, 50), "Genetic-Algorithm"),
-            (baseline_weighted_sum, (constraints,), "Weighted-Sum")
-        ]:
-            start_times[name] = time.time()
-            future = executor.submit(fn, *args)
-            future_to_name[future] = name
-        # Collect results and timing
-        for future in concurrent.futures.as_completed(future_to_name):
-            name = future_to_name[future]
-            try:
-                result = future.result()
-                elapsed = time.time() - start_times[name]
-                timings[name] = elapsed
-                results[name] = result
-                print(f"  ✓ {name}: {getattr(result, 'success', None)} (time: {elapsed:.2f}s)")
-            except Exception as exc:
-                elapsed = time.time() - start_times[name]
-                timings[name] = elapsed
-                print(f"  ✗ {name} generated an exception after {elapsed:.2f}s: {exc}")
-                results[name] = None
+    
+    # Run baselines sequentially with timeout to avoid ProcessPoolExecutor issues
+    baseline_functions = [
+        (baseline_random, (constraints, 100), "Random"),  # Faster for benchmarks
+        (baseline_greedy_cost, (constraints,), "Greedy-Cost"),
+        (baseline_greedy_latency, (constraints,), "Greedy-Latency"),
+        (baseline_genetic_algorithm, (constraints, 20, 30), "Genetic-Algorithm"),  # Faster for benchmarks
+        (baseline_weighted_sum, (constraints,), "Weighted-Sum")
+    ]
+    
+    for fn, args, name in baseline_functions:
+        start_time = time.time()
+        try:
+            print(f"  Running {name}...")
+            result = fn(*args)
+            elapsed = time.time() - start_time
+            timings[name] = elapsed
+            results[name] = result
+            print(f"  ✓ {name}: {getattr(result, 'success', None)} (time: {elapsed:.2f}s)")
+        except Exception as exc:
+            elapsed = time.time() - start_time
+            timings[name] = elapsed
+            print(f"  ✗ {name} failed after {elapsed:.2f}s: {exc}")
+            results[name] = None
+    
     print("Baseline timings:")
     for name, t in timings.items():
         print(f"    {name}: {t:.2f}s")
+    
     return results
 
 

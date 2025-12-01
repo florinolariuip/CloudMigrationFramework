@@ -13,6 +13,7 @@ Key visualizations:
 
 from typing import Dict, List, Any
 from backend.models import Solution
+from backend.services.pricing import get_cost_for_service, get_latency_for_service
 
 
 def generate_sankey_data(solution: Solution, services_data: Dict[str, Any]) -> Dict[str, Any]:
@@ -38,7 +39,8 @@ def generate_sankey_data(solution: Solution, services_data: Dict[str, Any]) -> D
     # Create provider nodes
     providers = set()
     for service in config.values():
-        provider = service.split('_')[0].upper()  # Extract provider from service name
+        # Extract provider robustly from service string (space or hyphen separated)
+        provider = (service.split()[0] if ' ' in service else service.split('-')[0]).upper()
         providers.add(provider)
     
     for provider in sorted(providers):
@@ -65,7 +67,7 @@ def generate_sankey_data(solution: Solution, services_data: Dict[str, Any]) -> D
     provider_to_category = {}
     
     for component, service in config.items():
-        provider = service.split('_')[0].upper()
+        provider = (service.split()[0] if ' ' in service else service.split('-')[0]).upper()
         
         # Find which category this component belongs to
         category = None
@@ -83,8 +85,8 @@ def generate_sankey_data(solution: Solution, services_data: Dict[str, Any]) -> D
                     'count': 0
                 }
             
-            provider_to_category[key]['cost'] += costs.get(service, 0)
-            provider_to_category[key]['latency'] += latencies.get(service, 0)
+            provider_to_category[key]['cost'] += get_cost_for_service(service)
+            provider_to_category[key]['latency'] += get_latency_for_service(service)
             provider_to_category[key]['count'] += 1
     
     # Create links with cost as the flow value
@@ -133,7 +135,7 @@ def generate_latency_sankey(solution: Solution, services_data: Dict[str, Any]) -
     # Create provider nodes
     providers = set()
     for service in config.values():
-        provider = service.split('_')[0].upper()
+        provider = (service.split()[0] if ' ' in service else service.split('-')[0]).upper()
         providers.add(provider)
     
     for provider in sorted(providers):
@@ -149,13 +151,13 @@ def generate_latency_sankey(solution: Solution, services_data: Dict[str, Any]) -
     
     # Create links showing latency contribution
     for component, service in config.items():
-        provider = service.split('_')[0].upper()
-        latency = latencies.get(service, 0)
-        
+        provider = (service.split()[0] if ' ' in service else service.split('-')[0]).upper()
+        latency = get_latency_for_service(service)
+
         if latency > 0:
             source_idx = node_index[f"provider_{provider}"]
             target_idx = node_index[f"component_{component}"]
-            
+
             links.append({
                 "source": source_idx,
                 "target": target_idx,
