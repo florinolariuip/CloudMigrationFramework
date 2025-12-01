@@ -107,7 +107,9 @@ python -m http.server 8080
 
 ### 🏗️ Core Capabilities
 
-#### 1. **Four-Phase Optimization (CMOv4)**
+**Note**: Both CMOv3 and CMOv4 share the same optimization pipeline (CSP+Expert+Pareto). The difference is in their use case: CMOv3 for production workflows, CMOv4 for academic benchmarking and research validation.
+
+#### 1. **Four-Phase Optimization (Shared by CMOv3 & CMOv4)**
 - **Phase 1 - Strategic Sampling**: Generates ~50 intelligent combinations using backend's constraint engine
   - 1× min-cost strategy (guaranteed cheapest feasible)
   - 1× min-latency strategy (guaranteed fastest feasible)
@@ -115,7 +117,7 @@ python -m http.server 8080
   - 3× single-provider strategies (AWS-only, Azure-only, GCP-only)
   - 37× diverse random samples for thorough exploration
 - **Phase 2 - CSP Filter**: Validates configurations against hard constraints (budget, latency, providers)
-- **Phase 3 - Expert Rules**: Scores solutions using 44 business rules across 4 categories
+- **Phase 3 - Expert Rules**: Scores solutions using 44 business rules across 4 categories (cost, performance, strategic, preference)
 - **Phase 4 - Pareto Frontier**: Identifies non-dominated solutions for cost-latency trade-offs
 
 #### 2. **Multi-Objective Optimization**

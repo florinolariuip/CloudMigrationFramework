@@ -131,19 +131,22 @@ def optimize_architecture(arch: dict, constraints: dict, config: dict = None) ->
         
         # Apply Expert System rules (same as CMOv3) for business-aware scoring
         print(f"[CMOv4] Applying Expert System rules...")
-        from backend.engines.rules import evaluate_solutions_with_expert_system
-        from backend.config import EXPERT_RULES_CONFIG
+        from backend.engines.rules import evaluate_solutions
+        from backend.models import Preferences
         
-        # Get user preferences from constraints
-        user_preferences = constraints.get('preferences', {})
+        # Build Preferences object from constraints
+        user_prefs = constraints.get('preferences', {})
+        preferences = Preferences()
+        preferences.preferredProvider = user_prefs.get('preferredProvider')
+        preferences.prioritizeCost = user_prefs.get('prioritizeCost', False)
+        preferences.prioritizePerformance = user_prefs.get('prioritizePerformance', False)
         
         # Evaluate solutions with expert system (same as CMOv3)
         try:
-            evaluated_solutions = evaluate_solutions_with_expert_system(
+            evaluated_solutions = evaluate_solutions(
                 feasible_solutions, 
-                csp_constraints,
-                user_preferences,
-                EXPERT_RULES_CONFIG
+                preferences,
+                constraints.get('maxBudget', 10000)
             )
             print(f"[CMOv4] Expert System evaluated {len(evaluated_solutions)} solutions")
             feasible_solutions = evaluated_solutions
