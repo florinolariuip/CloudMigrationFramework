@@ -949,7 +949,9 @@ def optimize():
         # EXPLAINABILITY: Generate transparency data for best solution (Priority 3)
         print(f"[TIMING] Starting explainability generation")
         explainability_start = time.time()
-        best_solution = ranked[0] if ranked else None
+        # Select best solution from Pareto frontier based on user preferences
+        # Use balanced knee point as representative solution (optimal cost-latency trade-off)
+        best_solution = extreme_solutions.get('balanced') if extreme_solutions else (ranked[0] if ranked else None)
         explainability_data = None
 
         if best_solution:
@@ -1026,7 +1028,7 @@ def optimize():
             "constraints": asdict(constraints),
             "preferences": asdict(preferences),
             "metrics": metrics,
-            "topSolution": asdict(ranked[0]) if ranked else None,
+            "topSolution": asdict(best_solution) if best_solution else None,
         })
 
         # SANKEY DIAGRAM: Generate visualization data for solution flows
@@ -1061,7 +1063,7 @@ def optimize():
             "duplicatesRemoved": duplicates_removed,
             "feasibilityRate": round((post_dedup_count / total_combinations) * 100, 1),
             "solutions": [asdict(s) for s in ranked],
-            "topSolution": asdict(ranked[0]) if ranked else None,
+            "topSolution": asdict(best_solution) if best_solution else None,
             "statistics": calculate_statistics(ranked),
             "metrics": metrics,  # Academic performance metrics
             # Multi-objective Pareto results

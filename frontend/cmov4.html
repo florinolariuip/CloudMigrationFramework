@@ -119,15 +119,25 @@
         applyRecommendedComponents();
       }, [customArchPattern]);
 
+      // ===== NORMALIZATION FUNCTION (v2.0.1 - WITH TIMING FIX) =====
       function normalizeV4(v4) {
+        console.log('[normalizeV4 v2.0.1 LOADED] Input metrics:', v4?.metrics);
         if (!v4) return null;
         const paretoSolutions = v4.pareto_frontier || [];
         const metrics = v4.metrics || {};
         const extremes = v4.extreme_solutions || {};
+        
+        console.log('[normalizeV4] Extracting timing - total_time_ms:', metrics.total_time_ms);
+        
         return {
           metrics: {
             feasible_space_size: metrics.feasible_count || 0,
             pareto_frontier_size: metrics.pareto_count || paretoSolutions.length || 0,
+            // CRITICAL: Include timing data for baseline comparison
+            total_time_ms: metrics.total_time_ms || 0,
+            csp_time_ms: metrics.csp_time_ms || 0,
+            expert_time_ms: metrics.expert_time_ms || 0,
+            pareto_time_ms: metrics.pareto_time_ms || 0,
           },
           paretoFrontier: {
             size: metrics.pareto_count || paretoSolutions.length || 0,
@@ -372,13 +382,25 @@
             // Send the existing Pareto frontier solutions array from the benchmark
             paretoFrontier: results.paretoFrontier?.solutions || [],
             // Send accurate timing data from CMOv4 optimization
+            // IMPORTANT: CMOv4 returns timing in results.metrics, not results.timing
             timing: {
-              csp_time_ms: results.timing?.csp_time_ms || 0,
-              expert_time_ms: results.timing?.expert_time_ms || 0,
-              pareto_time_ms: results.timing?.pareto_time_ms || 0,
-              total_time_ms: results.timing?.total_time_ms || 0
+              csp_time_ms: results.metrics?.csp_time_ms || 0,
+              expert_time_ms: results.metrics?.expert_time_ms || 0,
+              pareto_time_ms: results.metrics?.pareto_time_ms || 0,
+              total_time_ms: results.metrics?.total_time_ms || 0
             }
           };
+          
+          console.log('[Baseline Comparison] Full results object:', results);
+          console.log('[Baseline Comparison] results.metrics:', results.metrics);
+          console.log('[Baseline Comparison] Scenario:', scenario);
+          console.log('[Baseline Comparison] CMOv4 Timing:', scenario.timing);
+          console.log('[DEBUG] total_time_ms value:', results.metrics?.total_time_ms);
+          
+          // TEMPORARY DEBUG: Show timing value on screen
+          if (!results.metrics?.total_time_ms || results.metrics?.total_time_ms === 0) {
+            alert('⚠️ DEBUG: total_time_ms is missing or zero!\n\nresults.metrics = ' + JSON.stringify(results.metrics, null, 2));
+          }
           
           console.log('Sending scenario to backend:', scenario);
 

@@ -44,15 +44,48 @@ class BaselineResult:
 
 
 def calculate_config_cost(config: Dict[str, str]) -> float:
-    """Calculate total cost for a configuration"""
-    # Use safe lookup that resolves common alias variants
-    return sum(get_cost_for_service(service) for service in config.values())
+    """
+    Calculate total cost for a configuration.
+    
+    IMPORTANT: Includes data transfer costs for multi-cloud configurations
+    to ensure fair comparison with CMOv4 (which accounts for these costs).
+    Academic rigor requires baselines to include the same cost components.
+    """
+    from backend.engines.constraints import calculate_data_transfer_cost
+    
+    # Base service costs
+    base_cost = sum(get_cost_for_service(service) for service in config.values())
+    
+    # Add multi-cloud data transfer costs (100GB/month typical workload)
+    transfer_cost = calculate_data_transfer_cost(config, 100)
+    
+    total_cost = base_cost + transfer_cost
+    
+    # Debug logging
+    if transfer_cost > 0:
+        print(f"[Baseline] Cost calculation: base=${base_cost:.2f} + transfer=${transfer_cost:.2f} = ${total_cost:.2f}")
+    
+    return total_cost
 
 
 def calculate_config_latency(config: Dict[str, str]) -> float:
-    """Calculate average latency for a configuration"""
+    """
+    Calculate average latency for a configuration.
+    
+    IMPORTANT: Includes cross-cloud latency penalties for multi-cloud configurations
+    to ensure fair comparison with CMOv4 (which accounts for these penalties).
+    Academic rigor requires baselines to include the same latency components.
+    """
+    from backend.engines.constraints import calculate_cross_cloud_penalty
+    
+    # Base average latency
     latency_values = [get_latency_for_service(service) for service in config.values()]
-    return sum(latency_values) / len(latency_values) if latency_values else 0.0
+    base_latency = sum(latency_values) / len(latency_values) if latency_values else 0.0
+    
+    # Add cross-cloud communication penalty
+    cross_cloud_penalty = calculate_cross_cloud_penalty(config)
+    
+    return base_latency + cross_cloud_penalty
 
 
 def count_config_providers(config: Dict[str, str]) -> int:
@@ -85,11 +118,18 @@ def is_valid_configuration(config: Dict[str, str], constraints: Constraints) -> 
 
 def create_solution_from_config(config: Dict[str, str]) -> Solution:
     """Create a Solution object from a configuration"""
+    cost = calculate_config_cost(config)
+    latency = calculate_config_latency(config)
+    providers = count_config_providers(config)
+    
+    # Debug logging
+    print(f"[create_solution_from_config] cost=${cost:.2f}, latency={latency:.2f}ms, providers={providers}")
+    
     return Solution(
         configuration=config,
-        cost=calculate_config_cost(config),
-        latency=calculate_config_latency(config),
-        providers=count_config_providers(config),
+        cost=cost,
+        latency=latency,
+        providers=providers,
         providerDistribution=get_provider_distribution(config),
         score=None,
         evaluationLog=None,
@@ -289,10 +329,13 @@ def baseline_genetic_algorithm(
         """
         Fitness function: minimize cost + latency
         Invalid solutions get heavy penalty
+        
+        IMPORTANT: Uses calculate_config_cost() and calculate_config_latency()
+        to include multi-cloud penalties for fair comparison with CMOv4.
         """
-        # Fast cost/latency calculation using cached data
-        total_cost = sum(costs.get(service, 0) for service in config.values())
-        total_latency = sum(latencies.get(service, 0) for service in config.values()) / len(config)
+        # Use proper calculation functions that include multi-cloud penalties
+        total_cost = calculate_config_cost(config)
+        total_latency = calculate_config_latency(config)
         providers = len({service.split(" ")[0] for service in config.values()})
         
         # Check constraints quickly
