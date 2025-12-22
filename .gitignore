@@ -43,3 +43,9 @@ debug.log
 *.tmp
 *.temp
 .cache/
+
+# Test cache
+.pytest_cache/
+
+# Jupyter notebooks
+.ipynb_checkpoints/

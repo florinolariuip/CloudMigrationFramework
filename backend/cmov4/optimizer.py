@@ -37,7 +37,10 @@ COMPONENT_TYPE_MAPPING = {
 def map_cmov4_to_cmov3_components(components: list) -> list:
     """
     Map CMOv4 component types to CMOv3 service names.
+    Fixed: Now handles direct component name matches (e.g., 'api_gateway' -> 'api_gateway')
     """
+    from backend.services.pricing import COMPONENTS
+    
     mapped = []
     for comp in components:
         # Handle both dict and string inputs
@@ -46,8 +49,13 @@ def map_cmov4_to_cmov3_components(components: list) -> list:
         else:
             comp_type = str(comp).lower()
         
-        if comp_type in COMPONENT_TYPE_MAPPING:
+        # First: Check if component name matches directly (e.g., 'api_gateway')
+        if comp_type in COMPONENTS:
+            mapped.append(comp_type)
+        # Second: Try the mapping dictionary (e.g., 'compute' -> 'application_server')
+        elif comp_type in COMPONENT_TYPE_MAPPING:
             mapped.append(COMPONENT_TYPE_MAPPING[comp_type])
+    
     return list(set(mapped)) if mapped else None
 
 def optimize_architecture(arch: dict, constraints: dict, config: dict = None) -> dict:
