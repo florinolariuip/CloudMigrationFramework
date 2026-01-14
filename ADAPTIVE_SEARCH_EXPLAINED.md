@@ -1,26 +1,28 @@
 # Adaptive Search Strategy - Technical Deep Dive
 
-## ⚠️ Current Status: **"Adaptive" is a Misnomer**
+## ⚠️ Current Status: **"Adaptive" Label Clarification**
 
 ### The Truth About "Adaptive Search"
 
-Currently, **"Adaptive Search" does NOT actually learn or adapt**. It's a UI label that maps to the backend's `heuristic` strategy, which uses **predefined heuristics** rather than machine learning or adaptive algorithms.
+Currently, **"Adaptive Search" does NOT use machine learning or runtime adaptation**. It's a UI label that maps to the backend's `heuristic` strategy, which uses **predefined heuristics and intelligent sampling** rather than adaptive algorithms that learn from previous runs.
 
-### Frontend-Backend Mapping Issue
+This naming choice reflects the strategy's ability to adapt its sampling to problem structure (component types, constraint tightness) through predetermined rules, not through online learning.
+
+### Frontend-Backend Mapping
 
 **Frontend (`cmov4.html`)**:
 ```javascript
 const searchStrategies = [
   { id: 'random', name: 'Random Sampling' },
   { id: 'sequential', name: 'Sequential Search' },
-  { id: 'adaptive', name: 'Adaptive Search' }  // ← Misleading name!
+  { id: 'adaptive', name: 'Adaptive Search' }  // Maps to backend 'heuristic'
 ];
 ```
 
 **Backend (`backend/config.py`)**:
 ```python
 CSP_CONFIG = {
-    "search_strategy": "heuristic",  # exhaustive | heuristic | random_sample | ml
+    "search_strategy": "heuristic",  # exhaustive | heuristic | random_sample
     "sample_size": 100,
 }
 ```
@@ -28,7 +30,7 @@ CSP_CONFIG = {
 **Actual Mapping**:
 - Frontend `random` → Backend `random_sample`
 - Frontend `sequential` → Backend `exhaustive`
-- Frontend `adaptive` → Backend `heuristic` (NOT adaptive!)
+- Frontend `adaptive` → Backend `heuristic` (intelligent but predetermined)
 
 ## How "Heuristic" Strategy Actually Works
 

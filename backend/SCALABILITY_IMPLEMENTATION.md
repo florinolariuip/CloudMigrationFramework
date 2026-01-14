@@ -4,11 +4,11 @@
 
 This document describes the scalability implementation of the hybrid CSP+Expert System approach, including both CMOv3 (15 fixed components) and CMOv4 (flexible component selection) architectures.
 
-**Academic Contribution**: Demonstrates that the hybrid approach scales to realistic enterprise architectures with **21M+ combinations** while maintaining sub-500ms performance, full explainability, and superior solution quality vs. baselines.
+**Research Contribution**: Demonstrates that the hybrid approach scales to realistic enterprise architectures with **21M+ combinations** while maintaining sub-500ms performance, full explainability, and superior solution quality vs. baselines.
 
 ---
 
-## Current System Status (Dec 2025)
+## Current System Status (January 2026)
 
 - **Performance Optimized**: Fixed baseline algorithm freezes (genetic algorithm now <10s vs 40s+)
 - **Live Pricing**: Azure Retail API integration with 100% success rate
@@ -16,6 +16,7 @@ This document describes the scalability implementation of the hybrid CSP+Expert 
 - **Timeout Protection**: 10-second limits with graceful error handling
 - **Zero Solutions Handling**: Intelligent suggestions when constraints too restrictive
 - **Reproducibility**: Optional seeding for deterministic runs (`seed` field on `/api/optimize`)
+- **Latency Modeling**: Dual metrics (classic and graph-based critical path) with live override support
 
 ---
 
@@ -24,12 +25,13 @@ This document describes the scalability implementation of the hybrid CSP+Expert 
 ### Research Question
 **Can the hybrid CSP+Expert approach handle realistic enterprise cloud migration scenarios with both fixed and flexible component architectures?**
 
-### Academic Context
+### Research Context
 - **CMOv3**: Fixed 15-component enterprise architecture (21M+ combinations)
 - **CMOv4**: Flexible component selection (5-15 components) with rich modeling
 - Demonstrates scalability across different architectural patterns
 - Maintains performance, solution quality, and explainability at enterprise scale
 - Shows superiority over 5 baseline algorithms with optimized performance
+- Validated through 30-run experiments with statistical significance testing
 
 ### Implementation Goals
 **CMOv3**: Fixed 15-component enterprise architecture (21,257,640 combinations)
@@ -77,15 +79,24 @@ This document describes the scalability implementation of the hybrid CSP+Expert 
 
 ## New Experiments: Evolutionary and Oracle Baselines
 
-Scalability experiments confirm that evolutionary algorithms (NSGA-II, MOEA/D) scale to 15 components, while oracle exhaustive is only feasible for N ≤ 5. All results are reproducible via `reproduce_all.sh` and Dockerfile.
+Scalability experiments confirm that evolutionary algorithms (NSGA-II, MOEA/D) scale to 15 components, while oracle exhaustive is only feasible for N ≤ 5. All results are reproducible via the experiment harness in `experiments/run_all_experiments.py`.
+
+> **Tested implementation (GA convergence).** The GA baseline convergence and
+> plateau behaviour discussed in this document and in the paper are backed by
+> the script `experiments/ga_convergence_experiment.py`. Its end-to-end
+> execution and artefacts (`ga_convergence_data.csv`,
+> `ga_plateau_analysis.txt`, and optional convergence plots) are exercised by
+> the smoke test `experiments/tests/test_ga_convergence_smoke.py`, which
+> verifies that the convergence pipeline runs and produces non-empty outputs.
 
 ---
 
 ## Threats to Validity
 
-- **Scalability**: Oracle exhaustive is only feasible for small N; evolutionary methods scale but may miss rare optima.
+- **Scalability**: Oracle exhaustive is only feasible for small N (≤5); evolutionary methods scale but may miss rare optima.
 - **Stochasticity**: NSGA-II/MOEA/D results vary by seed; all runs use fixed seeds for reproducibility.
-- **Implementation**: All code and results are reproducible via the provided scripts and Docker image.
+- **Implementation**: All code and results are reproducible via the provided scripts with pinned dependencies.
+- **Statistical Validity**: 30-run experiments with paired t-tests ensure claims are empirically supported.
 - 3^12 = 531,441 combinations (~5 seconds)
 - 3^15 = 14,348,907 combinations (~2 minutes exhaustive)
 
@@ -636,26 +647,3 @@ def benchmark_scalability():
 **Document Version**: 1.0  
 **Last Updated**: Priority 4 Implementation Complete  
 **Related Documentation**: PARETO_IMPLEMENTATION.md, BASELINE_IMPLEMENTATION.md, EXPLAINABILITY_IMPLEMENTATION.md
-
----
-
-## Results (quick table)
-
-| N | Mean Time (ms) | Pareto (μ±σ) | Feasible (μ) | Hypervolume (μ) | Spacing (μ) | Coverage % (μ) |
-|---:|---:|---:|---:|---:|---:|---:|
-| 5 | 138.8 ± 34.2 | 7.0 ± 1.4 | 24 | 494.74 | 16.57 | 29.5% |
-| 10 | 59.6 ± 7.2 | 3.3 ± 0.5 | 8 | 1147.33 | 20.17 | 43.5% |
-| 15 | 64.3 ± 20.5 | 1.7 ± 0.5 | 5 | 1590.17 | 0.00 | 36.7% |
-
-### Explanation Accuracy (μ)
-
-Each experiment run now computes explanation accuracy (see frontend/academic_tests.html): composite of score integrity, constraints ratio, and rule coverage. Aggregated mean±std and label counts are shown in summary tables and exports.
-
-### Interpretation
-
-- Runtime: Sub‑200 ms per run with heuristic and N ≤ 15 → interactive.
-- Feasible: declines with N (constraint pressure); total space grows exponentially.
-- Pareto size: drops with N; diversity decreases under fixed constraints and sampling.
-- Hypervolume: increases with N under normalization; frontier shifts despite fewer points.
-- Spacing: very low at N=15 → clustered frontier; add padding/jitter in plots.
-- Coverage: ~30–44% shows effective pruning relative to feasible set.

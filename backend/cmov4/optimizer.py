@@ -131,6 +131,10 @@ def optimize_architecture(arch: dict, constraints: dict, config: dict = None) ->
             maxProviders=constraints.get('maxProviders', 3),
             selected_components=selected_components
         )
+        # Respect latency model selection if provided (avg_latency | tail_latency | throughput | graph_latency)
+        perf_metric = constraints.get('performanceMetric') or constraints.get('latencyModel')
+        if perf_metric:
+            setattr(csp_constraints, 'performanceMetric', perf_metric)
         
         # Use backend's strategic heuristic sampler (generates ~50 smart combinations)
         print(f"[CMOv4] Using strategic heuristic sampling (backend engine)...")
@@ -295,6 +299,8 @@ def optimize_architecture(arch: dict, constraints: dict, config: dict = None) ->
                 'csp_time_ms': round(total_time_ms * 0.3, 2),  # Approximate: 30% CSP
                 'expert_time_ms': round(total_time_ms * 0.2, 2),  # Approximate: 20% Expert
                 'pareto_time_ms': round(total_time_ms * 0.5, 2),  # Approximate: 50% Pareto
+                # Include selected latency model for UI badge and PDF metadata
+                'latency_model': perf_metric or 'avg_latency',
             }
         }
     except TimeoutError:

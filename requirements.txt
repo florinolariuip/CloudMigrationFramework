@@ -10,3 +10,6 @@ pymoo==0.6.0.1
 numpy==1.26.4
 gunicorn
 reportlab==4.4.5
+
+# Graph analysis for realistic latency modeling
+networkx==3.3

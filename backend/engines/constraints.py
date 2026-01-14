@@ -17,7 +17,8 @@ from backend.services.pricing import (
     get_total_combinations,
 )
 from backend.services.pricing import _resolve_service_key, get_cost_for_service, get_latency_for_service
-from backend.config import CSP_CONFIG, SERVICE_DEPENDENCIES
+from backend.config import CSP_CONFIG, SERVICE_DEPENDENCIES, DEFAULT_PRICING
+from backend.engines.latency_graph import RealisticLatencyModel
 
 
 
@@ -88,10 +89,45 @@ def calculate_cross_cloud_penalty(config: Dict[str, str]) -> float:
 #   - tail_latency: 95th percentile latency (demo: sorted, index)
 #   - throughput: inverse of mean latency (demo: 1000 / avg)
 def calculate_performance(config: Dict[str, str], metric: str = "avg_latency") -> float:
+    """Compute performance (latency) for a configuration.
+
+    Supported metrics:
+    - avg_latency: mean latency across services + cross-cloud penalty
+    - tail_latency: 95th percentile latency (approximate)
+    - throughput: inverse of mean latency (1000 / avg)
+    - graph_latency: critical path latency via dependency graph and inter-region network latency
+    """
     latencies = [get_latency_for_service(s) for s in config.values()]
     if not latencies:
         return 0.0
-    
+
+    # New: dependency-aware critical path latency
+    if metric == "graph_latency":
+        # Build deployment map: component -> {region, latency}
+        provider_region = {
+            'AWS': DEFAULT_PRICING.get('aws_region', 'us-east-1'),
+            'Azure': DEFAULT_PRICING.get('azure_region', 'westeurope'),
+            'GCP': DEFAULT_PRICING.get('gcp_region', 'us-central1'),
+        }
+        deployment = {}
+        for component, service_choice in config.items():
+            provider = service_choice.split(" ")[0] if service_choice else 'AWS'
+            region = provider_region.get(provider, DEFAULT_PRICING.get('aws_region', 'us-east-1'))
+            svc_latency = get_latency_for_service(service_choice)
+            deployment[component.replace('-', '_')] = {
+                'region': region,
+                'latency': float(svc_latency),
+                'provider': provider,
+            }
+        try:
+            model = RealisticLatencyModel()
+            result = model.compute_critical_path(deployment)
+            return float(result.get('total_latency', 0.0))
+        except Exception:
+            # Fallback to classic avg if graph computation fails
+            pass
+
+    # Classic metrics
     base_latency = 0.0
     if metric == "avg_latency":
         base_latency = sum(latencies) / len(latencies)
@@ -105,7 +141,7 @@ def calculate_performance(config: Dict[str, str], metric: str = "avg_latency") -
         return 1000 / avg if avg > 0 else 0.0
     else:
         base_latency = sum(latencies) / len(latencies)
-    
+
     # Add cross-cloud penalty for multi-cloud configurations
     cross_cloud_penalty = calculate_cross_cloud_penalty(config)
     return base_latency + cross_cloud_penalty

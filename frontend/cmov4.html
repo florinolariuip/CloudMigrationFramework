@@ -65,8 +65,10 @@
       const [prioritizePerformance, setPrioritizePerformance] = useState(false);
 
       // Custom scenario constraints
-      const [maxBudget, setMaxBudget] = useState('10000');
+  const [maxBudget, setMaxBudget] = useState('5000');
       const [maxLatency, setMaxLatency] = useState('150');
+  // Latency model selection
+  const [latencyModel, setLatencyModel] = useState('avg_latency');
 
       // Custom scenario
       const [customArchPattern, setCustomArchPattern] = useState('microservices');
@@ -74,6 +76,12 @@
       const [customProviders, setCustomProviders] = useState(['AWS', 'Azure', 'GCP']);
       const [searchStrategy, setSearchStrategy] = useState('heuristic');
       const [sampleSize, setSampleSize] = useState('1000');
+
+  // Network latency override state (fetched on load)
+  const [networkLatency, setNetworkLatency] = useState(null);
+  const [loadingNetworkLatency, setLoadingNetworkLatency] = useState(true);
+  const [networkLatencyError, setNetworkLatencyError] = useState(null);
+  const [showNetworkLatencyBanner, setShowNetworkLatencyBanner] = useState(true);
 
       const architecturePatterns = [
         { id: 'monolith', name: 'Monolith', recommended: ['web','compute','database','cache','monitoring'] },
@@ -160,6 +168,7 @@
           explanations: v4.explanations || [],
           suggestions: v4.suggestions || [],
           sankeyDiagram: null,
+          latencyModel: metrics.latency_model || 'avg_latency',
         };
       }
 
@@ -201,6 +210,7 @@
             preferred_provider: preferredProvider || '',
             prioritize_cost: prioritizeCost ? '1' : '0',
             prioritize_performance: prioritizePerformance ? '1' : '0',
+            latency_model: String(latencyModel)
           }).toString();
           const res = await fetch(`${API_BASE}/api/benchmark?${qs}`);
           const data = await res.json();
@@ -213,6 +223,27 @@
           setResults({ error: 'Failed to run benchmark.' });
         } finally {
           setLoading(false);
+        }
+      };
+
+      // Fetch network latency override on mount
+      useEffect(() => {
+        fetchNetworkLatency();
+      }, []);
+
+      const fetchNetworkLatency = async () => {
+        setLoadingNetworkLatency(true);
+        setNetworkLatencyError(null);
+        try {
+          const res = await fetch(`${API_BASE}/api/network-latency`);
+          if (!res.ok) throw new Error('Failed to fetch network latency info');
+          const data = await res.json();
+          setNetworkLatency(data);
+        } catch (e) {
+          console.error('Failed to fetch network latency info:', e);
+          setNetworkLatencyError(e.message);
+        } finally {
+          setLoadingNetworkLatency(false);
         }
       };
 
@@ -259,6 +290,7 @@
               maxBudget: Number(maxBudget),
               maxLatency: Number(maxLatency),
               requiredProviders: customProviders,
+              performanceMetric: latencyModel,
               usage_profile: {
                 requests_per_month: Number(requestsPerMonth),
                 cross_az_gb: Number(crossAzGb),
@@ -311,6 +343,7 @@
             prioritize_performance: Boolean(prioritizePerformance),
             search_strategy: searchStrategy || 'adaptive',
             sample_size: Number(sampleSize) || 100,
+            latency_model: (results?.latencyModel || latencyModel || 'avg_latency')
           };
 
           // Prepare solution data - ensure numeric fields are numbers
@@ -376,7 +409,7 @@
           // Prepare scenario parameters using actual benchmark constraints and timing
           const scenario = {
             components: actualComponents,
-            maxBudget: Number(maxBudget) || 10000,
+            maxBudget: Number(maxBudget) || 5000,
             maxLatency: Number(maxLatency) || 150,
             maxProviders: 3,
             // Send the existing Pareto frontier solutions array from the benchmark
@@ -439,6 +472,76 @@
               Custom Scenario
             </button>
           </div>
+
+          {/* Network Latency Configuration Banner */}
+          {loadingNetworkLatency && (
+            <div className="bg-blue-500/20 backdrop-blur-md rounded-xl p-4 mb-6 border border-blue-500/30 flex items-center gap-3">
+              <div className="w-5 h-5 border-2 border-blue-400/30 border-t-blue-400 rounded-full animate-spin" />
+              <span className="text-blue-200">Loading network latency configuration...</span>
+            </div>
+          )}
+          {networkLatencyError && (
+            <div className="bg-red-500/20 backdrop-blur-md rounded-xl p-4 mb-6 border border-red-500/30">
+              <div className="flex items-center justify-between">
+                <span className="text-red-200">⚠️ Error loading network latency info: {networkLatencyError}</span>
+                <button onClick={() => fetchNetworkLatency()} className="px-3 py-1 bg-red-600 text-white rounded hover:bg-red-700 transition text-sm">
+                  Retry
+                </button>
+              </div>
+            </div>
+          )}
+          {networkLatency && !loadingNetworkLatency && (
+            <div className="bg-cyan-500/10 backdrop-blur-md rounded-xl mb-6 border border-cyan-500/20">
+              <div className="flex items-center justify-between p-4 cursor-pointer" onClick={() => setShowNetworkLatencyBanner(!showNetworkLatencyBanner)}>
+                <div className="text-cyan-200">
+                  <div className="font-semibold">Network latency configuration</div>
+                  {!showNetworkLatencyBanner && (
+                    <div className="text-xs text-cyan-300 mt-0.5">
+                      Override: {networkLatency.status?.has_override ? 'Active' : 'None'}
+                      {typeof networkLatency.status?.entries === 'number' && ` • Entries: ${networkLatency.status.entries}`}
+                    </div>
+                  )}
+                </div>
+                <div className="flex items-center gap-2">
+                  <button onClick={(e) => { e.stopPropagation(); fetchNetworkLatency(); }} className="px-3 py-1 bg-cyan-600 text-white rounded hover:bg-cyan-700 transition text-sm">
+                    Refresh
+                  </button>
+                  <svg className={`w-5 h-5 text-cyan-400 transition-transform ${showNetworkLatencyBanner ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                  </svg>
+                </div>
+              </div>
+              {showNetworkLatencyBanner && (
+                <div className="px-4 pb-4 pt-0 text-sm text-cyan-200 space-y-1">
+                  <div>Override status: <strong>{networkLatency.status?.has_override ? 'Active' : 'None'}</strong></div>
+                  {typeof networkLatency.status?.entries === 'number' && (
+                    <div>Override entries: <strong>{networkLatency.status.entries}</strong></div>
+                  )}
+                  {typeof networkLatency.status?.ttl_seconds === 'number' && (
+                    <div>TTL: <strong>{networkLatency.status.ttl_seconds}s</strong></div>
+                  )}
+                  {typeof networkLatency.status?.age_seconds === 'number' && (
+                    <div>Age: <strong>{Math.floor(networkLatency.status.age_seconds)}s</strong></div>
+                  )}
+                  {networkLatency.override && (
+                    <div className="mt-2 text-xs text-cyan-300">
+                      Showing up to 6 override entries:
+                      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2 mt-2">
+                        {Object.entries(networkLatency.override).slice(0,6).map(([k,v]) => (
+                          <div key={k} className="bg-cyan-500/10 border border-cyan-500/20 rounded px-2 py-1">
+                            <span className="font-mono">{k}</span>: <span className="font-semibold">{v} ms</span>
+                          </div>
+                        ))}
+                      </div>
+                      {Object.entries(networkLatency.override).length > 6 && (
+                        <div className="mt-1">… and {Object.entries(networkLatency.override).length - 6} more</div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
 
           {/* Validation Cards */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
@@ -579,6 +682,14 @@
                 <h3 className="font-semibold text-cyan-200 mb-3">Optimization Preferences</h3>
                 <div className="space-y-3">
                   <div>
+                    <label className="block text-xs text-blue-300 mb-1">Latency Model</label>
+                    <select value={latencyModel} onChange={e=>setLatencyModel(e.target.value)} className="w-full bg-white/10 backdrop-blur-md border border-blue-500/30 rounded-lg px-4 py-2 text-white focus:outline-none focus:border-cyan-400">
+                      <option value="avg_latency" className="bg-slate-800">Classic (Average Latency)</option>
+                      <option value="graph_latency" className="bg-slate-800">Graph-based (Critical Path)</option>
+                    </select>
+                    <p className="text-xs text-blue-300/70 mt-1">Dependency-aware critical path considers inter-region network hops.</p>
+                  </div>
+                  <div>
                     <label className="block text-xs text-blue-300 mb-1">Preferred Cloud Provider</label>
                     <select value={preferredProvider} onChange={e=>setPreferredProvider(e.target.value)} className="w-full bg-white/10 backdrop-blur-md border border-blue-500/30 rounded-lg px-4 py-2 text-white focus:outline-none focus:border-cyan-400">
                       <option value="" className="bg-slate-800">No Preference</option>
@@ -718,6 +829,13 @@
               <div className="bg-gradient-to-r from-teal-500/20 to-cyan-500/20 backdrop-blur-md rounded-xl p-6 border border-teal-500/30">
                 <h3 className="font-semibold text-teal-200 mb-3">Optimization Preferences</h3>
                 <div className="space-y-3">
+                  <div>
+                    <label className="block text-xs text-teal-300 mb-1">Latency Model</label>
+                    <select value={latencyModel} onChange={e=>setLatencyModel(e.target.value)} className="w-full bg-white/10 backdrop-blur-md border border-teal-500/30 rounded-lg px-4 py-2 text-white focus:outline-none focus:border-cyan-400">
+                      <option value="avg_latency" className="bg-slate-800">Classic (Average Latency)</option>
+                      <option value="graph_latency" className="bg-slate-800">Graph-based (Critical Path)</option>
+                    </select>
+                  </div>
                   <div>
                     <label className="block text-xs text-teal-300 mb-1">Preferred Cloud Provider</label>
                     <select value={preferredProvider} onChange={e=>setPreferredProvider(e.target.value)} className="w-full bg-white/10 backdrop-blur-md border border-teal-500/30 rounded-lg px-4 py-2 text-white focus:outline-none focus:border-cyan-400">
@@ -884,7 +1002,15 @@
           {results && (
             <div className="mt-8 space-y-6">
               <div className="flex items-center justify-between">
-                <h2 className="text-xl font-semibold bg-gradient-to-r from-cyan-400 to-blue-500 bg-clip-text text-transparent">Results</h2>
+                <h2 className="text-xl font-semibold bg-gradient-to-r from-cyan-400 to-blue-500 bg-clip-text text-transparent flex items-center gap-3">
+                  Results
+                  <span className="text-xs px-2 py-1 rounded-full border border-blue-500/40 bg-blue-500/10 text-blue-200">
+                    Latency: {(() => {
+                      const lm = results.latencyModel || 'avg_latency';
+                      return lm === 'graph_latency' ? 'Graph-based' : 'Classic';
+                    })()}
+                  </span>
+                </h2>
                 <button onClick={() => setShowRaw(!showRaw)} className="text-xs px-4 py-2 rounded-lg bg-yellow-500/20 backdrop-blur-md border border-yellow-500/40 text-yellow-300 font-semibold hover:bg-yellow-500/30 transition">
                   {showRaw ? '🙈 Hide Raw V4' : '👁️ Show Raw V4'}
                 </button>

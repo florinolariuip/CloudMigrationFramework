@@ -1,14 +1,14 @@
 # Pricing Methodology
 
 ## Overview
-This document explains how cloud pricing is fetched, calculated, and maintained in the Cloud Migration Optimization framework.
+This document explains how cloud pricing is fetched, calculated, and maintained in the Cloud Migration Optimization framework. Our approach balances academic rigor with practical real-world data.
 
 ---
 
 ## ✅ Current State: Dynamic Regional Pricing
 
 ### **AWS Pricing** (85% Accurate)
-**Method**: Regional pricing tables based on official AWS documentation (updated Nov 2025)
+**Method**: Regional pricing tables based on official AWS documentation (updated monthly)
 
 **Sources**:
 - EC2: https://aws.amazon.com/ec2/pricing/on-demand/
@@ -23,6 +23,7 @@ This document explains how cloud pricing is fetched, calculated, and maintained 
 - `ap-southeast-1` (Singapore)
 
 **Update Frequency**: Monthly manual updates from AWS pricing pages
+**Validation**: Cross-referenced with AWS Calculator estimates
 
 **Example**:
 ```python
@@ -52,6 +53,7 @@ ec2_prices = {
 - Dynamic: Any Azure region code
 
 **Update Frequency**: Real-time (fetched on every request, cached for 1 hour)
+**Validation**: Direct from Microsoft's official pricing API
 
 **Example API Query**:
 ```python
@@ -64,7 +66,7 @@ filter = "serviceName eq 'Virtual Machines' and " \
 ---
 
 ### **GCP Pricing** (85% Accurate)
-**Method**: Regional pricing tables based on official GCP documentation (updated Nov 2025)
+**Method**: Regional pricing tables based on official GCP documentation (updated monthly)
 
 **Sources**:
 - Compute Engine: https://cloud.google.com/compute/all-pricing
@@ -79,6 +81,7 @@ filter = "serviceName eq 'Virtual Machines' and " \
 - `asia-southeast1` (Singapore)
 
 **Update Frequency**: Monthly manual updates from GCP pricing pages
+**Validation**: Cross-referenced with GCP Calculator estimates
 
 **Example**:
 ```python

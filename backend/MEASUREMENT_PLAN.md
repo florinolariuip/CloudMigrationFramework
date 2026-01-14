@@ -2,7 +2,7 @@
 
 ## Overview
 
-This document outlines **what to measure**, **how to measure**, and **why** for comprehensive evaluation of the hybrid CSP+Expert cloud migration optimization framework.
+This document outlines **what to measure**, **how to measure**, and **why** for comprehensive evaluation of the hybrid CSP+Expert cloud migration optimization framework. This plan supports rigorous academic research with reproducible, statistically valid results.
 
 ---
 
@@ -15,7 +15,7 @@ This document outlines **what to measure**, **how to measure**, and **why** for 
 
 ### RQ2: Solution Quality
 **Q2.1:** How do solutions compare to baseline algorithms in cost and latency?  
-**Q2.2:** What is the optimality gap compared to exhaustive search?  
+**Q2.2:** What is the optimality gap compared to exhaustive search (when feasible)?  
 **Q2.3:** How diverse are the Pareto-optimal solutions?
 
 ### RQ3: Explainability & Usability

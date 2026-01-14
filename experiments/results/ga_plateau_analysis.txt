@@ -3,9 +3,9 @@ GA PLATEAU ANALYSIS
 ================================================================================
 
           config  plateau_generation  plateau_evaluations  cost_at_plateau  final_cost  improvement_after_plateau_pct
-GA-5K (baseline)                  40                 2000            395.9       395.9                            0.0
-          GA-10K                  40                 4000            395.9       395.9                            0.0
-          GA-20K                  20                 4000            395.9       395.9                            0.0
+GA-5K (baseline)                  20                 1000            418.9      395.90                       5.490571
+          GA-10K                  30                 3000            395.9      432.74                      -9.305380
+          GA-20K                  30                 6000            395.9      395.90                       0.000000
 
 INTERPRETATION:
 - Plateau = point where improvement drops below 0.5% per generation

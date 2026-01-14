@@ -112,6 +112,11 @@ def api_benchmark():
     print(f"[DEBUG] usage_profile: {usage_profile}", file=sys.stderr)
     if usage_profile:
         scenario['usage_profile'] = usage_profile
+
+    # Extract latency model selection and attach to constraints for CMOv4
+    latency_model = request.args.get('latency_model') or request.args.get('performance_metric')
+    if latency_model:
+        scenario.setdefault('constraints', {})['performanceMetric'] = latency_model
     
     # Extract preferences
     preferences = {}
@@ -440,6 +445,9 @@ def update_defaults():
         DEFAULT_CONSTRAINTS["maxLatency"] = float(payload["maxLatency"])
     if "maxProviders" in payload:
         DEFAULT_CONSTRAINTS["maxProviders"] = int(payload["maxProviders"])
+    # Persist selected performance metric (avg_latency | tail_latency | throughput | graph_latency)
+    if "performanceMetric" in payload:
+        DEFAULT_CONSTRAINTS["performanceMetric"] = str(payload.get("performanceMetric", "avg_latency"))
     
     return jsonify({
         "success": True,
@@ -567,6 +575,7 @@ def get_services():
             "azure_region": DEFAULT_PRICING.get("azure_region", "westeurope"),
             "currency": DEFAULT_PRICING.get("currency", "USD")
         },
+        "network_latency": __nl_status(),
         "live_api_status": {
             "success_rate": pricing_sources.get("success_rate", "0%"),
             "live_services": pricing_sources.get("live_services", 0),
@@ -585,6 +594,22 @@ def get_services():
             )
         }
     })
+
+def __nl_status():
+    try:
+        from backend.services.network_latency_store import status, get_override
+        st = status()
+        # Do not include full matrix by default to keep payload small
+        return {
+            "has_override": st.get("has_override"),
+            "entries": st.get("entries"),
+            "ttl_seconds": st.get("ttl_seconds"),
+            "age_seconds": st.get("age_seconds"),
+        }
+    except Exception:
+        return {
+            "has_override": False
+        }
 
 @app.get("/api/pricing-status")
 def get_pricing_status():
@@ -648,6 +673,136 @@ def update_pricing_settings():
         "pricing": DEFAULT_PRICING
     })
 
+
+# Live network latency override endpoints
+@app.get("/api/network-latency")
+def get_network_latency_override():
+    """Return current network latency matrix (default + override status)."""
+    try:
+        from backend.services.network_latency_store import get_override, status
+        override = get_override()
+        # Convert tuple keys to "a,b" for JSON friendliness
+        override_json = {f"{a},{b}": v for (a, b), v in override.items()} if override else None
+        return jsonify({
+            "override": override_json,
+            "status": status()
+        })
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@app.post("/api/network-latency")
+def set_network_latency_override():
+    """Set or clear the live network latency override matrix.
+
+    Body formats supported:
+    - { "matrix": { "us-east-1,eu-west-1": 92.0, ... }, "ttl_seconds": 3600 }
+    - { "clear": true }
+    """
+    try:
+        from backend.services.network_latency_store import set_override, clear_override, status
+        payload = request.get_json(force=True, silent=True) or {}
+        if payload.get("clear"):
+            clear_override()
+            return jsonify({"success": True, "status": status()})
+        matrix = payload.get("matrix", {})
+        ttl = payload.get("ttl_seconds")
+        if not isinstance(matrix, dict) or not matrix:
+            return jsonify({"error": "matrix must be a non-empty object mapping 'from,to' to milliseconds"}), 400
+        set_override(matrix, ttl_seconds=ttl)
+        return jsonify({"success": True, "status": status()})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@app.get("/api/network-latency/probe")
+def probe_network_latency():
+    """Probe TCP connect times (ms) from the server to regional endpoints.
+
+    Query params:
+      - regions: comma-separated region codes (default inferred from latency model)
+      - attempts: number of attempts per region (default 3)
+      - timeout_ms: per-attempt timeout in ms (default 500)
+      - host_template: Python format string with {region} (default 'ec2.{region}.amazonaws.com')
+      - port: TCP port to connect to (default 443)
+
+    NOTE: This measures server→region connectivity, not inter-region RTTs.
+    Use results to calibrate overrides manually via POST /api/network-latency.
+    """
+    import socket, time, statistics
+    from typing import List
+
+    # Infer default regions from latency model keys
+    try:
+        from backend.engines.latency_graph import RealisticLatencyModel
+        model_regions = set()
+        for (a, b) in RealisticLatencyModel().network_latency.keys():
+            model_regions.add(a)
+            model_regions.add(b)
+        default_regions = sorted(model_regions)
+    except Exception:
+        default_regions = [
+            'us-east-1', 'us-west-2', 'eu-west-1', 'eu-central-1', 'ap-south-1', 'ap-northeast-1'
+        ]
+
+    regions_param = (request.args.get('regions') or '').strip()
+    regions: List[str] = [r.strip() for r in regions_param.split(',') if r.strip()] or default_regions
+    attempts = max(1, int(request.args.get('attempts', 3)))
+    timeout_ms = max(100, int(request.args.get('timeout_ms', 500)))
+    host_tmpl = request.args.get('host_template', 'ec2.{region}.amazonaws.com')
+    port = int(request.args.get('port', 443))
+
+    def connect_once(host: str, port: int, timeout_s: float) -> float | None:
+        start = time.perf_counter()
+        try:
+            with socket.create_connection((host, port), timeout=timeout_s):
+                pass
+            end = time.perf_counter()
+            return (end - start) * 1000.0
+        except Exception:
+            return None
+
+    results = {}
+    measured = 0
+    failed = 0
+    for region in regions:
+        host = host_tmpl.format(region=region)
+        samples = []
+        successes = 0
+        for _ in range(attempts):
+            ms = connect_once(host, port, timeout_ms / 1000.0)
+            if ms is not None:
+                samples.append(round(ms, 2))
+                successes += 1
+        if successes:
+            measured += 1
+            median_ms = round(statistics.median(samples), 2)
+            results[region] = {
+                'target': f'{host}:{port}',
+                'attempts': attempts,
+                'successes': successes,
+                'samples_ms': samples,
+                'median_ms': median_ms,
+            }
+        else:
+            failed += 1
+            results[region] = {
+                'target': f'{host}:{port}',
+                'attempts': attempts,
+                'successes': 0,
+                'error': f'All attempts failed (timeout {timeout_ms}ms)'
+            }
+
+    return jsonify({
+        'regions': regions,
+        'attempts': attempts,
+        'timeout_ms': timeout_ms,
+        'port': port,
+        'host_template': host_tmpl,
+        'summary': { 'measured': measured, 'failed': failed },
+        'results': results,
+        'note': 'These are server→region TCP connect medians, not inter-region RTTs.'
+    })
 
 @app.post("/api/multi-cloud-analysis")
 def analyze_multi_cloud():
@@ -1021,6 +1176,11 @@ def optimize():
                 "rule_weights": SCORING_WEIGHTS.copy(),
             }
         }
+        # Include selected latency model for clarity in comparisons (avg_latency | tail_latency | throughput | graph_latency)
+        try:
+            metrics["latency_model"] = getattr(constraints, "performanceMetric", DEFAULT_CONSTRAINTS.get("performanceMetric", "avg_latency"))
+        except Exception:
+            metrics["latency_model"] = DEFAULT_CONSTRAINTS.get("performanceMetric", "avg_latency")
 
         # Academic extension: log the run for empirical validation
         RUN_LOG.append({

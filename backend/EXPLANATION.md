@@ -25,7 +25,7 @@
 - **CMOv4 Architecture**: Component-based modeling with instance counts, tech stacks, dependencies
 - **Timeout Protection**: 10-second timeout with graceful fallback for all optimization calls
 - **Zero Solutions Handling**: Intelligent suggestions when no feasible solutions found
-- **Default Configuration**: Updated from restrictive (5K budget, 12ms latency) to realistic (10K budget, 150ms latency)
+- **Default Configuration**: Updated from restrictive (5K budget, 12ms latency) to realistic (5K budget, 150ms latency)
 - **Frontend Synchronization**: Dynamic preference thresholds based on current constraints
 
 **📰 See [NEWS.md](NEWS.md) for detailed changelog and test results.**
@@ -53,7 +53,7 @@ This project implements a hybrid optimization pipeline for cloud migration plann
 ## Version 3 Highlights
 
 ### New Features (v3/v4)
-- **Realistic Defaults**: Budget $10,000, Latency 150ms, 3 providers (updated from restrictive values)
+- **Realistic Defaults**: Budget $5,000, Latency 150ms, 3 providers (updated from very restrictive earlier values)
 - **CMOv4 Integration**: Component-based architecture accessible via `/cmov4.html`
 - **Live Pricing**: Azure Retail API integration with real-time data
 - **Performance Fixes**: Baseline algorithms optimized (no more 40+ second freezes)
@@ -129,7 +129,7 @@ Use this to ensure the running environment supports seeding and matches the expe
 ## Key Concepts & Numbers
 
 ### 1. Constraints (CSP Phase)
-- **maxBudget**: Maximum total monthly cost allowed for the solution (default: `$10,000`).
+- **maxBudget**: Maximum total monthly cost allowed for the solution (default: `$5,000`).
 - **maxLatency**: Maximum average or tail latency allowed (default: `150ms`).
 - **maxProviders**: Maximum number of different cloud providers allowed (default: `3`).
 - **performanceMetric**: Which latency metric to use (`avg_latency`, `tail_latency`, or `throughput`).
@@ -219,224 +219,139 @@ The system compares CSP+Expert against 5 baseline algorithms:
 - **Run log**: Each optimization run is logged for empirical analysis.
 - **Reproducibility**: Export results in JSON format for external analysis
 
-## Components (15 Total)
-
-### Original 6 Components
-1. **api_gateway**: API Management
-2. **identity_management**: Authentication/Authorization
-3. **analytics**: Data warehousing
-4. **database**: Relational/NoSQL databases
-5. **application_server**: Compute instances
-6. **storage**: Object storage
-
-### Added 9 Components (v3 - Enterprise Scale)
-7. **cache**: In-memory caching (Redis/Memorystore)
-8. **message_queue**: Async messaging (SQS/Pub/Sub)
-9. **cdn**: Content delivery networks
-10. **load_balancer**: High-availability load balancing
-11. **monitoring**: Observability and metrics
-12. **backup**: Data protection and recovery
-13. **encryption**: Key management and encryption
-14. **containers**: Container orchestration (EKS/AKS/GKE)
-15. **serverless_compute**: Event-driven functions
-
-**Search Space**: 3^15 = 14,348,907 theoretical combinations (21,257,640 with dependencies)
-
-## How to Use
-
-1. **Start the application**:
-   ```bash
-   cd frontend
-   bash start.sh
-   ```
-   - CMOv3: Opens at `http://localhost:8080`
-   - CMOv4: Available at `http://localhost:8080/cmov4.html`
-   - Backend runs on port 5055
-
-2. **Set constraints**: Choose budget ($10,000 default), latency (150ms default), provider count (3 default) in the UI.
-
-3. **Review pricing sources**: Check the service data banner showing all three providers use "Public Pricing API"
-
-4. **Tune academic parameters**: Adjust rule weights and thresholds in the Academic tab
-
-5. **Run optimization**: The system will:
-   - Generate all possible configurations (up to 21M combinations)
-   - Filter by hard constraints (CSP phase - ~150ms)
-   - Score and rank feasible solutions (Expert System phase - ~50ms)
-   - Calculate Pareto frontier (Multi-objective phase - ~10ms)
-   - Generate explainability data (~5ms)
-   - Create Sankey diagrams for visualization
-   - **CMOv4**: Generate PDF reports for best solutions
-
-6. **Review results**:
-   - **Results Tab**: Top solution, alternatives, Sankey diagrams
-   - **Comparison Tab**: CSP+Expert vs. 5 baseline algorithms
-   - **Explainability Tab**: Constraint proofs, rule traces, decision paths
-
-7. **Compare with baselines**: Click "Compare with Baselines" to run all 6 algorithms
-
-8. **Export results**: Download results as JSON for further analysis
-
-9. **Run experiments (academic tests)**: 
-   - **CMOv3**: Open `frontend/academic_tests.html` for batch experiments
-   - **CMOv4**: Open `frontend/cmov4.html` for component-based optimization and benchmarking
-   - Both support CSV/JSON export and reproducibility testing with fixed seeds
-
-## Sankey Diagram Interpretation
-
-### Cost Flow Diagram
-- **Source Nodes**: AWS, Azure, GCP (providers)
-- **Target Nodes**: Component categories (API, Database, Storage, etc.)
-- **Links**: Show monthly cost flowing from provider to category
-- **Colors**: 
-  - AWS: Orange
-  - Azure: Blue
-  - GCP: Green
-  - Categories: Cyan/Purple/Pink spectrum
-
-### Latency Flow Diagram
-- **Source Nodes**: AWS, Azure, GCP (providers)
-- **Target Nodes**: Individual components (all 15)
-- **Links**: Show latency contribution from provider to component
-- **Colors**: Based on latency ranges (green=fast, yellow=medium, red=slow)
-
-## Code Structure
-
-### Backend (`/backend`)
-- **app.py**: Flask API endpoints (`/api/optimize`, `/api/compare-baselines`, `/api/service-data`)
-- **config.py**: Configuration (constraints, weights, thresholds, dependencies)
-- **models.py**: Data models (Constraints, Preferences, Solution)
-- **engines/**:
-  - `constraints.py`: CSP engine (combination generation, filtering)
-  - `rules.py`: Expert system (experta rules, scoring logic)
-  - `pareto.py`: Multi-objective optimization
-  - `baselines.py`: 5 baseline algorithms
-  - `explainability.py`: Transparency features
-  - `sankey.py`: Flow diagram data generation
-- **services/**:
-  - `pricing.py`: Cloud pricing integration (AWS/Azure/GCP)
-
-### Frontend (`/frontend`)
-- **index.html**: React SPA (main application)
-- **docs.html**: Markdown documentation viewer
-- **start.sh**: Startup script (venv, deps, servers, port cleanup)
-
-## Code Comments & Documentation
-
-- **backend/engines/constraints.py**: Detailed comments for CSP logic, cost/latency calculation, dependency checks
-- **backend/engines/rules.py**: Comments explain each rule, scoring logic, experta integration
-- **backend/engines/pareto.py**: Pareto frontier calculation, metrics, extreme solutions
-- **backend/engines/sankey.py**: Flow diagram generation, node/link structure
-- **backend/services/pricing.py**: Pricing fetch logic, sources, caching strategy
-- **frontend/index.html**: UI components, state management, API integration
-
-## Extending & Customizing
-
-### Add New Components
-1. Update `COMPONENTS` in `backend/services/pricing.py`
-2. Add service options to `get_service_options()`
-3. Add pricing in `fetch_aws_pricing()`, `fetch_azure_pricing()`, `fetch_gcp_pricing()`
-4. Add latency in `get_service_latency()`
-5. Add dependencies in `SERVICE_DEPENDENCIES` in `config.py`
-
-### Add New Rules
-Extend `backend/engines/rules.py`:
-```python
-@Rule(AS.solution << Solution(totalCost=MATCH.cost),
-      TEST(lambda cost: cost < 1000))
-def very_low_cost(self, solution):
-    """Bonus for ultra-low-cost solutions"""
-    solution.score += 20
-    solution.rulesFired.append("Very Low Cost")
-```
-
-### Add New Pricing Sources
-Extend `backend/services/pricing.py`:
-```python
-def fetch_new_provider_pricing(self) -> Dict[str, float]:
-    """Fetch pricing from new provider API"""
-    # Implementation here
-    return {"Service Name": monthly_cost}
-```
-
-### Customize Visualization
-Update Sankey colors in `backend/engines/sankey.py`:
-```python
-def get_provider_color(provider: str) -> str:
-    colors = {
-        'AWS': '#FF9900',      # Orange
-        'Azure': '#0078D4',    # Blue  
-        'GCP': '#4285F4',      # Google Blue
-        'NewProvider': '#YOUR_COLOR'
-    }
-    return colors.get(provider, '#888888')
-```
-
-## Example Numbers & Their Meaning
-- **maxBudget = 5000**: Only solutions with total monthly cost ≤ $5000 are considered
-- **maxLatency = 150**: Only solutions with avg/tail latency ≤ 150ms are considered
-- **score = 100 (base) + rule impacts**: Each solution starts at 100 points
-- **pruning efficiency = 99.98%**: CSP reduced 21M combinations to ~4-10 feasible solutions
-- **hypervolume**: Higher is better (Pareto frontier covers more objective space)
-- **spacing**: Lower is better (Pareto solutions evenly distributed)
-
-## Performance Benchmarks
-
-| Metric | CMOv3 | CMOv4 |
-|--------|-------|-------|
-| Total combinations | 21,257,640 | Variable (5-15 components) |
-| Feasible solutions (typical) | 4-10 | 5-20 |
-| CSP time | ~150ms | ~100ms (optimized) |
-| Expert time | ~50ms | ~30ms |
-| Pareto time | ~10ms | ~10ms |
-| Explainability time | ~5ms | ~5ms |
-| Total optimization time | ~250ms | ~200ms |
-| Memory usage | <100MB | <50MB |
-| Pruning efficiency | 99.98% | 99.9% |
-| Baseline comparison time | <10s (fixed) | <5s |
-
-## Best Practices
-- Always check the pricing source display to verify data sources
-- Use the Academic tab to tune rule weights for your specific scenario
-- Export results and run logs for reproducibility
-- Review explainability tab to understand why solutions were chosen
-- Compare with baselines to validate CSP+Expert superiority
-- Use Sankey diagrams to communicate cost/latency distribution to stakeholders
-- Extend with new rules, services, or APIs as needed
-
----
-For further details, see code comments in each backend and frontend file.
-For scalability analysis, see [SCALABILITY_IMPLEMENTATION.md](./SCALABILITY_IMPLEMENTATION.md).
-
 ---
 
-## Current experiment context
+## Reproducibility & Tests
 
-- Strategy: Heuristic (sample size 100)
-- Repeats per size: 3
-- Constraints: Budget $10,000; Max Latency 12 ms; Max Providers 2
-- Component sets: first N services from catalog for N ∈ {5,10,15}
+To support reviewers and future maintainers, the main claims in this
+document and in the paper are tied to concrete experiment harnesses and
+pytest-based smoke tests:
 
-## Metrics (definitions)
+- **Multi-run baseline superiority**  
+  Experiments: `experiments/multi_run_experiment.py`,
+  `experiments/statistical_tests.py`  
+  Test: `experiments/tests/test_multi_run_experiment_smoke.py`  
+  Ensures that a small multi-run configuration (`n_runs=3`) completes
+  and writes non-empty `multi_run_results.csv` and
+  `multi_run_statistics.csv` containing all six algorithms (CMOv4 + 5
+  baselines), from which the tables in
+  `backend/BASELINE_IMPLEMENTATION.md` are derived.
 
-- Mean Time (ms): wall‑clock per run (lower is better)
-- Pareto (μ±σ): count of non‑dominated solutions (higher = more trade‑offs)
-- Feasible (μ): count of solutions satisfying constraints
-- Hypervolume: dominated area under Pareto front (normalized units)
-- Spacing: dispersion of Pareto points (lower = more uniform spacing)
-- Coverage %: Pareto/Feasible ratio (percentage)
+- **GA baseline convergence and plateau**  
+  Experiment: `experiments/ga_convergence_experiment.py`  
+  Test: `experiments/tests/test_ga_convergence_smoke.py`  
+  Verifies that the GA convergence pipeline runs end-to-end and
+  produces non-empty `ga_convergence_data.csv` and
+  `ga_plateau_analysis.txt` (and plots when `matplotlib` is available),
+  backing the GA plateau discussion in
+  `backend/SCALABILITY_IMPLEMENTATION.md` and the paper.
 
-## Summary (from experiments page)
+- **Evolutionary vs. oracle Pareto baselines (NSGA-II / MOEA/D)**  
+  Harness: `backend/run_all_experiments.py` (NSGA-II / MOEA/D section)  
+  Test: `backend/tests/test_nsga_moead_experiments.py`  
+  Confirms that the pymoo-based NSGA-II and MOEA/D runners execute
+  under a small population/generation budget and, when successful,
+  emit non-empty `nsga2_results.csv` / `moead_results.csv`, which are
+  consistent with the reference tables in
+  `backend/PARETO_IMPLEMENTATION.md`. The "Oracle" rows there describe
+  an exhaustive baseline that is explicitly documented as future work.
 
-| Components | Selected Components (first N) | Mean Time (ms) | Pareto (μ±σ) | Feasible (μ) | Hypervolume (μ) | Spacing (μ) | Coverage % (μ) |
-|---:|---|---:|---|---:|---:|---:|---:|
-| 5 | analytics, api_gateway, application_server, backup, cache | 138.8 ± 34.2 | 7.0 ± 1.4 | 24 | 494.74 | 16.57 | 29.5% |
-| 10 | analytics, api_gateway, application_server, backup, cache, cdn, containers, database, encryption, identity_management | 59.6 ± 7.2 | 3.3 ± 0.5 | 8 | 1147.33 | 20.17 | 43.5% |
-| 15 | analytics, api_gateway, application_server, backup, cache, cdn, containers, database, encryption, identity_management, load_balancer, message_queue, monitoring, serverless_compute, storage | 64.3 ± 20.5 | 1.7 ± 0.5 | 5 | 1590.17 | 0.00 | 36.7% |
+- **Pricing, timeouts, and partial live/fallback behavior**  
+  Backend tests: `backend/tests/test_pricing_validation.py`  
+  Validate that pricing data is within expected ranges, cache/timeout
+  handling behaves as documented (including partial live success with
+  fallback fill), and API timeouts do not crash the optimizer.
 
-## Interpretation
+### Test coverage by functionality
 
-- Stability: Low σ on time and Pareto counts suggests stable behavior across 3 runs (notably N=10).
-- Feasible space shrinks with N; coverage grows then stabilizes → stronger pruning impact.
-- Hypervolume rises with N under current normalization, while Pareto count falls → frontier narrows but shifts.
-- Spacing ≈ 0 for N=15 implies clustered points; ensure plot padding/labels to avoid overlap.
+The automated tests cover the main functional areas of the framework:
+
+- **Core optimization pipeline (CSP → Expert Rules → Pareto)**  
+  Covered by `backend/tests/test_optimizer.py` and by the
+  end-to-end flows exercised in `experiments/multi_run_experiment.py`,
+  which call the same optimizer entry points and validate feasible
+  solutions, Pareto frontiers, and timing.
+
+- **Pricing & latency model (live + fallback, realistic latency, timeouts)**  
+  Covered by `backend/tests/test_pricing_validation.py`, which checks
+  cost/latency ranges, cache refresh and timeout behaviour, and
+  partial live API success with fallback completion.
+
+- **Baseline algorithms (Random, Greedy-Cost, Greedy-Latency, GA, Weighted Sum)**  
+  Covered by `backend/tests/test_optimizer.py` for baseline correctness
+  and by the multi-run experiment harness plus
+  `experiments/tests/test_multi_run_experiment_smoke.py`, which ensure
+  all six algorithms run repeatedly and write consistent result CSVs.
+
+- **GA convergence behaviour**  
+  Covered structurally by
+  `experiments/ga_convergence_experiment.py` and its smoke test
+  `experiments/tests/test_ga_convergence_smoke.py`, which exercise the
+  convergence and plateau analysis pipeline end-to-end.
+
+- **Evolutionary algorithms (NSGA-II / MOEA/D)**  
+  Covered structurally by `backend/tests/test_nsga_moead_experiments.py`,
+  confirming that the pymoo-based NSGA-II and MOEA/D runners can be
+  invoked from `backend/run_all_experiments.py` and emit non-empty
+  result CSVs when successful.
+
+- **API and documentation endpoints**  
+  Covered by backend endpoint tests (e.g. docs/version routes), which
+  ensure the documented HTTP interfaces are available and return the
+  expected structures.
+
+For an overview of how to re-run these experiments and which tests
+cover them, see also `experiments/README.md` ("Automated Validation via
+Tests"). Running `pytest backend/tests` and `pytest experiments/tests`
+provides a quick end-to-end validation that the implementation and
+documented experiments are in sync.
+
+### Cyclomatic complexity (radon snapshot, Jan 2026)
+
+We ran `radon cc backend -s` to quantify cyclomatic complexity across
+the backend code. Most helper functions and data classes are in the
+`A`–`B` range (scores ≤ 10). A small number of orchestrator and
+I/O-heavy functions have higher scores and are natural refactoring
+candidates:
+
+- **CMOv4 core and constraints**
+  - `backend/cmov4/optimizer.py::optimize_architecture` — F (52)
+  - `backend/engines/constraints.py::generate_feasible_solutions` — E (39)
+  - `backend/cmov4/validation.py::validate_architecture` — E (36)
+
+- **Main API endpoints** (Flask app)
+  - `backend/app.py::optimize` — F (54)
+  - `backend/app.py::compare_cmov4_baselines` — F (55)
+  - `backend/app.py::compare_baselines` — C (16)
+  - `backend/app.py::api_benchmark`, `update_rules_config`,
+    `analyze_multi_cloud`, `probe_network_latency` — C (11–13)
+
+- **Pricing and data fetching**
+  - `backend/services/pricing.py::ServiceDataCache.fetch_cloud_pricing_data` — F (47)
+  - `ServiceDataCache.fetch_aws_pricing`, `fetch_azure_pricing`,
+    `fetch_gcp_pricing` — C (14–18)
+
+- **Analysis/metrics and explainability**
+  - `backend/sensitivity_analysis.py::run_sensitivity_analysis` — E (40)
+  - `backend/engines/rules.py::evaluate_solutions_normalized` — C (18)
+  - `backend/engines/explainability.py::generate_rule_trace` — C (18)
+  - `backend/engines/latency_graph.py::RealisticLatencyModel.compute_critical_path` — C (17)
+  - `backend/engines/metrics.py::calculate_security_score`,
+    `calculate_scalability_score` — C (12)
+
+- **Baselines and comparison utilities**
+  - `backend/engines/baselines.py::baseline_genetic_algorithm` — C (12)
+  - `backend/engines/baselines.py::compare_with_csp_expert` — C (15)
+  - `backend/engines/baseline_comparison.py::prepare_comparison_response`,
+    `calculate_comparison_metrics`, `generate_pareto_frontier` — C (11–15)
+  - `backend/engines/experiment_harness.py::aggregate_metrics` — C (16)
+
+- **Reporting**
+  - `backend/academic_report_generator.py::AcademicReportGenerator._create_results_section` — C (14)
+  - `backend/cmov4/report_generator.py::_create_technical_section` — C (12)
+
+These scores are expected for functions that orchestrate multiple
+steps (HTTP parsing, validation, engine calls, aggregation, and
+formatting). Refactoring will focus on extracting smaller helpers
+without changing observable behaviour. We will re-run `radon` after
+these refactorings and update this section with the improved scores.

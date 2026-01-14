@@ -1,14 +1,14 @@
-# Journal Article Preparation Guide
+# Academic Research Guide
 
 ## Overview
 
-This document provides a **complete roadmap** for preparing a high-quality journal article based on the Cloud Migration Optimization Framework, targeting **top-tier venues** like IEEE Transactions on Cloud Computing or ACM Transactions on Internet Technology.
+This document provides a **comprehensive roadmap** for conducting rigorous academic research on the Cloud Migration Optimization Framework. It outlines methodologies, evaluation criteria, and experimental designs suitable for high-quality research validation.
 
 ---
 
-## 🎯 Article Positioning
+## 🎯 Research Positioning
 
-### Title Options
+### Research Focus Areas
 
 **Option 1 (Technical Focus):**
 > "A Hybrid CSP-Expert System with Automated Explainability for Multi-Objective Cloud Migration Optimization"
@@ -19,11 +19,11 @@ This document provides a **complete roadmap** for preparing a high-quality journ
 **Option 3 (Innovation Focus):**
 > "Beyond Black-Box Optimization: Automated Explainability for Multi-Cloud Service Selection"
 
-**Recommended:** Option 1 (clear, comprehensive, SEO-friendly)
+**Recommended:** Option 1 (clear, comprehensive, technically focused)
 
 ---
 
-### Abstract Structure (200-250 words)
+### Research Overview Structure (200-250 words)
 
 ```
 [Context] Organizations migrating to cloud environments face the challenge of 
@@ -60,21 +60,21 @@ satisfaction, expert systems, multi-criteria decision analysis
 
 ---
 
-## 📋 Article Structure
+## 📋 Research Structure
 
-### Standard Journal Format (8,000-12,000 words)
+### Standard Academic Format (8,000-12,000 words)
 
 | Section | Pages | Word Count | Status |
 |---------|-------|------------|--------|
-| Abstract | 0.5 | 200-250 | ✅ Draft above |
-| 1. Introduction | 2 | 1,500-2,000 | 📝 To write |
-| 2. Related Work | 3 | 2,500-3,000 | 📝 To write |
-| 3. Methodology | 3 | 2,500-3,000 | ✅ Have code |
-| 4. Implementation | 2 | 1,500-2,000 | ✅ Have code |
-| 5. Evaluation | 3 | 2,500-3,000 | 📊 Need data |
-| 6. Discussion | 1.5 | 1,000-1,500 | 📝 To write |
-| 7. Conclusion | 1 | 800-1,000 | 📝 To write |
-| References | 2 | - | 📚 To collect |
+| Abstract | 0.5 | 200-250 | ✅ Template above |
+| 1. Introduction | 2 | 1,500-2,000 | 📝 Framework ready |
+| 2. Related Work | 3 | 2,500-3,000 | 📝 Framework ready |
+| 3. Methodology | 3 | 2,500-3,000 | ✅ Implemented |
+| 4. Implementation | 2 | 1,500-2,000 | ✅ Implemented |
+| 5. Evaluation | 3 | 2,500-3,000 | 📊 Experiments ready |
+| 6. Discussion | 1.5 | 1,000-1,500 | 📝 Framework ready |
+| 7. Conclusion | 1 | 800-1,000 | 📝 Framework ready |
+| References | 2 | - | 📚 To compile |
 
 **Total:** 18-20 pages, 10,000-12,000 words
 
@@ -86,17 +86,17 @@ satisfaction, expert systems, multi-criteria decision analysis
 
 ### 1.1 Motivation & Context (400 words)
 ```
-- Cloud adoption statistics (Gartner, IDC reports)
+- Cloud adoption statistics (recent industry reports)
 - Multi-cloud trends (70% of enterprises use 2+ providers)
 - Migration complexity (AWS: 200+ services, Azure: 100+, GCP: 100+)
 - Decision paralysis: millions of combinations
 - Critical business impact: 20-30% of IT budget
 ```
 
-**Key Citations:**
-- Gartner (2024): Cloud spending forecast
-- Forrester: Multi-cloud adoption report
-- IEEE Cloud Computing: Migration challenges survey
+**Key Research Areas:**
+- Cloud computing evolution and adoption patterns
+- Multi-cloud strategy trends and challenges
+- Migration complexity analysis
 
 ### 1.2 Problem Statement (400 words)
 ```

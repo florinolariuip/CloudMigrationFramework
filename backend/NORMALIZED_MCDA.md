@@ -4,13 +4,15 @@
 
 The **Normalized MCDA Interface** (`index_normalized.html`) provides an advanced, academically rigorous approach to cloud migration optimization using **6-metric normalization** with **configurable weights** and **real-time validation**.
 
+This implementation follows established MCDA research methodologies and provides transparency in multi-objective decision making.
+
 ---
 
 ## 🎯 Key Features
 
 ### 1. **6-Metric Multi-Criteria Decision Analysis**
 
-The interface evaluates cloud solutions across **6 normalized criteria**:
+The interface evaluates cloud solutions across **6 normalized criteria** based on established research in cloud service selection:
 
 | Metric | Direction | Weight (Default) | Description |
 |--------|-----------|------------------|-------------|

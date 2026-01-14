@@ -170,9 +170,13 @@ class CMOv4ReportGenerator:
         elements.append(Spacer(1, 1*inch))
         
         # Summary box
+        # Friendly latency model label for metadata
+        lm = str(scenario_info.get('latency_model', 'avg_latency'))
+        lm_label = 'Graph-based' if lm == 'graph_latency' else 'Classic'
         summary_data = [
             ['<b>Total Cost</b>', f"${safe_float(solution.get('cost', 0)):,.2f} / month"],
             ['<b>Latency</b>', f"{safe_float(solution.get('latency', 0)):.1f} ms"],
+            ['<b>Latency Model</b>', lm_label],
             ['<b>Providers</b>', str(safe_int(solution.get('providers', 0)))],
             ['<b>Score</b>', f"{safe_float(solution.get('score', 0)):.2f} / 100"],
             ['<b>Generated</b>', datetime.now().strftime('%Y-%m-%d %H:%M:%S')]

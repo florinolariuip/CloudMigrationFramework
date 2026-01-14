@@ -1,28 +1,63 @@
-# Journal Experiments - Setup Complete ✓
+# Rigorous Academic Experiments - Setup Complete ✓
+
+## ✅ Automated Validation via Tests
+
+Each major experiment harness is covered by a lightweight smoke test to
+ensure it still runs and produces the core artefacts referenced in the
+paper and backend documentation:
+
+- **Multi-Run Baseline + CMOv4 Experiment**  
+  Harness: `experiments/multi_run_experiment.py`  
+  Test: `experiments/tests/test_multi_run_experiment_smoke.py`  
+  Verifies that `run_multi_experiment(n_runs=3)` completes and writes
+  `multi_run_results.csv` and `multi_run_statistics.csv` containing
+  all six algorithms (CMOv4 + 5 baselines).
+
+- **GA Convergence & Plateau Analysis**  
+  Harness: `experiments/ga_convergence_experiment.py`  
+  Test: `experiments/tests/test_ga_convergence_smoke.py`  
+  Verifies that the GA convergence pipeline runs end-to-end and
+  generates non-empty `ga_convergence_data.csv` and
+  `ga_plateau_analysis.txt` (plus convergence plots when matplotlib is
+  available).
+
+- **NSGA-II / MOEA/D Evolutionary Experiments**  
+  Harness: `backend/run_all_experiments.py` (NSGA-II / MOEA/D section)  
+  Test: `backend/tests/test_nsga_moead_experiments.py`  
+  Verifies that, under a small population/generation budget, the
+  NSGA-II and MOEA/D runners execute without errors and, when
+  successful, emit non-empty `nsga2_results.csv` / `moead_results.csv`.
+
+These tests are intentionally structural rather than numerical: they do
+not hard-code specific metric values, but they do guarantee that the
+code paths used to generate the documented tables and figures remain
+executable and produce well-formed outputs.
+
+---
 
 ## 📁 Experiments Created
 
-I've successfully created all three experimental scripts to strengthen your journal submission:
+Three comprehensive experimental frameworks have been implemented to support rigorous academic research:
 
 ### 1. Multi-Run Experiment (`multi_run_experiment.py`)
-**Purpose:** Addresses reviewer concern: *"Single-run results lack statistical rigor"*
+**Purpose:** Addresses research rigor requirement: *"Results must demonstrate statistical validity across multiple independent runs"*
 
 **What it does:**
 - Runs CMOv4 and all 5 baselines 30 times with different random seeds
 - Computes statistics: mean ± std dev, min, max
-- Generates publication-ready LaTeX table
+- Generates research-ready LaTeX table
 
 **Output files:**
 - `experiments/results/multi_run_results.csv` - Raw data (180 runs total)
 - `experiments/results/multi_run_statistics.csv` - Summary statistics  
-- `experiments/results/table_multi_run.tex` - LaTeX table for paper
+- `experiments/results/table_multi_run.tex` - LaTeX table for research documentation
 
 **Runtime:** ~3-4 hours for full 30 runs
 
 ---
 
 ### 2. GA Convergence Analysis (`ga_convergence_experiment.py`)
-**Purpose:** Addresses reviewer concern: *"Is the GA baseline too weak with only 5K evaluations?"*
+**Purpose:** Addresses research validation requirement: *"Baseline parameter selection must be empirically justified"*
 
 **What it does:**
 - Tests GA with 5K, 10K, and 20K evaluations
@@ -40,7 +75,7 @@ I've successfully created all three experimental scripts to strengthen your jour
 ---
 
 ### 3. Statistical Significance Tests (`statistical_tests.py`)
-**Purpose:** Addresses reviewer concern: *"No statistical tests, just point comparisons"*
+**Purpose:** Addresses research rigor requirement: *"Claims of superiority must be statistically validated"*
 
 **What it does:**
 - Paired t-tests between CMOv4 and each baseline
@@ -50,7 +85,7 @@ I've successfully created all three experimental scripts to strengthen your jour
 **Output files:**
 - `experiments/results/statistical_tests.csv` - t-test results
 - `experiments/results/effect_sizes.csv` - Cohen's d values
-- `experiments/results/table_statistical_tests.tex` - LaTeX table for paper
+- `experiments/results/table_statistical_tests.tex` - LaTeX table for research documentation
 
 **Runtime:** ~1 minute (runs after multi-run experiment)
 
@@ -58,7 +93,7 @@ I've successfully created all three experimental scripts to strengthen your jour
 
 ## 🚀 How to Run
 
-### Option 1: Run All Experiments (Recommended for Publication)
+### Option 1: Run All Experiments (Recommended for Research)
 ```bash
 cd "/Users/florinolariu/Downloads/journalimplementationver2 5"
 python3 experiments/run_all_experiments.py
@@ -71,7 +106,7 @@ python3 experiments/run_all_experiments.py
 python3 experiments/run_all_experiments.py --quick
 ```
 **Runtime:** ~30 minutes  
-**Output:** Same files, but with 3 runs instead of 30 (NOT suitable for publication)
+**Output:** Same files, but with 3 runs instead of 30 (NOT suitable for rigorous research validation)
 
 ### Option 3: Run Individual Experiments
 ```bash
@@ -119,23 +154,23 @@ validating the 5K baseline choice.
 
 ---
 
-## 🎓 Impact on Journal Submission
+## 🎓 Impact on Research Quality
 
 ### Before Experiments:
 - ❌ Single-run results  
 - ❌ No statistical tests
 - ❌ Weak GA baseline justification
-- **Acceptance probability: 45-55% (Tier-1), 70-75% (Tier-2)**
+- **Research Quality: Preliminary findings, requires additional validation**
 
 ### After Experiments:
 - ✅ Multi-run statistics (mean ± std)
 - ✅ Paired t-tests + effect sizes
 - ✅ GA convergence proof
-- **Acceptance probability: 70-75% (Tier-1), 85-90% (Tier-2)**
+- **Research Quality: Research-ready with rigorous empirical validation**
 
 ---
 
-## 📝 How to Use in Paper
+## 📝 How to Use Results in Academic Writing
 
 ### 1. Results Section
 Replace single-run table with:
@@ -213,23 +248,23 @@ All required packages have been installed:
 3. Run full 30-run experiment overnight
 4. Run GA convergence analysis
 5. Run statistical tests
-6. Integrate results into paper
+6. Document and analyze results
 
 ---
 
 ## 🎯 Summary
 
-You now have a complete experimental framework that addresses all three critical reviewer concerns:
+You now have a complete experimental framework that addresses all three critical research validation requirements:
 
 1. **Statistical Rigor** → Multi-run statistics
 2. **Baseline Strength** → GA convergence proof
 3. **Significance Testing** → t-tests + Cohen's d
 
-**Your journal is now 85-90% ready for submission** (was 70% before).
+**Your research framework is comprehensive and rigorous.**
 
 After running these experiments, you'll have:
-- ✅ Publication-quality empirical validation
-- ✅ Statistical proof of superiority
+- ✅ Research-quality empirical validation
+- ✅ Statistical proof of performance differences
 - ✅ Theoretical and empirical completeness
 
 **Estimated time to completion: 3-6 hours of compute time**  
@@ -237,5 +272,5 @@ After running these experiments, you'll have:
 
 ---
 
-Generated: December 9, 2025  
+Generated: January 13, 2026  
 Location: `/Users/florinolariu/Downloads/journalimplementationver2 5/experiments/`

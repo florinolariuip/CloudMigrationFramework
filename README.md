@@ -1,6 +1,26 @@
 # Cloud Migration Optimizer v4 - Hybrid CSP + Expert System
 
-## ✨ What's New (December 2025)
+## For Reviewers & Reproducibility
+
+If you are evaluating this project for a paper or academic review, these
+are the key entry points:
+
+- **System & API overview**: `backend/EXPLANATION.md`  
+- **Baselines & 30-run statistics**: `backend/BASELINE_IMPLEMENTATION.md`  
+- **Scalability & GA convergence analysis**: `backend/SCALABILITY_IMPLEMENTATION.md`  
+- **Pareto / NSGA-II / MOEA/D experiments**: `backend/PARETO_IMPLEMENTATION.md`  
+- **Experiment harnesses & how to run them**: `experiments/README.md`
+
+To quickly validate that implementation and experiments are in sync:
+
+- Backend tests: `pytest backend/tests`  
+- Experiment smoke tests: `pytest experiments/tests`  
+
+These tests exercise the same pipelines used to generate the tables and
+figures referenced in the documentation and paper, without hard-coding
+exact numeric results.
+
+## ✨ Latest Updates (January 2026)
 
 ### CMOv4 Release - Major Performance Breakthrough
 
@@ -12,16 +32,24 @@
 - **🔧 Flask-Compatible**: Thread-safe timeout using `threading.Timer` instead of `signal.alarm()`
 - **📈 Accurate Metrics**: Pareto metrics (hypervolume, spacing, coverage) with proper score handling
 - **🏆 Algorithm Champion**: CMOv4 outperforms all 5 baseline algorithms (GA, Greedy-Cost, Greedy-Latency, Random, Weighted Sum)
-- **🔬 Expert System Integration**: CMOv4 now uses same 44 business rules as CMOv3 for consistent evaluation
+- **🔬 Expert System Integration**: CMOv4 now uses same 24 business rules as CMOv3 for consistent evaluation
 - **🎲 Enhanced Strategic Sampling**: Increased from 20 to 50 combinations (8 balanced, 37 random exploration)
 - **📈 Configurable Exhaustive Search**: Now returns up to 500 solutions (vs 50) for thorough research analysis
+
+#### Realistic Latency Modeling (January 2026)
+- **Dependency-Aware Latency Engine**: Critical path analysis using directed acyclic graphs (DAG) for service dependencies
+- **Region-Sensitive Network Modeling**: Inter-region RTT matrix (e.g., US↔EU ≈ 85ms) merged with service processing times
+- **Live Latency Override System**: TTL-based in-memory store for runtime latency calibration
+- **Network Probe API**: Server-to-region TCP connect median measurement for empirical calibration
+- **Dual Latency Metrics**: Classic (sum-of-latencies) and graph-based (critical path) with UI selectors
+- **Implementation**: `backend/engines/latency_graph.py` with networkx-based critical path computation
 
 ### v3 Features (November 2025)
 
 - Deterministic runs via optional seed on /api/optimize (reports metrics.seed_used)
 - New /api/version endpoint exposes version and feature flags
 - Added instrumentation: feasible_pre_dedup, feasible_post_dedup, duplicates_removed, timing breakdowns
-- Deterministic ordering of feasible solutions (stable sorting) for reproducible tables
+- Deterministic ordering of feasible solutions (stable sorting) for reproducible results
 - Dynamic AcademicSummary card on the main dashboard (explanation accuracy)
 - New academic_tests.html page to batch experiments and aggregate explanation accuracy; CSV/JSON export
 - Normalized scoring page polish: fixed-decimal formatting for cost/latency
@@ -35,6 +63,8 @@ A **research-grade cloud migration optimizer** that combines Constraint Satisfac
 **Key Innovation**: Three-phase hybrid approach (CSP → Expert Rules → Pareto Frontier) that guarantees constraint satisfaction, optimizes business value, and identifies optimal cost-latency trade-offs.
 
 **Performance**: CMOv4 achieves **4,000× faster execution** than Genetic Algorithms while delivering better cost-latency balance and multiple solution options.
+
+**Academic Rigor**: Validated through 30-run multi-experiment studies with statistical significance testing (paired t-tests, Cohen's d effect sizes), GA convergence analysis, and comprehensive explainability evaluation.
 
 ---
 
@@ -100,14 +130,14 @@ python -m http.server 8080
 
 - **🔢 Default Budget**: Set to **$5000** (configurable)
 - **📈 Sankey Diagrams**: Interactive flow visualizations for cost and latency
-- **🌐 Unified Pricing**: All three cloud providers use "Public Pricing API"
+- **🌐 Unified Pricing**: All three cloud providers use live and documented pricing APIs
 - **🎨 Multi-Provider Display**: Clear indication of pricing sources for AWS, Azure, GCP
 - **🔧 Auto Port Cleanup**: Automatic cleanup of ports 5055 and 8080 on startup
 - **📝 Enhanced Documentation**: Comprehensive markdown docs with viewer
 
 ### 🏗️ Core Capabilities
 
-**Note**: Both CMOv3 and CMOv4 share the same optimization pipeline (CSP+Expert+Pareto). The difference is in their use case: CMOv3 for production workflows, CMOv4 for academic benchmarking and research validation.
+**Note**: Both CMOv3 and CMOv4 share the same optimization pipeline (CSP+Expert+Pareto). The difference is in their use case: CMOv3 for production workflows with fixed 15-component enterprise architecture, CMOv4 for flexible component modeling and academic benchmarking.
 
 #### 1. **Four-Phase Optimization (Shared by CMOv3 & CMOv4)**
 - **Phase 1 - Strategic Sampling**: Generates ~50 intelligent combinations using backend's constraint engine
@@ -117,7 +147,7 @@ python -m http.server 8080
   - 3× single-provider strategies (AWS-only, Azure-only, GCP-only)
   - 37× diverse random samples for thorough exploration
 - **Phase 2 - CSP Filter**: Validates configurations against hard constraints (budget, latency, providers)
-- **Phase 3 - Expert Rules**: Scores solutions using 44 business rules across 4 categories (cost, performance, strategic, preference)
+- **Phase 3 - Expert Rules**: Scores solutions using 24 business rules across 4 categories (cost, performance, strategic, preference)
 - **Phase 4 - Pareto Frontier**: Identifies non-dominated solutions for cost-latency trade-offs
 
 #### 2. **Multi-Objective Optimization**
@@ -133,11 +163,12 @@ python -m http.server 8080
 #### 4. **Baseline Comparisons**
 - **6 Baseline Algorithms**: CMOv4 Pareto, Genetic Algorithm, Greedy-Cost, Greedy-Latency, Random, Weighted Sum
 - **Performance Metrics**: Solution quality, execution time, explainability scores
-- **Academic Validation**: Empirical evidence showing CMOv4's superiority
+- **Empirical Validation**: Demonstrates CMOv4's superiority through rigorous experimentation
   - **4,300× faster** than Genetic Algorithm (0.03ms vs 128.99ms)
   - **457,000× faster** than Greedy Cost (0.03ms vs 13,716ms)
   - **24% cheaper** than GA while maintaining comparable latency
   - **Multiple solutions** (4 Pareto options) vs single solution from baselines
+- **Statistical Rigor**: 30-run experiments with paired t-tests, Cohen's d effect sizes, and convergence analysis
 
 #### 5. **Scalability**
 - **18 Components**: From 6 original to 18 enterprise components (API Gateway, Database, Cache, CDN, Containers, Serverless, IoT, etc.)
@@ -164,7 +195,7 @@ python -m http.server 8080
   - Static pricing: Uses cached data during optimization (<1s) to avoid API delays
   - Thread-safe timeout: 30s limit using `threading.Timer` for Flask compatibility
 - **CSP Engine**: `engines/constraints.py` - Strategic heuristic sampler shared with CMOv4
-- **Expert System**: `engines/rules.py` (using `experta` - 44 rules)
+- **Expert System**: `engines/rules.py` (using `experta` - 24 rules)
 - **Pareto Optimization**: `engines/pareto.py` (hypervolume, spacing, coverage metrics)
 - **Baseline Algorithms**: `engines/baselines.py` (6 algorithms for comparison)
 - **Explainability**: `engines/explainability.py`
@@ -219,7 +250,7 @@ Note: Some previously referenced research docs are planned but not yet included 
 This system demonstrates:
 
 1. **Hybrid Approach Superiority**: Both CMOv3 and CMOv4 use the same CSP+Expert+Pareto pipeline
-   - **Same 44 expert rules**: Ensures consistent business-aware evaluation
+   - **Same 24 expert rules**: Ensures consistent business-aware evaluation
    - **Same strategic sampling**: 50 intelligent combinations for thorough coverage
    - **Same Pareto optimization**: Multi-objective frontier with accurate metrics
    - **Different contexts**: CMOv3 for production workflows, CMOv4 for benchmarking
@@ -434,7 +465,7 @@ journalimplementationver2 5/
 │   │   ├── constraints.py        # CSP engine
 │   │   ├── explainability.py     # Transparency features
 │   │   ├── pareto.py             # Multi-objective optimization
-│   │   ├── rules.py              # Expert system (44 rules)
+│   │   ├── rules.py              # Expert system (24 rules)
 │   │   └── sankey.py             # Flow diagram generation
 │   └── services/
 │       └── pricing.py            # Cloud pricing integration
@@ -451,7 +482,7 @@ journalimplementationver2 5/
 
 ### Key Technologies
 
-- **Backend**: Flask, experta (expert system with 44 rules), NumPy (Pareto calculations)
+- **Backend**: Flask, experta (expert system with 24 rules), NumPy (Pareto calculations)
 - **Frontend**: React 18 (UMD), TailwindCSS, Plotly.js, marked.js
 - **Live APIs**: AWS Pricing API, Azure Retail Pricing API, GCP Compute API
 - **Visualization**: Plotly.js Sankey diagrams and Pareto frontier plots

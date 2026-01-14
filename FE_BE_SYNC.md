@@ -1,8 +1,8 @@
 # Frontend-Backend Synchronization Summary
 
-## Date: November 19, 2025
+## Date: January 2026
 
-This document describes the synchronization between the frontend (cmov4.html) and backend (Flask API) for the Cloud Migration Optimizer v4.
+This document describes the synchronization between the frontend (cmov4.html) and backend (Flask API) for the Cloud Migration Optimizer v4, documenting API contracts and data flow for reproducibility.
 
 ---
 

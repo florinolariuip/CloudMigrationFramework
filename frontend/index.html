@@ -126,7 +126,7 @@
     }
 
     function CloudMigrationOptimizer() {
-  const [constraints, setConstraints] = useState({ maxBudget: 10000, maxLatency: 150, maxProviders: 3 });
+  const [constraints, setConstraints] = useState({ maxBudget: 5000, maxLatency: 150, maxProviders: 3 });
     // Workload Profile state
     const [requestsPerMonth, setRequestsPerMonth] = useState(10000000);
     const [crossAzGb, setCrossAzGb] = useState(500);
@@ -168,6 +168,11 @@
       const [serviceData, setServiceData] = useState(null);
   const [showDocsMenu, setShowDocsMenu] = useState(false);
   const [showServiceBanner, setShowServiceBanner] = useState(true);
+  // Network latency override state (fetched on load like services)
+  const [networkLatency, setNetworkLatency] = useState(null);
+  const [loadingNetworkLatency, setLoadingNetworkLatency] = useState(true);
+  const [networkLatencyError, setNetworkLatencyError] = useState(null);
+  const [showNetworkLatencyBanner, setShowNetworkLatencyBanner] = useState(true);
   // Track if docs dropdown is open by click
   const [docsMenuClicked, setDocsMenuClicked] = useState(false);
       const [loadingServices, setLoadingServices] = useState(true);
@@ -199,6 +204,7 @@
         fetchServiceData();
         fetchDefaults();
         fetchAcademicConfig();
+        fetchNetworkLatency();
       }, []);
 
       const fetchDefaults = async () => {
@@ -221,6 +227,22 @@
           setAcademicConfig(data);
         } catch (e) {
           console.error('Failed to fetch academic config:', e);
+        }
+      };
+
+      const fetchNetworkLatency = async () => {
+        setLoadingNetworkLatency(true);
+        setNetworkLatencyError(null);
+        try {
+          const res = await fetch(`${API_BASE}/api/network-latency`);
+          if (!res.ok) throw new Error('Failed to fetch network latency info');
+          const data = await res.json();
+          setNetworkLatency(data);
+        } catch (e) {
+          console.error('Failed to fetch network latency info:', e);
+          setNetworkLatencyError(e.message);
+        } finally {
+          setLoadingNetworkLatency(false);
         }
       };
 
@@ -559,6 +581,83 @@
               </div>
             )}
 
+            {loadingNetworkLatency && (
+              <div className="bg-blue-500/20 backdrop-blur-md rounded-xl p-4 mb-6 border border-blue-500/30 flex items-center gap-3">
+                <div className="w-5 h-5 border-2 border-blue-400/30 border-t-blue-400 rounded-full animate-spin" />
+                <span className="text-blue-200">Loading network latency configuration...</span>
+              </div>
+            )}
+
+            {networkLatencyError && (
+              <div className="bg-red-500/20 backdrop-blur-md rounded-xl p-4 mb-6 border border-red-500/30">
+                <div className="flex items-center justify-between">
+                  <span className="text-red-200">⚠️ Error loading network latency info: {networkLatencyError}</span>
+                  <button onClick={() => fetchNetworkLatency()} className="px-3 py-1 bg-red-600 text-white rounded hover:bg-red-700 transition text-sm">
+                    Retry
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {networkLatency && !loadingNetworkLatency && (
+              <div className="bg-cyan-500/10 backdrop-blur-md rounded-xl mb-6 border border-cyan-500/20 relative z-40">
+                <div className="flex items-center justify-between p-4 cursor-pointer" onClick={() => setShowNetworkLatencyBanner(!showNetworkLatencyBanner)}>
+                  <div className="flex items-center gap-3 flex-1">
+                    <CheckCircle className="w-5 h-5 text-cyan-400" />
+                    <div className="text-cyan-200">
+                      <div className="font-semibold">Network latency configuration</div>
+                      {!showNetworkLatencyBanner && (
+                        <div className="text-xs text-cyan-300 mt-0.5">
+                          Override: {networkLatency.status?.has_override ? 'Active' : 'None'}
+                          {typeof networkLatency.status?.entries === 'number' && ` • Entries: ${networkLatency.status.entries}`}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <button 
+                      onClick={(e) => { e.stopPropagation(); fetchNetworkLatency(); }} 
+                      className="px-3 py-1 bg-cyan-600 text-white rounded hover:bg-cyan-700 transition text-sm flex items-center gap-2"
+                    >
+                      <Download className="w-3 h-3" /> Refresh
+                    </button>
+                    <svg className={`w-5 h-5 text-cyan-400 transition-transform ${showNetworkLatencyBanner ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                    </svg>
+                  </div>
+                </div>
+                {showNetworkLatencyBanner && (
+                  <div className="px-4 pb-4 pt-0 text-sm text-cyan-200 space-y-1">
+                    <div>Override status: <strong>{networkLatency.status?.has_override ? 'Active' : 'None'}</strong></div>
+                    {typeof networkLatency.status?.entries === 'number' && (
+                      <div>Override entries: <strong>{networkLatency.status.entries}</strong></div>
+                    )}
+                    {typeof networkLatency.status?.ttl_seconds === 'number' && (
+                      <div>TTL: <strong>{networkLatency.status.ttl_seconds}s</strong></div>
+                    )}
+                    {typeof networkLatency.status?.age_seconds === 'number' && (
+                      <div>Age: <strong>{Math.floor(networkLatency.status.age_seconds)}s</strong></div>
+                    )}
+                    {networkLatency.override && (
+                      <div className="mt-2 text-xs text-cyan-300">
+                        Showing up to 6 override entries:
+                        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2 mt-2">
+                          {Object.entries(networkLatency.override).slice(0,6).map(([k,v]) => (
+                            <div key={k} className="bg-cyan-500/10 border border-cyan-500/20 rounded px-2 py-1">
+                              <span className="font-mono">{k}</span>: <span className="font-semibold">{v} ms</span>
+                            </div>
+                          ))}
+                        </div>
+                        {Object.entries(networkLatency.override).length > 6 && (
+                          <div className="mt-1">… and {Object.entries(networkLatency.override).length - 6} more</div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            )}
+
             {activeTab === 'configuration' && (
               <div className="space-y-6">
                 {/* Two-Phase Approach Explanation */}
@@ -636,6 +735,20 @@
                     <div>
                       <label className="block text-sm font-medium text-blue-200 mb-2">Max Latency (ms)</label>
                       <input type="number" value={constraints.maxLatency} onChange={(e)=>setConstraints({...constraints, maxLatency: parseFloat(e.target.value||'0')})} className="w-full px-4 py-2 bg-white/5 border border-blue-500/30 rounded-lg text-white focus:outline-none focus:border-blue-400" />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-blue-200 mb-2">Latency Model</label>
+                      <select 
+                        value={constraints.performanceMetric || 'avg_latency'}
+                        onChange={(e)=>setConstraints({...constraints, performanceMetric: e.target.value})}
+                        className="w-full px-4 py-2 bg-white/5 border border-blue-500/30 rounded-lg text-white focus:outline-none focus:border-blue-400"
+                      >
+                        <option value="avg_latency">Classic (Average Latency)</option>
+                        <option value="graph_latency">Graph-based (Critical Path)</option>
+                      </select>
+                      <div className="text-xs text-blue-300 mt-1">
+                        Choose simple average vs dependency-aware critical path.
+                      </div>
                     </div>
                     <div>
                       <label className="block text-sm font-medium text-blue-200 mb-2">Max Providers</label>
@@ -1238,7 +1351,14 @@
               <div className="space-y-6">
                 {/* Two-Phase Results Summary */}
                 <div className="bg-gradient-to-r from-purple-500/20 to-blue-500/20 backdrop-blur-md rounded-xl p-6 border border-purple-500/30">
-                  <h2 className="text-xl font-bold text-white mb-4">📊 Optimization Pipeline Results</h2>
+                  <h2 className="text-xl font-bold text-white mb-4 flex items-center gap-3">
+                    📊 Optimization Pipeline Results
+                    {results?.metrics?.latency_model && (
+                      <span className="text-xs px-2 py-1 rounded-full border border-blue-500/40 bg-blue-500/10 text-blue-200">
+                        Latency: {results.metrics.latency_model === 'graph_latency' ? 'Graph-based' : 'Classic'}
+                      </span>
+                    )}
+                  </h2>
                   <div className="grid md:grid-cols-2 gap-4">
                     <div className="bg-cyan-500/20 rounded-lg p-4 border border-cyan-500/40">
                       <div className="flex items-center gap-2 mb-3">

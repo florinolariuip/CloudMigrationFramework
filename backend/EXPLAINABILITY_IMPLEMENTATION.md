@@ -1,34 +1,39 @@
 # Explainability Implementation
 
 ## Overview
-This document describes the explainability features of the Hybrid CSP + Expert System approach for cloud migration optimization.
+This document describes the explainability features of the Hybrid CSP + Expert System approach for cloud migration optimization, emphasizing academic rigor and transparency.
 
 ## Key Explainability Features
 
 1. **Constraint Proofs**
    - Shows exact calculations for each constraint (budget, latency, provider count, dependencies).
    - Example: Budget check displays the sum of all service costs and compares to the allowed maximum.
+   - Provides mathematical traceability for all constraint validation.
 
 2. **Rule Traces**
    - Logs which expert rules fired for each solution and why.
    - Includes rule name, condition evaluated, and points added or subtracted.
    - Provides full transparency into the scoring logic.
+   - Supports reproducibility and auditability.
 
 3. **Decision Path**
    - Step-by-step reasoning from constraints to final solution selection.
    - Details how many combinations were generated, filtered, scored, and ranked.
+   - Enables validation of optimization process.
 
 4. **Comparison with Baselines**
    - Shows how explainability in the hybrid approach exceeds that of baseline algorithms.
    - Baselines typically lack detailed reasoning or constraint proofs.
+   - Quantified through explainability scoring in academic experiments.
 
-## Academic Value
+## Research Value
 - Explainability supports reproducibility, auditability, and trust in optimization results.
-- Enables users and reviewers to understand why a solution was chosen and how constraints were satisfied.
+- Enables researchers and practitioners to understand why a solution was chosen and how constraints were satisfied.
 - Facilitates debugging, validation, and improvement of the optimization pipeline.
+- Addresses the "black-box" problem common in optimization algorithms.
 
 ---
-For examples, see the per-run explainability data and decision traces in the main app.
+For examples, see the per-run explainability data and decision traces in the main application interface.
 
 ---
 
@@ -64,15 +69,15 @@ Use this table to log rule effects from the backend explainability payload.
 
 ## New Experiments: Evolutionary and Oracle Baselines
 
-Explainability is preserved for all new baselines. NSGA-II, MOEA/D, and oracle exhaustive results are logged with full configuration and metrics. All runs use fixed seeds for reproducibility.
+Explainability is preserved for all baseline algorithms in the experimental framework. NSGA-II, MOEA/D, and oracle exhaustive results are logged with full configuration and metrics. All runs use fixed seeds for reproducibility.
 
 ---
 
 ## Threats to Validity
 
-- **Explainability**: Baselines lack detailed reasoning; only the hybrid approach provides full constraint and rule trace logs.
+- **Explainability Gap**: Baseline algorithms lack detailed reasoning; only the hybrid approach provides full constraint and rule trace logs.
 - **Stochasticity**: Evolutionary results are averaged over fixed seeds; logs are available for all runs.
-- **Reproducibility**: All code, seeds, and requirements are pinned and available in the Docker image.
+- **Reproducibility**: All code, seeds, and requirements are pinned and documented in the experiments/ directory.
 | 5 | Balanced | 226.01 | 10.20 | 2 |
 | 10 | Min Cost | 530.87 | 10.30 | 2 |
 | 10 | Min Latency | 566.75 | 9.50 | 1 |
