@@ -905,84 +905,68 @@ def analyze_multi_cloud():
             "detail": error_detail
         }), 500
 
-@app.post("/api/optimize")
-def optimize():
-    """
-    ============================================
-    HYBRID CSP + EXPERT SYSTEM OPTIMIZATION
-    ============================================
-    Two-phase approach:
-    
-    PHASE 1 - CSP (Constraint Satisfaction Problem):
-      Input: Hard constraints (maxBudget, maxLatency, maxProviders)
-      Process: Generate all combinations and filter by constraints
-      Output: Feasible solutions (all satisfy constraints)
-    
-    PHASE 2 - Expert System (Rule-Based Ranking):
-      Input: Feasible solutions + business preferences
-      Process: Apply expert rules to score each solution
-      Output: Ranked solutions (best score first)
-    
-    This hybrid approach ensures:
-    - All solutions are VALID (CSP guarantees constraint satisfaction)
-    - Best solution is OPTIMAL for business needs (Expert rules optimize business value)
-    """
-    import time
-    start_time = time.time()
-    
-    payload = request.get_json(force=True, silent=True) or {}
+def _apply_seed_if_provided(payload: dict) -> int | None:
+    """Apply deterministic seed for reproducible experiments if present.
 
-    # Optional deterministic seed for reproducibility in academic experiments.
-    # When provided, this will fix Python's and NumPy's RNG so that heuristic sampling
-    # and any random ordering inside CSP strategies become repeatable. This stabilizes
-    # feasible_pre_dedup / feasible_post_dedup counts and Pareto frontier size for a given input.
+    Returns the integer seed that was actually applied (or None).
+    """
     seed = payload.get("seed")
-    seed_used = None
-    if seed is not None:
-        try:
-            seed_int = int(seed)
-            import random
-            random.seed(seed_int)
-            try:
-                import numpy as np  # numpy available per requirements.txt
-                np.random.seed(seed_int)
-            except Exception:
-                pass  # NumPy seeding best-effort; ignore if unavailable
-            seed_used = seed_int
-            print(f"[OPTIMIZE] Using deterministic seed: {seed_int}")
-        except Exception as _seed_err:
-            print(f"[OPTIMIZE] Invalid seed provided '{seed}': {_seed_err}")
+    if seed is None:
+        return None
 
+    try:
+        seed_int = int(seed)
+        import random
+
+        random.seed(seed_int)
+        try:
+            import numpy as np  # numpy available per requirements.txt
+
+            np.random.seed(seed_int)
+        except Exception:
+            # NumPy seeding best-effort; ignore if unavailable
+            pass
+        print(f"[OPTIMIZE] Using deterministic seed: {seed_int}")
+        return seed_int
+    except Exception as _seed_err:  # pragma: no cover - defensive logging
+        print(f"[OPTIMIZE] Invalid seed provided '{seed}': {_seed_err}")
+        return None
+
+
+def _parse_constraints_and_prefs(payload: dict) -> tuple[Constraints, Preferences]:
+    """Parse constraints and preferences from request payload.
+
+    Mirrors previous inline logic, including component name mapping and
+    workload profile / performance metric handling.
+    """
     cons = payload.get("constraints", {})
     prefs = payload.get("preferences", {})
 
-    # Parse input constraints (for CSP phase)
-    # Handle component selection - convert UI strings to component names
     selected_components = cons.get("selected_components")
     if selected_components and isinstance(selected_components, list):
-        # Map UI component names to internal component names
         component_mapping = {
-            'Web Frontend': 'api_gateway',
-            'Application Server': 'application_server', 
-            'Database': 'database',
-            'Cache': 'cache',
-            'Monitoring': 'monitoring',
-            'Storage': 'storage',
-            'Message Queue': 'message_queue',
-            'CDN': 'cdn',
-            'Load Balancer': 'load_balancer',
-            'Backup': 'backup',
-            'Encryption': 'encryption',
-            'Containers': 'containers',
-            'Serverless Compute': 'serverless_compute',
-            'Identity Management': 'identity_management',
-            'Analytics': 'analytics'
+            "Web Frontend": "api_gateway",
+            "Application Server": "application_server",
+            "Database": "database",
+            "Cache": "cache",
+            "Monitoring": "monitoring",
+            "Storage": "storage",
+            "Message Queue": "message_queue",
+            "CDN": "cdn",
+            "Load Balancer": "load_balancer",
+            "Backup": "backup",
+            "Encryption": "encryption",
+            "Containers": "containers",
+            "Serverless Compute": "serverless_compute",
+            "Identity Management": "identity_management",
+            "Analytics": "analytics",
         }
-        mapped_components = []
+        mapped_components: list[str] = []
+        lower_components = [c.lower() for c in COMPONENTS]
         for comp in selected_components:
             if comp in component_mapping:
                 mapped_components.append(component_mapping[comp])
-            elif comp.lower() in [c.lower() for c in COMPONENTS]:
+            elif comp.lower() in lower_components:
                 mapped_components.append(comp.lower())
         selected_components = mapped_components if mapped_components else None
         print(f"[DEBUG] UI components: {cons.get('selected_components')}")
@@ -992,279 +976,475 @@ def optimize():
         maxBudget=int(cons.get("maxBudget", DEFAULT_CONSTRAINTS["maxBudget"])),
         maxLatency=float(cons.get("maxLatency", DEFAULT_CONSTRAINTS["maxLatency"])),
         maxProviders=int(cons.get("maxProviders", DEFAULT_CONSTRAINTS["maxProviders"])),
-        selected_components=selected_components
+        selected_components=selected_components,
     )
-    # Add workload profile if provided
+
     workload = payload.get("workload")
     if workload:
         constraints.workload_profile = {
-            'requests_per_month': int(workload.get('requests_per_month', 0)),
-            'cross_az_gb': int(workload.get('cross_az_gb', 0)),
-            'internet_egress_gb': int(workload.get('internet_egress_gb', 0)),
-            'ebs_gb': int(workload.get('ebs_gb', 0)),
-            'rds_backup_gb': int(workload.get('rds_backup_gb', 0)),
-            's3_gb': int(workload.get('s3_gb', 0))
+            "requests_per_month": int(workload.get("requests_per_month", 0)),
+            "cross_az_gb": int(workload.get("cross_az_gb", 0)),
+            "internet_egress_gb": int(workload.get("internet_egress_gb", 0)),
+            "ebs_gb": int(workload.get("ebs_gb", 0)),
+            "rds_backup_gb": int(workload.get("rds_backup_gb", 0)),
+            "s3_gb": int(workload.get("s3_gb", 0)),
         }
-    # Academic extension: add performance metric to constraints
-    setattr(constraints, "performanceMetric", cons.get("performanceMetric", DEFAULT_CONSTRAINTS.get("performanceMetric", "avg_latency")))
 
-    # Parse input preferences (for Expert System phase)
+    setattr(
+        constraints,
+        "performanceMetric",
+        cons.get(
+            "performanceMetric",
+            DEFAULT_CONSTRAINTS.get("performanceMetric", "avg_latency"),
+        ),
+    )
+
     preferences = Preferences(
         preferredProvider=prefs.get("preferredProvider") or None,
         prioritizeCost=bool(prefs.get("prioritizeCost", False)),
         prioritizePerformance=bool(prefs.get("prioritizePerformance", False)),
     )
 
-    # Optional per-request CSP overrides (do not persist globally)
+    return constraints, preferences
+
+
+def _apply_csp_overrides(payload: dict) -> dict:
+    """Apply optional per-request CSP overrides, returning the original snapshot."""
     csp_overrides = payload.get("csp") or {}
     old_csp = CSP_CONFIG.copy()
-    try:
-        if csp_overrides:
-            for key, value in csp_overrides.items():
-                if key in CSP_CONFIG:
-                    if key == "search_strategy":
-                        CSP_CONFIG[key] = str(value)
-                    elif isinstance(CSP_CONFIG[key], bool):
-                        CSP_CONFIG[key] = bool(value)
-                    else:
-                        try:
-                            CSP_CONFIG[key] = int(value)
-                        except Exception:
-                            # Fallback: ignore invalid type
-                            pass
 
-        # PHASE 1: CSP - Generate feasible solutions
-        print(f"[TIMING] Starting CSP phase with constraints: Budget=${constraints.maxBudget}, Latency={constraints.maxLatency}ms, Providers={constraints.maxProviders}")
-        csp_start = time.time()
-        feasible = generate_feasible_solutions(constraints)
-        csp_duration = time.time() - csp_start
-        print(f"[TIMING] CSP phase completed: {csp_duration*1000:.1f}ms")
+    if csp_overrides:
+        for key, value in csp_overrides.items():
+            if key not in CSP_CONFIG:
+                continue
+            if key == "search_strategy":
+                CSP_CONFIG[key] = str(value)
+            elif isinstance(CSP_CONFIG[key], bool):
+                CSP_CONFIG[key] = bool(value)
+            else:
+                try:
+                    CSP_CONFIG[key] = int(value)
+                except Exception:
+                    # Fallback: ignore invalid type
+                    pass
 
-        # Capture pre-dedup count for research reproducibility
-        pre_dedup_count = len(feasible)
+    return old_csp
 
-        # IMPORTANT: Remove duplicates before any further processing
-        from backend.engines.rules import deduplicate_solutions
-        feasible = deduplicate_solutions(feasible)
-        post_dedup_count = len(feasible)
-        duplicates_removed = pre_dedup_count - post_dedup_count
-        if duplicates_removed > 0:
-            print(f"[OPTIMIZE] Removed {duplicates_removed} duplicate solutions from CSP results (pre={pre_dedup_count}, post={post_dedup_count})")
 
-        # Generate suggestions if no feasible solutions
-        if not feasible:
-            suggestions = []
-            component_count = len(constraints.selected_components) if constraints.selected_components else 5
-            
-            if constraints.maxBudget < component_count * 1000:
-                suggestions.append(f"Increase budget to ${component_count * 1500}/month (${component_count * 1500 - constraints.maxBudget} more)")
-            
-            if constraints.maxLatency < 100:
-                suggestions.append(f"Increase max latency to 200-400ms (currently {constraints.maxLatency}ms)")
-            
-            if component_count > 6:
-                suggestions.append(f"Reduce components to 4-6 (currently {component_count} selected)")
-            
-            if constraints.maxProviders == 1:
-                suggestions.append("Allow 2-3 providers for more service options")
-            
-            return jsonify({
-                "error": "No feasible solutions found",
-                "suggestions": suggestions,
-                "totalCombinations": get_total_combinations(),
-                "feasibleSolutions": 0,
-                "solutions": [],
-                "metrics": {"feasible_count": 0}
-            })
+def _run_csp_phase(constraints: Constraints):
+    """Run the CSP phase and return (feasible_solutions, csp_duration, counts)."""
+    import time
 
-        # Deterministic ordering: sort solutions to eliminate ordering noise between runs
-        feasible.sort(key=lambda s: (
-            round(s.cost, 4),
-            round(s.latency, 4),
-            tuple(sorted(s.configuration.items()))
-        ))
+    print(
+        f"[TIMING] Starting CSP phase with constraints: Budget=${constraints.maxBudget}, "
+        f"Latency={constraints.maxLatency}ms, Providers={constraints.maxProviders}"
+    )
+    csp_start = time.time()
+    feasible = generate_feasible_solutions(constraints)
+    csp_duration = time.time() - csp_start
+    print(f"[TIMING] CSP phase completed: {csp_duration*1000:.1f}ms")
 
-        # PHASE 2: Expert System - Rank by business rules
-        print(f"[TIMING] Starting Expert System phase with {len(feasible)} solutions")
-        expert_start = time.time()
-        ranked = evaluate_solutions(feasible, preferences, constraints.maxBudget)
-        expert_duration = time.time() - expert_start
-        print(f"[TIMING] Expert System completed: {expert_duration*1000:.1f}ms, ranked {len(ranked)} solutions")
+    pre_dedup_count = len(feasible)
+    from backend.engines.rules import deduplicate_solutions
 
-        # MULTI-OBJECTIVE: Calculate Pareto frontier (now on deduplicated solutions)
-        print(f"[TIMING] Starting Pareto frontier calculation")
-        pareto_start = time.time()
-        pareto_frontier = calculate_pareto_frontier(feasible, objectives=['cost', 'latency'])
-        pareto_ranked = evaluate_solutions(pareto_frontier, preferences, constraints.maxBudget)  # Rank Pareto solutions
-        pareto_metrics = calculate_pareto_metrics(feasible, pareto_frontier)
-        extreme_solutions = get_extreme_solutions(pareto_frontier)
-        pareto_duration = time.time() - pareto_start
-        print(f"[TIMING] Pareto frontier completed: {pareto_duration*1000:.1f}ms, found {len(pareto_frontier)} optimal solutions")
+    feasible = deduplicate_solutions(feasible)
+    post_dedup_count = len(feasible)
+    duplicates_removed = pre_dedup_count - post_dedup_count
+    if duplicates_removed > 0:
+        print(
+            f"[OPTIMIZE] Removed {duplicates_removed} duplicate solutions from CSP results "
+            f"(pre={pre_dedup_count}, post={post_dedup_count})"
+        )
 
-        # EXPLAINABILITY: Generate transparency data for best solution (Priority 3)
-        print(f"[TIMING] Starting explainability generation")
-        explainability_start = time.time()
-        # Select best solution from Pareto frontier based on user preferences
-        # Use balanced knee point as representative solution (optimal cost-latency trade-off)
-        best_solution = extreme_solutions.get('balanced') if extreme_solutions else (ranked[0] if ranked else None)
-        explainability_data = None
+    return feasible, csp_duration, pre_dedup_count, post_dedup_count, duplicates_removed
 
-        if best_solution:
-            # Generate constraint proof
-            constraint_proof = generate_constraint_proof(best_solution, constraints)
 
-            # Generate rule firing trace
-            rule_trace = generate_rule_trace(best_solution, preferences, SCORING_WEIGHTS)
+def _build_no_feasible_response(constraints: Constraints):
+    """Return a JSON response with suggestions when no feasible solutions exist."""
+    suggestions: list[str] = []
+    component_count = (
+        len(constraints.selected_components)
+        if constraints.selected_components
+        else 5
+    )
 
-            # Generate decision path
-            decision_path = generate_decision_path(
-                constraints=constraints,
-                preferences=preferences,
-                csp_time_ms=csp_duration * 1000,
-                expert_time_ms=expert_duration * 1000,
-                pareto_time_ms=pareto_duration * 1000,
-                feasible_count=len(feasible),
-                pareto_count=len(pareto_frontier),
-                best_solution=best_solution
-            )
+    if constraints.maxBudget < component_count * 1000:
+        suggestions.append(
+            f"Increase budget to ${component_count * 1500}/month "
+            f"(${component_count * 1500 - constraints.maxBudget} more)"
+        )
 
-            # Add explainability to best solution
-            best_solution.constraintProof = [asdict(check) for check in constraint_proof]
-            best_solution.ruleTrace = [asdict(rule) for rule in rule_trace]
-            best_solution.decisionPath = [asdict(step) for step in decision_path]
+    if constraints.maxLatency < 100:
+        suggestions.append(
+            f"Increase max latency to 200-400ms (currently {constraints.maxLatency}ms)"
+        )
 
-            # Get explainability comparison
-            explainability_comparison = compare_explainability()
+    if component_count > 6:
+        suggestions.append(
+            f"Reduce components to 4-6 (currently {component_count} selected)"
+        )
 
-            explainability_data = {
-                "constraintProof": best_solution.constraintProof,
-                "ruleTrace": best_solution.ruleTrace,
-                "decisionPath": best_solution.decisionPath,
-                "comparison": explainability_comparison,
-                "explainabilityScore": 100,  # CSP+Expert has full explainability
-            }
+    if constraints.maxProviders == 1:
+        suggestions.append("Allow 2-3 providers for more service options")
 
-        explainability_duration = time.time() - explainability_start
-        print(f"[TIMING] Explainability completed: {explainability_duration*1000:.1f}ms")
-
-        total_combinations = get_total_combinations()
-        total_duration = time.time() - start_time
-        print(f"[TIMING] TOTAL OPTIMIZATION: {total_duration*1000:.1f}ms")
-        print(f"[TIMING] Performance breakdown - CSP: {csp_duration*1000:.1f}ms ({(csp_duration/total_duration)*100:.1f}%), Expert: {expert_duration*1000:.1f}ms ({(expert_duration/total_duration)*100:.1f}%), Pareto: {pareto_duration*1000:.1f}ms ({(pareto_duration/total_duration)*100:.1f}%), Explain: {explainability_duration*1000:.1f}ms ({(explainability_duration/total_duration)*100:.1f}%)")
-
-        # Academic metrics for research/analysis
-        metrics = {
-            "total_time_ms": round(total_duration * 1000, 2),
-            "csp_time_ms": round(csp_duration * 1000, 2),
-            "expert_time_ms": round(expert_duration * 1000, 2),
-            "pareto_time_ms": round(pareto_duration * 1000, 2),
-            "explainability_time_ms": round(explainability_duration * 1000, 2),
-            "sankey_time_ms": round(sankey_duration * 1000, 2) if 'sankey_duration' in locals() else 0,
-            "search_space_size": total_combinations,
-            # Feasible set sizes (pre & post dedup) for variance analysis in experiments
-            "feasible_pre_dedup": pre_dedup_count,
-            "feasible_post_dedup": post_dedup_count,
-            "duplicates_removed": duplicates_removed,
-            # Backward compatible field (will equal post-dedup going forward)
-            "feasible_space_size": post_dedup_count,
-            "pareto_frontier_size": len(pareto_frontier),
-            "pruning_efficiency": round((1 - post_dedup_count / total_combinations) * 100, 2) if total_combinations > 0 else 0,
-            "solutions_evaluated": len(ranked),
-            "seed_used": seed_used,
-            "config_snapshot": {
-                "csp_strategy": CSP_CONFIG["search_strategy"],
-                "rule_weights": SCORING_WEIGHTS.copy(),
-            }
+    return jsonify(
+        {
+            "error": "No feasible solutions found",
+            "suggestions": suggestions,
+            "totalCombinations": get_total_combinations(),
+            "feasibleSolutions": 0,
+            "solutions": [],
+            "metrics": {"feasible_count": 0},
         }
-        # Include selected latency model for clarity in comparisons (avg_latency | tail_latency | throughput | graph_latency)
-        try:
-            metrics["latency_model"] = getattr(constraints, "performanceMetric", DEFAULT_CONSTRAINTS.get("performanceMetric", "avg_latency"))
-        except Exception:
-            metrics["latency_model"] = DEFAULT_CONSTRAINTS.get("performanceMetric", "avg_latency")
+    )
 
-        # Academic extension: log the run for empirical validation
-        RUN_LOG.append({
+
+def _run_expert_phase(feasible, preferences: Preferences, constraints: Constraints):
+    """Run the expert system scoring phase and return (ranked, expert_duration)."""
+    import time
+
+    print(f"[TIMING] Starting Expert System phase with {len(feasible)} solutions")
+    expert_start = time.time()
+    ranked = evaluate_solutions(feasible, preferences, constraints.maxBudget)
+    expert_duration = time.time() - expert_start
+    print(
+        f"[TIMING] Expert System completed: {expert_duration*1000:.1f}ms, ranked {len(ranked)} solutions"
+    )
+    return ranked, expert_duration
+
+
+def _run_pareto_phase(feasible, preferences: Preferences, constraints: Constraints):
+    """Run Pareto frontier and metrics computation.
+
+    Returns (pareto_frontier, pareto_ranked, pareto_metrics, extreme_solutions, pareto_duration).
+    """
+    import time
+
+    print("[TIMING] Starting Pareto frontier calculation")
+    pareto_start = time.time()
+    pareto_frontier = calculate_pareto_frontier(feasible, objectives=["cost", "latency"])
+    pareto_ranked = evaluate_solutions(
+        pareto_frontier, preferences, constraints.maxBudget
+    )
+    pareto_metrics = calculate_pareto_metrics(feasible, pareto_frontier)
+    extreme_solutions = get_extreme_solutions(pareto_frontier)
+    pareto_duration = time.time() - pareto_start
+    print(
+        f"[TIMING] Pareto frontier completed: {pareto_duration*1000:.1f}ms, found {len(pareto_frontier)} optimal solutions"
+    )
+    return pareto_frontier, pareto_ranked, pareto_metrics, extreme_solutions, pareto_duration
+
+
+def _generate_explainability(
+    best_solution,
+    constraints: Constraints,
+    preferences: Preferences,
+    csp_duration: float,
+    expert_duration: float,
+    pareto_duration: float,
+    feasible_count: int,
+    pareto_count: int,
+):
+    """Generate explainability artifacts for the best solution.
+
+    Returns (explainability_data, explainability_duration).
+    """
+    import time
+
+    print("[TIMING] Starting explainability generation")
+    explainability_start = time.time()
+    explainability_data = None
+
+    if best_solution:
+        constraint_proof = generate_constraint_proof(best_solution, constraints)
+        rule_trace = generate_rule_trace(best_solution, preferences, SCORING_WEIGHTS)
+        decision_path = generate_decision_path(
+            constraints=constraints,
+            preferences=preferences,
+            csp_time_ms=csp_duration * 1000,
+            expert_time_ms=expert_duration * 1000,
+            pareto_time_ms=pareto_duration * 1000,
+            feasible_count=feasible_count,
+            pareto_count=pareto_count,
+            best_solution=best_solution,
+        )
+
+        best_solution.constraintProof = [asdict(check) for check in constraint_proof]
+        best_solution.ruleTrace = [asdict(rule) for rule in rule_trace]
+        best_solution.decisionPath = [asdict(step) for step in decision_path]
+
+        explainability_comparison = compare_explainability()
+        explainability_data = {
+            "constraintProof": best_solution.constraintProof,
+            "ruleTrace": best_solution.ruleTrace,
+            "decisionPath": best_solution.decisionPath,
+            "comparison": explainability_comparison,
+            "explainabilityScore": 100,
+        }
+
+    explainability_duration = time.time() - explainability_start
+    print(f"[TIMING] Explainability completed: {explainability_duration*1000:.1f}ms")
+    return explainability_data, explainability_duration
+
+
+def _log_run_metrics(
+    constraints: Constraints,
+    preferences: Preferences,
+    best_solution,
+    total_combinations: int,
+    total_duration: float,
+    csp_duration: float,
+    expert_duration: float,
+    pareto_duration: float,
+    explainability_duration: float,
+    pre_dedup_count: int,
+    post_dedup_count: int,
+    duplicates_removed: int,
+    pareto_frontier,
+    ranked,
+    seed_used,
+):
+    """Build and log academic metrics for the optimization run."""
+    metrics = {
+        "total_time_ms": round(total_duration * 1000, 2),
+        "csp_time_ms": round(csp_duration * 1000, 2),
+        "expert_time_ms": round(expert_duration * 1000, 2),
+        "pareto_time_ms": round(pareto_duration * 1000, 2),
+        "explainability_time_ms": round(explainability_duration * 1000, 2),
+        "sankey_time_ms": 0,
+        "search_space_size": total_combinations,
+        "feasible_pre_dedup": pre_dedup_count,
+        "feasible_post_dedup": post_dedup_count,
+        "duplicates_removed": duplicates_removed,
+        "feasible_space_size": post_dedup_count,
+        "pareto_frontier_size": len(pareto_frontier),
+        "pruning_efficiency": round(
+            (1 - post_dedup_count / total_combinations) * 100, 2
+        )
+        if total_combinations > 0
+        else 0,
+        "solutions_evaluated": len(ranked),
+        "seed_used": seed_used,
+        "config_snapshot": {
+            "csp_strategy": CSP_CONFIG["search_strategy"],
+            "rule_weights": SCORING_WEIGHTS.copy(),
+        },
+    }
+    try:
+        metrics["latency_model"] = getattr(
+            constraints,
+            "performanceMetric",
+            DEFAULT_CONSTRAINTS.get("performanceMetric", "avg_latency"),
+        )
+    except Exception:
+        metrics["latency_model"] = DEFAULT_CONSTRAINTS.get(
+            "performanceMetric", "avg_latency"
+        )
+
+    RUN_LOG.append(
+        {
             "timestamp": datetime.now().isoformat(),
             "constraints": asdict(constraints),
             "preferences": asdict(preferences),
             "metrics": metrics,
             "topSolution": asdict(best_solution) if best_solution else None,
-        })
+        }
+    )
+    return metrics
 
-        # SANKEY DIAGRAM: Generate visualization data for solution flows
-        sankey_start = time.time()
-        sankey_data = None
-        latency_sankey_data = None
-        terraform_preview = None
-        if best_solution:
-            from backend.services.pricing import get_service_costs, get_service_latency
-            services_info = {
-                'costs': get_service_costs(),
-                'latency': get_service_latency()
-            }
-            sankey_data = generate_sankey_data(best_solution, services_info)
-            latency_sankey_data = generate_latency_sankey(best_solution, services_info)
-            
-            # Generate Terraform preview for multi-cloud solutions
-            if best_solution.providers > 1:
-                try:
-                    terraform_preview = generate_terraform_for_solution(best_solution)[:500] + "..." # Preview only
-                except Exception as e:
-                    print(f"[WARNING] Terraform preview generation failed: {e}")
-                    terraform_preview = None
-        
-        sankey_duration = time.time() - sankey_start
-        print(f"[TIMING] Sankey diagrams: {sankey_duration*1000:.1f}ms")
+
+def _build_sankey_and_insights(best_solution):
+    """Generate Sankey diagram data and multi-cloud insights for response."""
+    import time
+
+    sankey_start = time.time()
+    sankey_data = None
+    latency_sankey_data = None
+    terraform_preview = None
+
+    if best_solution:
+        from backend.services.pricing import get_service_costs, get_service_latency
+
+        services_info = {
+            "costs": get_service_costs(),
+            "latency": get_service_latency(),
+        }
+        sankey_data = generate_sankey_data(best_solution, services_info)
+        latency_sankey_data = generate_latency_sankey(best_solution, services_info)
+
+        if best_solution.providers > 1:
+            try:
+                terraform_preview = (
+                    generate_terraform_for_solution(best_solution)[:500] + "..."
+                )
+            except Exception as e:  # pragma: no cover - defensive logging only
+                print(f"[WARNING] Terraform preview generation failed: {e}")
+                terraform_preview = None
+
+    sankey_duration = time.time() - sankey_start
+    print(f"[TIMING] Sankey diagrams: {sankey_duration*1000:.1f}ms")
+
+    return (
+        sankey_duration,
+        {
+            "costFlow": sankey_data,
+            "latencyFlow": latency_sankey_data,
+        },
+        {
+            "terraformPreview": terraform_preview,
+            "crossCloudLatency": calculate_cross_cloud_penalty(
+                best_solution.configuration
+            )
+            if best_solution
+            else 0,
+            "dataTransferCost": calculate_data_transfer_cost(
+                best_solution.configuration, 100
+            )
+            if best_solution
+            else 0,
+            "operationalComplexity": "High"
+            if best_solution and best_solution.providers > 2
+            else "Medium"
+            if best_solution and best_solution.providers > 1
+            else "Low",
+        },
+    )
+
+
+@app.post("/api/optimize")
+def optimize():
+    """Hybrid CSP + Expert System optimization endpoint (refactored)."""
+    import time
+
+    start_time = time.time()
+    payload = request.get_json(force=True, silent=True) or {}
+
+    seed_used = _apply_seed_if_provided(payload)
+    constraints, preferences = _parse_constraints_and_prefs(payload)
+    old_csp = _apply_csp_overrides(payload)
+
+    try:
+        feasible, csp_duration, pre_dedup_count, post_dedup_count, duplicates_removed = _run_csp_phase(
+            constraints
+        )
+
+        if not feasible:
+            return _build_no_feasible_response(constraints)
+
+        feasible.sort(
+            key=lambda s: (
+                round(s.cost, 4),
+                round(s.latency, 4),
+                tuple(sorted(s.configuration.items())),
+            )
+        )
+
+        ranked, expert_duration = _run_expert_phase(
+            feasible, preferences, constraints
+        )
+
+        (
+            pareto_frontier,
+            pareto_ranked,
+            pareto_metrics,
+            extreme_solutions,
+            pareto_duration,
+        ) = _run_pareto_phase(feasible, preferences, constraints)
+
+        best_solution = (
+            extreme_solutions.get("balanced")
+            if extreme_solutions
+            else (ranked[0] if ranked else None)
+        )
+
+        explainability_data, explainability_duration = _generate_explainability(
+            best_solution,
+            constraints,
+            preferences,
+            csp_duration,
+            expert_duration,
+            pareto_duration,
+            len(feasible),
+            len(pareto_frontier),
+        )
+
+        total_combinations = get_total_combinations()
+        total_duration = time.time() - start_time
+        print(f"[TIMING] TOTAL OPTIMIZATION: {total_duration*1000:.1f}ms")
+        print(
+            f"[TIMING] Performance breakdown - CSP: {csp_duration*1000:.1f}ms, "
+            f"Expert: {expert_duration*1000:.1f}ms, Pareto: {pareto_duration*1000:.1f}ms, "
+            f"Explain: {explainability_duration*1000:.1f}ms"
+        )
+
+        metrics = _log_run_metrics(
+            constraints,
+            preferences,
+            best_solution,
+            total_combinations,
+            total_duration,
+            csp_duration,
+            expert_duration,
+            pareto_duration,
+            explainability_duration,
+            pre_dedup_count,
+            post_dedup_count,
+            duplicates_removed,
+            pareto_frontier,
+            ranked,
+            seed_used,
+        )
+
+        sankey_duration, sankey_diagram, multi_cloud_insights = _build_sankey_and_insights(
+            best_solution
+        )
+        metrics["sankey_time_ms"] = round(sankey_duration * 1000, 2)
 
         resp = {
             "totalCombinations": total_combinations,
             "feasibleSolutions": post_dedup_count,
             "feasibleSolutionsPreDedup": pre_dedup_count,
             "duplicatesRemoved": duplicates_removed,
-            "feasibilityRate": round((post_dedup_count / total_combinations) * 100, 1),
+            "feasibilityRate": round(
+                (post_dedup_count / total_combinations) * 100, 1
+            ),
             "solutions": [asdict(s) for s in ranked],
             "topSolution": asdict(best_solution) if best_solution else None,
             "statistics": calculate_statistics(ranked),
-            "metrics": metrics,  # Academic performance metrics
-            # Multi-objective Pareto results
+            "metrics": metrics,
             "paretoFrontier": {
                 "size": len(pareto_frontier),
                 "solutions": [asdict(s) for s in pareto_ranked],
                 "metrics": {
-                    "hypervolume": pareto_metrics.get('hypervolume', 0),
-                    "spacing": pareto_metrics.get('spacing', 0),
-                    "coverage_rate": pareto_metrics.get('coverage_rate', 0),
-                    "cost_range": pareto_metrics.get('cost_range', {}),
-                    "latency_range": pareto_metrics.get('latency_range', {}),
+                    "hypervolume": pareto_metrics.get("hypervolume", 0),
+                    "spacing": pareto_metrics.get("spacing", 0),
+                    "coverage_rate": pareto_metrics.get("coverage_rate", 0),
+                    "cost_range": pareto_metrics.get("cost_range", {}),
+                    "latency_range": pareto_metrics.get("latency_range", {}),
                 },
                 "extremeSolutions": {
-                    "minCost": asdict(extreme_solutions['min_cost']) if 'min_cost' in extreme_solutions else None,
-                    "minLatency": asdict(extreme_solutions['min_latency']) if 'min_latency' in extreme_solutions else None,
-                    "balanced": asdict(extreme_solutions['balanced']) if 'balanced' in extreme_solutions else None,
-                }
+                    "minCost": asdict(extreme_solutions["min_cost"])
+                    if "min_cost" in extreme_solutions
+                    else None,
+                    "minLatency": asdict(extreme_solutions["min_latency"])
+                    if "min_latency" in extreme_solutions
+                    else None,
+                    "balanced": asdict(extreme_solutions["balanced"])
+                    if "balanced" in extreme_solutions
+                    else None,
+                },
             },
-            # Explainability data (Priority 3)
             "explainability": explainability_data,
-            # Sankey diagram data for flow visualization
-            "sankeyDiagram": {
-                "costFlow": sankey_data,
-                "latencyFlow": latency_sankey_data
-            },
-            # Multi-cloud operational insights
-            "multiCloudInsights": {
-                "terraformPreview": terraform_preview,
-                "crossCloudLatency": calculate_cross_cloud_penalty(best_solution.configuration) if best_solution else 0,
-                "dataTransferCost": calculate_data_transfer_cost(best_solution.configuration, 100) if best_solution else 0,
-                "operationalComplexity": "High" if best_solution and best_solution.providers > 2 else "Medium" if best_solution and best_solution.providers > 1 else "Low"
-            }
+            "sankeyDiagram": sankey_diagram,
+            "multiCloudInsights": multi_cloud_insights,
         }
         return jsonify(resp)
-    except Exception as e:
+    except Exception as e:  # pragma: no cover - defensive, logged response
         import traceback
+
         print(f"[OPTIMIZE] Error: {e}\n" + traceback.format_exc())
         return jsonify({"error": str(e)}), 500
     finally:
-        # Restore global CSP config to avoid leaking per-request overrides
         CSP_CONFIG.update(old_csp)
         
 # Import cross-cloud penalty functions at module level
@@ -1692,119 +1872,368 @@ def generate_terraform():
             "detail": error_detail
         }), 500
 
+def _parse_cmov4_baseline_scenario(data):
+    """Extract scenario parameters for the CMOv4 baseline comparison."""
+    from models import Constraints
+    from services.pricing import COMPONENTS
+
+    scenario = data.get("scenario", {})
+    if isinstance(scenario.get("components"), list):
+        components = scenario["components"]
+    else:
+        components = COMPONENTS
+
+    max_budget = float(scenario.get("maxBudget", 5000))
+    max_latency = float(scenario.get("maxLatency", 200))
+    max_providers = int(scenario.get("maxProviders", 3))
+    provided_pareto = scenario.get("paretoFrontier", [])
+
+    cmov4_timing = scenario.get("timing", {})
+    cmov4_csp_time = cmov4_timing.get("csp_time_ms", 0)
+    cmov4_expert_time = cmov4_timing.get("expert_time_ms", 0)
+    cmov4_pareto_time = cmov4_timing.get("pareto_time_ms", 0)
+    cmov4_total_time = cmov4_timing.get("total_time_ms", 0)
+
+    constraints = Constraints(
+        maxBudget=max_budget,
+        maxLatency=max_latency,
+        maxProviders=max_providers,
+        selected_components=components,
+    )
+
+    print(
+        f"[CMOv4 Baseline Comparison] Components: {len(components)}, Budget: ${max_budget}, "
+        f"Latency: {max_latency}ms, Max Providers: {max_providers}"
+    )
+    print(
+        f"[CMOv4 Baseline Comparison] Provided Pareto frontier: {len(provided_pareto)} solutions"
+    )
+    print(
+        f"[CMOv4 Baseline Comparison] Provided timing: CSP={cmov4_csp_time}ms, "
+        f"Expert={cmov4_expert_time}ms, Pareto={cmov4_pareto_time}ms, Total={cmov4_total_time}ms"
+    )
+
+    return (
+        constraints,
+        components,
+        provided_pareto,
+        cmov4_csp_time,
+        cmov4_expert_time,
+        cmov4_pareto_time,
+        cmov4_total_time,
+    )
+
+
+def _load_pareto_solutions(provided_pareto):
+    """Load provided Pareto frontier into Solution objects.
+
+    Returns (pareto_solutions, provided_pareto_flag_reset).
+    """
+    from models import Solution
+
+    pareto_solutions = []
+
+    if provided_pareto and len(provided_pareto) > 0:
+        print(
+            f"[CMOv4] Using provided Pareto frontier with {len(provided_pareto)} solutions"
+        )
+        try:
+            for sol_data in provided_pareto:
+                if isinstance(sol_data, dict):
+                    config = sol_data.get("configuration", {})
+                    cost = float(sol_data.get("cost", 0))
+                    latency = float(sol_data.get("latency", 0))
+                    providers = int(sol_data.get("providers", 0))
+                    provider_dist = sol_data.get("providerDistribution", {})
+
+                    solution = Solution(
+                        configuration=config,
+                        cost=cost,
+                        latency=latency,
+                        providers=providers,
+                        providerDistribution=provider_dist,
+                        score=sol_data.get("score"),
+                        evaluationLog=sol_data.get("evaluationLog"),
+                    )
+                    pareto_solutions.append(solution)
+                else:
+                    pareto_solutions.append(sol_data)
+            print(
+                f"[CMOv4] Successfully loaded {len(pareto_solutions)} Pareto solutions"
+            )
+        except Exception as e:  # pragma: no cover - defensive logging
+            print(f"[ERROR] Failed to load provided Pareto frontier: {str(e)}")
+            import traceback
+
+            traceback.print_exc()
+            pareto_solutions = []
+
+    return pareto_solutions
+
+
+def _run_baseline_algorithms(constraints):
+    """Run all baseline algorithms and return a dict of their results."""
+    from engines.baselines import (
+        baseline_random,
+        baseline_greedy_cost,
+        baseline_greedy_latency,
+        baseline_genetic_algorithm,
+        baseline_weighted_sum,
+    )
+
+    baselines = {}
+
+    result = baseline_random(constraints)
+    baselines["random"] = {
+        "success": result.success,
+        "cost": result.solution.cost if result.solution else 0,
+        "latency": result.solution.latency if result.solution else 0,
+        "providers": count_unique_providers(result.solution.configuration)
+        if result.solution
+        else 0,
+        "execution_time_ms": result.execution_time_ms,
+        "reason": result.reason,
+    }
+
+    result = baseline_greedy_cost(constraints)
+    baselines["greedy_cost"] = {
+        "success": result.success,
+        "cost": result.solution.cost if result.solution else 0,
+        "latency": result.solution.latency if result.solution else 0,
+        "providers": count_unique_providers(result.solution.configuration)
+        if result.solution
+        else 0,
+        "execution_time_ms": result.execution_time_ms,
+        "reason": result.reason,
+    }
+
+    result = baseline_greedy_latency(constraints)
+    baselines["greedy_latency"] = {
+        "success": result.success,
+        "cost": result.solution.cost if result.solution else 0,
+        "latency": result.solution.latency if result.solution else 0,
+        "providers": count_unique_providers(result.solution.configuration)
+        if result.solution
+        else 0,
+        "execution_time_ms": result.execution_time_ms,
+        "reason": result.reason,
+    }
+
+    result = baseline_genetic_algorithm(constraints)
+    baselines["genetic_algorithm"] = {
+        "success": result.success,
+        "cost": result.solution.cost if result.solution else 0,
+        "latency": result.solution.latency if result.solution else 0,
+        "providers": count_unique_providers(result.solution.configuration)
+        if result.solution
+        else 0,
+        "execution_time_ms": result.execution_time_ms,
+        "reason": result.reason,
+    }
+
+    result = baseline_weighted_sum(constraints)
+    baselines["weighted_sum"] = {
+        "success": result.success,
+        "cost": result.solution.cost if result.solution else 0,
+        "latency": result.solution.latency if result.solution else 0,
+        "providers": count_unique_providers(result.solution.configuration)
+        if result.solution
+        else 0,
+        "execution_time_ms": result.execution_time_ms,
+        "reason": result.reason,
+    }
+
+    return baselines
+
+
+def _compute_baseline_comparison_metrics(
+    baselines, cmov4_success, cmov4_cost, cmov4_latency
+):
+    """Compute wins and comparison metrics between CMOv4 and baselines."""
+    wins_per_baseline = {name: 0 for name in baselines.keys()}
+    total_wins = 0
+
+    if cmov4_success:
+        for name, baseline in baselines.items():
+            if baseline["success"]:
+                if cmov4_cost <= baseline["cost"] and cmov4_latency <= baseline["latency"]:
+                    total_wins += 1
+                elif (
+                    baseline["cost"] < cmov4_cost
+                    and baseline["latency"] < cmov4_latency
+                ):
+                    wins_per_baseline[name] += 1
+
+    return wins_per_baseline, total_wins
+
+
+def _compute_pareto_metrics_for_baselines(pareto_solutions):
+    """Compute simple Pareto metrics (hypervolume, diversity, averages)."""
+    pareto_metrics = {}
+
+    if pareto_solutions and len(pareto_solutions) > 1:
+        sorted_pareto = sorted(pareto_solutions, key=lambda s: s.cost)
+        hypervolume = 0
+        for i in range(len(sorted_pareto) - 1):
+            width = sorted_pareto[i + 1].cost - sorted_pareto[i].cost
+            height = sorted_pareto[i].latency
+            hypervolume += width * height
+
+        costs = [s.cost for s in pareto_solutions]
+        latencies = [s.latency for s in pareto_solutions]
+        cost_diversity = max(costs) - min(costs)
+        latency_diversity = max(latencies) - min(latencies)
+
+        pareto_metrics = {
+            "hypervolume": round(hypervolume, 2),
+            "cost_range": round(cost_diversity, 2),
+            "latency_range": round(latency_diversity, 2),
+            "avg_cost": round(sum(costs) / len(costs), 2),
+            "avg_latency": round(sum(latencies) / len(latencies), 2),
+        }
+
+    return pareto_metrics
+
+
+def _build_cmov4_baseline_response(
+    cmov4_success,
+    cmov4_cost,
+    cmov4_latency,
+    cmov4_providers,
+    cmov4_time_ms,
+    cmov4_csp_time,
+    cmov4_expert_time,
+    cmov4_pareto_time,
+    pareto_count,
+    pareto_solutions,
+    pareto_metrics,
+    baselines,
+    total_wins,
+    wins_per_baseline,
+    components,
+    max_budget,
+    max_latency,
+    max_providers,
+):
+    """Build the final JSON payload for the baseline comparison."""
+    baseline_success_rate = (
+        sum(1 for b in baselines.values() if b["success"]) / len(baselines)
+        if baselines
+        else 0
+    )
+
+    best_baseline_cost = min(
+        [b["cost"] for b in baselines.values() if b["success"]],
+        default=cmov4_cost,
+    )
+    best_baseline_latency = min(
+        [b["latency"] for b in baselines.values() if b["success"]],
+        default=cmov4_latency,
+    )
+
+    speed_multiplier = (
+        round(max([b["execution_time_ms"] for b in baselines.values()]) / cmov4_time_ms, 2)
+        if cmov4_time_ms > 0 and baselines
+        else None
+    )
+
+    response = {
+        "cmov4_pareto": {
+            "success": cmov4_success,
+            "cost": round(cmov4_cost, 2) if cmov4_success else 0,
+            "latency": round(cmov4_latency, 2) if cmov4_success else 0,
+            "providers": cmov4_providers,
+            "execution_time_ms": round(cmov4_time_ms, 2),
+            "timing_breakdown": {
+                "csp_time_ms": round(cmov4_csp_time, 2),
+                "expert_time_ms": round(cmov4_expert_time, 2),
+                "pareto_time_ms": round(cmov4_pareto_time, 2),
+                "total_time_ms": round(cmov4_time_ms, 2),
+            },
+            "pareto_count": pareto_count,
+            "pareto_metrics": pareto_metrics,
+            "frontier": [
+                {
+                    "cost": round(s.cost, 2),
+                    "latency": round(s.latency, 2),
+                    "providers": len(set(s.configuration.values())),
+                }
+                for s in pareto_solutions[:20]
+            ]
+            if pareto_solutions
+            else [],
+        },
+        "baselines": baselines,
+        "comparison": {
+            "total_wins": total_wins,
+            "wins_per_baseline": wins_per_baseline,
+            "baseline_success_rate": baseline_success_rate,
+            "cmov4_advantage": {
+                "cost_vs_best_baseline": round(
+                    cmov4_cost - best_baseline_cost, 2
+                )
+                if cmov4_success
+                else None,
+                "latency_vs_best_baseline": round(
+                    cmov4_latency - best_baseline_latency, 2
+                )
+                if cmov4_success
+                else None,
+                "speed_multiplier": speed_multiplier,
+                "pareto_solutions_count": pareto_count,
+                "explainability": "Full CSP+Expert+Pareto pipeline with rule traces",
+            },
+        },
+        "scenario": {
+            "components": len(components),
+            "max_budget": max_budget,
+            "max_latency": max_latency,
+            "max_providers": max_providers,
+        },
+    }
+
+    return response
+
+
 @app.route('/api/cmov4/compare-baselines', methods=['POST'])
 def compare_cmov4_baselines():
-    """
-    Compare CMOv4 Pareto optimization against 5 baseline algorithms.
-    Enhanced for multi-objective comparison showing Pareto frontier advantages.
-    """
+    """Compare CMOv4 Pareto optimization against 5 baseline algorithms."""
     try:
-        import time
         import sys
         import os
-        import random
-        
-        # Add backend to path if needed
+
         backend_dir = os.path.dirname(os.path.abspath(__file__))
         if backend_dir not in sys.path:
             sys.path.insert(0, backend_dir)
-        
-        from engines.baselines import (
-            baseline_random,
-            baseline_greedy_cost,
-            baseline_greedy_latency,
-            baseline_genetic_algorithm,
-            baseline_weighted_sum
-        )
-        from engines.pareto import calculate_pareto_frontier
-        from models import Constraints, Solution
-        from services.pricing import COMPONENTS, get_service_options, get_service_costs, get_service_latency, _resolve_service_key, get_cost_for_service, get_latency_for_service
-        import itertools
-        
+
         data = request.json
         if not data:
-            return jsonify({'error': 'Missing request data'}), 400
-        
-        # Extract scenario parameters
-        scenario = data.get('scenario', {})
-        # Fix: handle both list and dict for components
-        if isinstance(scenario.get('components'), list):
-            components = scenario['components']
-        else:
-            # COMPONENTS is a list, not a dict
-            components = COMPONENTS  # Use all 18 components by default
-        max_budget = float(scenario.get('maxBudget', 5000))
-        max_latency = float(scenario.get('maxLatency', 200))
-        max_providers = int(scenario.get('maxProviders', 3))
-        provided_pareto = scenario.get('paretoFrontier', [])  # Use existing Pareto frontier if provided
-        
-        # Get CMOv4 timing data if provided (more accurate than regenerating)
-        cmov4_timing = scenario.get('timing', {})
-        cmov4_csp_time = cmov4_timing.get('csp_time_ms', 0)
-        cmov4_expert_time = cmov4_timing.get('expert_time_ms', 0)
-        cmov4_pareto_time = cmov4_timing.get('pareto_time_ms', 0)
-        cmov4_total_time = cmov4_timing.get('total_time_ms', 0)
-        
-        # Create constraints
-        constraints = Constraints(
-            maxBudget=max_budget,
-            maxLatency=max_latency,
-            maxProviders=max_providers,
-            selected_components=components
-        )
-        
-        print(f"[CMOv4 Baseline Comparison] Components: {len(components)}, Budget: ${max_budget}, Latency: {max_latency}ms, Max Providers: {max_providers}")
-        print(f"[CMOv4 Baseline Comparison] Provided Pareto frontier: {len(provided_pareto)} solutions")
-        print(f"[CMOv4 Baseline Comparison] Provided timing: CSP={cmov4_csp_time}ms, Expert={cmov4_expert_time}ms, Pareto={cmov4_pareto_time}ms, Total={cmov4_total_time}ms")
-        
-        # Use provided CMOv4 results (Option 1: more accurate and fair)
-        pareto_solutions = []
-        
-        if provided_pareto and len(provided_pareto) > 0:
-            # Use the provided Pareto frontier from the benchmark
-            print(f"[CMOv4] Using provided Pareto frontier with {len(provided_pareto)} solutions")
-            try:
-                for sol_data in provided_pareto:
-                    if isinstance(sol_data, dict):
-                        # Extract required fields
-                        config = sol_data.get('configuration', {})
-                        cost = float(sol_data.get('cost', 0))
-                        latency = float(sol_data.get('latency', 0))
-                        providers = int(sol_data.get('providers', 0))
-                        provider_dist = sol_data.get('providerDistribution', {})
-                        
-                        solution = Solution(
-                            configuration=config,
-                            cost=cost,
-                            latency=latency,
-                            providers=providers,
-                            providerDistribution=provider_dist,
-                            score=sol_data.get('score'),
-                            evaluationLog=sol_data.get('evaluationLog')
-                        )
-                        pareto_solutions.append(solution)
-                    else:
-                        pareto_solutions.append(sol_data)
-                print(f"[CMOv4] Successfully loaded {len(pareto_solutions)} Pareto solutions")
-            except Exception as e:
-                print(f"[ERROR] Failed to load provided Pareto frontier: {str(e)}")
-                import traceback
-                traceback.print_exc()
-                provided_pareto = []
-                pareto_solutions = []
-        
-        # If no provided solutions, return error (baseline comparison requires CMOv4 results first)
+            return jsonify({"error": "Missing request data"}), 400
+
+        (
+            constraints,
+            components,
+            provided_pareto,
+            cmov4_csp_time,
+            cmov4_expert_time,
+            cmov4_pareto_time,
+            cmov4_total_time,
+        ) = _parse_cmov4_baseline_scenario(data)
+
+        pareto_solutions = _load_pareto_solutions(provided_pareto)
+
         if not pareto_solutions:
-            return jsonify({
-                'error': 'No CMOv4 results provided. Please run CMOv4 optimization first.',
-                'cmov4_pareto': {'success': False, 'pareto_count': 0},
-                'baselines': {}
-            }), 400
-        
-        # Use provided timing (accurate) instead of measuring here
-        cmov4_time_ms = cmov4_total_time if cmov4_total_time > 0 else 0.04  # Fallback to minimal value
+            return jsonify(
+                {
+                    "error": "No CMOv4 results provided. Please run CMOv4 optimization first.",
+                    "cmov4_pareto": {"success": False, "pareto_count": 0},
+                    "baselines": {},
+                }
+            ), 400
+
+        cmov4_time_ms = cmov4_total_time if cmov4_total_time > 0 else 0.04
         pareto_count = len(pareto_solutions)
-        
+
         if pareto_solutions:
             best_pareto = min(pareto_solutions, key=lambda s: s.cost)
             cmov4_success = True
@@ -1816,161 +2245,59 @@ def compare_cmov4_baselines():
             cmov4_cost = 0
             cmov4_latency = 0
             cmov4_providers = 0
-            best_pareto = None
-        
-        # Run baseline algorithms
-        baselines = {}
-        
-        # 1. Random Selection
-        result = baseline_random(constraints)
-        baselines['random'] = {
-            'success': result.success,
-            'cost': result.solution.cost if result.solution else 0,
-            'latency': result.solution.latency if result.solution else 0,
-            'providers': count_unique_providers(result.solution.configuration) if result.solution else 0,
-            'execution_time_ms': result.execution_time_ms,
-            'reason': result.reason
-        }
-        
-        # 2. Greedy Cost
-        result = baseline_greedy_cost(constraints)
-        baselines['greedy_cost'] = {
-            'success': result.success,
-            'cost': result.solution.cost if result.solution else 0,
-            'latency': result.solution.latency if result.solution else 0,
-            'providers': count_unique_providers(result.solution.configuration) if result.solution else 0,
-            'execution_time_ms': result.execution_time_ms,
-            'reason': result.reason
-        }
-        
-        # 3. Greedy Latency
-        result = baseline_greedy_latency(constraints)
-        baselines['greedy_latency'] = {
-            'success': result.success,
-            'cost': result.solution.cost if result.solution else 0,
-            'latency': result.solution.latency if result.solution else 0,
-            'providers': count_unique_providers(result.solution.configuration) if result.solution else 0,
-            'execution_time_ms': result.execution_time_ms,
-            'reason': result.reason
-        }
-        
-        # 4. Genetic Algorithm
-        result = baseline_genetic_algorithm(constraints)
-        baselines['genetic_algorithm'] = {
-            'success': result.success,
-            'cost': result.solution.cost if result.solution else 0,
-            'latency': result.solution.latency if result.solution else 0,
-            'providers': count_unique_providers(result.solution.configuration) if result.solution else 0,
-            'execution_time_ms': result.execution_time_ms,
-            'reason': result.reason
-        }
-        
-        # 5. Weighted Sum
-        result = baseline_weighted_sum(constraints)
-        baselines['weighted_sum'] = {
-            'success': result.success,
-            'cost': result.solution.cost if result.solution else 0,
-            'latency': result.solution.latency if result.solution else 0,
-            'providers': count_unique_providers(result.solution.configuration) if result.solution else 0,
-            'execution_time_ms': result.execution_time_ms,
-            'reason': result.reason
-        }
-        
-        # Calculate comparison metrics
-        wins_per_baseline = {name: 0 for name in baselines.keys()}
-        total_wins = 0
-        
-        if cmov4_success:
-            for name, baseline in baselines.items():
-                if baseline['success']:
-                    # CMOv4 wins if it has lower cost AND lower latency
-                    if cmov4_cost <= baseline['cost'] and cmov4_latency <= baseline['latency']:
-                        total_wins += 1
-                    # Baseline wins if it dominates CMOv4
-                    elif baseline['cost'] < cmov4_cost and baseline['latency'] < cmov4_latency:
-                        wins_per_baseline[name] += 1
-        
-        # Calculate Pareto-specific metrics
-        pareto_metrics = {}
-        if pareto_solutions and len(pareto_solutions) > 1:
-            # Hypervolume indicator (simplified - area under Pareto curve)
-            sorted_pareto = sorted(pareto_solutions, key=lambda s: s.cost)
-            hypervolume = 0
-            for i in range(len(sorted_pareto) - 1):
-                width = sorted_pareto[i+1].cost - sorted_pareto[i].cost
-                height = sorted_pareto[i].latency
-                hypervolume += width * height
-            
-            # Solution diversity (cost and latency ranges)
-            costs = [s.cost for s in pareto_solutions]
-            latencies = [s.latency for s in pareto_solutions]
-            cost_diversity = max(costs) - min(costs)
-            latency_diversity = max(latencies) - min(latencies)
-            
-            pareto_metrics = {
-                'hypervolume': round(hypervolume, 2),
-                'cost_range': round(cost_diversity, 2),
-                'latency_range': round(latency_diversity, 2),
-                'avg_cost': round(sum(costs) / len(costs), 2),
-                'avg_latency': round(sum(latencies) / len(latencies), 2)
-            }
-        
-        # Prepare response
-        response = {
-            'cmov4_pareto': {
-                'success': cmov4_success,
-                'cost': round(cmov4_cost, 2) if cmov4_success else 0,
-                'latency': round(cmov4_latency, 2) if cmov4_success else 0,
-                'providers': cmov4_providers,
-                'execution_time_ms': round(cmov4_time_ms, 2),
-                'timing_breakdown': {
-                    'csp_time_ms': round(cmov4_csp_time, 2),
-                    'expert_time_ms': round(cmov4_expert_time, 2),
-                    'pareto_time_ms': round(cmov4_pareto_time, 2),
-                    'total_time_ms': round(cmov4_time_ms, 2)
-                },
-                'pareto_count': pareto_count,
-                'pareto_metrics': pareto_metrics,
-                'frontier': [
-                    {
-                        'cost': round(s.cost, 2),
-                        'latency': round(s.latency, 2),
-                        'providers': len(set(s.configuration.values()))
-                    }
-                    for s in pareto_solutions[:20]  # Limit to first 20 for performance
-                ] if pareto_solutions else []
-            },
-            'baselines': baselines,
-            'comparison': {
-                'total_wins': total_wins,
-                'wins_per_baseline': wins_per_baseline,
-                'baseline_success_rate': sum(1 for b in baselines.values() if b['success']) / len(baselines),
-                'cmov4_advantage': {
-                    'cost_vs_best_baseline': round(cmov4_cost - min([b['cost'] for b in baselines.values() if b['success']], default=cmov4_cost), 2) if cmov4_success else None,
-                    'latency_vs_best_baseline': round(cmov4_latency - min([b['latency'] for b in baselines.values() if b['success']], default=cmov4_latency), 2) if cmov4_success else None,
-                    'speed_multiplier': round(max([b['execution_time_ms'] for b in baselines.values()]) / cmov4_time_ms, 2) if cmov4_time_ms > 0 else None,
-                    'pareto_solutions_count': pareto_count,
-                    'explainability': 'Full CSP+Expert+Pareto pipeline with rule traces'
-                }
-            },
-            'scenario': {
-                'components': len(components),
-                'max_budget': max_budget,
-                'max_latency': max_latency,
-                'max_providers': max_providers
-            }
-        }
-        
+
+        baselines = _run_baseline_algorithms(constraints)
+
+        wins_per_baseline, total_wins = _compute_baseline_comparison_metrics(
+            baselines, cmov4_success, cmov4_cost, cmov4_latency
+        )
+
+        pareto_metrics = _compute_pareto_metrics_for_baselines(pareto_solutions)
+
+        max_budget = constraints.maxBudget
+        max_latency = constraints.maxLatency
+        max_providers = constraints.maxProviders
+
+        response = _build_cmov4_baseline_response(
+            cmov4_success,
+            cmov4_cost,
+            cmov4_latency,
+            cmov4_providers,
+            cmov4_time_ms,
+            cmov4_csp_time,
+            cmov4_expert_time,
+            cmov4_pareto_time,
+            pareto_count,
+            pareto_solutions,
+            pareto_metrics,
+            baselines,
+            total_wins,
+            wins_per_baseline,
+            components,
+            max_budget,
+            max_latency,
+            max_providers,
+        )
+
         return jsonify(response)
-        
-    except Exception as e:
+
+    except Exception as e:  # pragma: no cover - defensive logging
         import traceback
+
         error_details = traceback.format_exc()
-        print(f"[ERROR] CMOv4 Baseline Comparison failed: {error_details}", file=sys.stderr)
-        return jsonify({
-            'error': f'Baseline comparison failed: {str(e)}',
-            'details': error_details
-        }), 500
+        print(
+            f"[ERROR] CMOv4 Baseline Comparison failed: {error_details}",
+            file=sys.stderr,
+        )
+        return (
+            jsonify(
+                {
+                    "error": f"Baseline comparison failed: {str(e)}",
+                    "details": error_details,
+                }
+            ),
+            500,
+        )
 
 if __name__ == "__main__":
     import os

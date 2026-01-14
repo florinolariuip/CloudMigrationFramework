@@ -5,7 +5,7 @@
 
 from __future__ import annotations
 
-from typing import Dict, List, Any
+from typing import Dict, List, Any, Iterable
 import itertools
 
 from backend.models import Constraints, Solution
@@ -156,7 +156,6 @@ def count_providers(config: Dict[str, str]) -> int:
 
 
 
-# Return a count of services per provider in the configuration.
 def provider_distribution(config: Dict[str, str]) -> Dict[str, int]:
     dist: Dict[str, int] = {}
     for s in config.values():
@@ -165,9 +164,6 @@ def provider_distribution(config: Dict[str, str]) -> Dict[str, int]:
     return dist
 
 
-
-# Check if all service dependencies are satisfied.
-# E.g., if RDS is chosen, EC2 must also be present.
 def check_dependencies(config: Dict[str, str]) -> bool:
     for rule in SERVICE_DEPENDENCIES:
         if rule["if"] in config.values() and rule["requires"] not in config.values():
@@ -175,55 +171,42 @@ def check_dependencies(config: Dict[str, str]) -> bool:
     return True
 
 
+def _select_components_for_csp(constraints: Constraints) -> List[str]:
+    """Return the list of components to use in CSP (selected or all)."""
+    return constraints.selected_components if constraints.selected_components else COMPONENTS
 
-# Main entry: generate all feasible solutions given constraints.
-# Steps:
-#   1. Generate all possible service combinations (Cartesian product)
-#   2. Apply hard constraints:
-#       - Budget (cost <= maxBudget)
-#       - Performance (latency <= maxLatency)
-#       - Provider count (<= maxProviders)
-#       - Dependencies (check_dependencies)
-#   3. Prune configs with missing cost data
-#   4. Return list of Solution objects for scoring/ranking
 
-def generate_feasible_solutions(constraints: Constraints) -> List[Solution]:
-    """
-    Constraints Engine (CSP):
-    - Generates combinations over selected components (or all if not specified)
-    - Applies hard constraints: budget, performance (selected metric), max providers, interdependencies
-    - Supports pruning strategies (exhaustive, heuristic, random_sample, ml placeholder)
+def _build_candidate_picks(selected_components: List[str], service_options: Dict[str, List[str]]) -> Iterable[List[str]]:
+    """Build the iterable of candidate combinations according to CSP_CONFIG strategy.
+
+    This encapsulates the strategy branching (exhaustive, random_sample, heuristic, ml).
     """
     import time
-    start_time = time.time()
-    
-    solutions: List[Solution] = []
-    service_options = get_service_options()
-    metric = getattr(constraints, "performanceMetric", "avg_latency")
-
-    # Use selected_components if provided, else default to all COMPONENTS
-    selected_components = constraints.selected_components if constraints.selected_components else COMPONENTS
-    print(f"[TIMING] CSP starting with {len(selected_components)} components, strategy: {CSP_CONFIG.get('search_strategy', 'exhaustive')}")
+    import itertools as _itertools
 
     strategy = CSP_CONFIG.get("search_strategy", "exhaustive")
     combination_start = time.time()
-    picks = itertools.product(*(service_options[c] for c in selected_components))
+    base_picks = _itertools.product(*(service_options[c] for c in selected_components))
+
     if strategy == "random_sample":
         import random
-        all_picks = list(picks)
-        picks = random.sample(all_picks, min(CSP_CONFIG.get("sample_size", 1000), len(all_picks)))
+
+        all_picks = list(base_picks)
+        sample_size = min(CSP_CONFIG.get("sample_size", 1000), len(all_picks))
+        picks = random.sample(all_picks, sample_size)
         print(f"[TIMING] Random sampling: {len(picks)} from {len(all_picks)} combinations")
-    elif strategy == "heuristic":
+        return picks
+
+    if strategy == "heuristic":
         import random
-        print(f"[TIMING] Pre-caching pricing data for heuristic generation...")
-        
-        # Pre-cache all pricing data to avoid repeated API calls
+
+        print("[TIMING] Pre-caching pricing data for heuristic generation...")
         costs = get_service_costs()
         latencies = get_service_latency()
-        
+
         # Pre-sort all options by cost and latency to avoid repeated sorting
-        sorted_by_cost = {}
-        sorted_by_latency = {}
+        sorted_by_cost: Dict[str, List[str]] = {}
+        sorted_by_latency: Dict[str, List[str]] = {}
         for component in selected_components:
             options = service_options.get(component, [])
             if options:
@@ -232,9 +215,9 @@ def generate_feasible_solutions(constraints: Constraints) -> List[Solution]:
             else:
                 sorted_by_cost[component] = []
                 sorted_by_latency[component] = []
-        
-        print(f"[TIMING] Pricing data cached, generating heuristic combinations...")
-        heuristic_picks = []
+
+        print("[TIMING] Pricing data cached, generating heuristic combinations...")
+        heuristic_picks: List[List[str]] = []
 
         # Strategy 1: Pure cheapest (cost-optimized)
         if all(sorted_by_cost[c] for c in selected_components):
@@ -246,7 +229,7 @@ def generate_feasible_solutions(constraints: Constraints) -> List[Solution]:
 
         # Strategy 3-10: Balanced - pick from top 2 options (increased from 3 to 8)
         for _ in range(8):
-            pick = []
+            pick: List[str] = []
             for c in selected_components:
                 cost_opts = sorted_by_cost[c][:2]
                 latency_opts = sorted_by_latency[c][:2]
@@ -259,12 +242,16 @@ def generate_feasible_solutions(constraints: Constraints) -> List[Solution]:
                 heuristic_picks.append(pick)
 
         # Strategy 11-13: Single-provider solutions (AWS, Azure, GCP)
-        for provider in ['AWS', 'Azure', 'GCP']:
+        for provider in ["AWS", "Azure", "GCP"]:
             pick = []
             for c in selected_components:
-                provider_opts = [opt for opt in service_options.get(c, []) if opt.startswith(provider)]
+                provider_opts = [
+                    opt
+                    for opt in service_options.get(c, [])
+                    if opt.startswith(provider)
+                ]
                 if provider_opts:
-                    pick.append(provider_opts[0])  # Use first available instead of min cost lookup
+                    pick.append(provider_opts[0])
                 elif sorted_by_cost.get(c):
                     pick.append(sorted_by_cost[c][0])
             if len(pick) == len(selected_components):
@@ -280,54 +267,100 @@ def generate_feasible_solutions(constraints: Constraints) -> List[Solution]:
             if len(pick) == len(selected_components):
                 heuristic_picks.append(pick)
 
-        picks = heuristic_picks
-        print(f"[TIMING] Heuristic generation: {len(heuristic_picks)} strategic combinations in {(time.time() - combination_start)*1000:.1f}ms")
-    elif strategy == "ml":
-        # Use iterator directly, don't convert to list
-        picks = itertools.islice(picks, CSP_CONFIG.get("sample_size", 1000))
-        print(f"[TIMING] ML sampling: up to {CSP_CONFIG.get('sample_size', 1000)} combinations")
-    else:
-        # Exhaustive - use iterator directly to avoid memory issues
-        print(f"[TIMING] Exhaustive search: processing combinations as iterator")
+        elapsed_ms = (time.time() - combination_start) * 1000
+        print(
+            f"[TIMING] Heuristic generation: {len(heuristic_picks)} strategic combinations in {elapsed_ms:.1f}ms"
+        )
+        return heuristic_picks
 
-    # Add timeout protection for constraint checking
+    if strategy == "ml":
+        import itertools as _it
+
+        picks = _it.islice(base_picks, CSP_CONFIG.get("sample_size", 1000))
+        print(
+            f"[TIMING] ML sampling: up to {CSP_CONFIG.get('sample_size', 1000)} combinations"
+        )
+        return picks
+
+    # Exhaustive - use iterator directly to avoid memory issues
+    print("[TIMING] Exhaustive search: processing combinations as iterator")
+    return base_picks
+
+
+def _filter_feasible_solutions(
+    picks: Iterable[List[str]],
+    selected_components: List[str],
+    constraints: Constraints,
+    metric: str,
+) -> List[Solution]:
+    """Filter candidate configurations into feasible Solution objects.
+
+    Adds a 30s timeout guard to avoid pathological cases.
+    """
+    import time
+
+    solutions: List[Solution] = []
     constraint_start = time.time()
-    max_constraint_time = 30.0  # 30 second timeout
-    
+    max_constraint_time = 30.0
+
     for i, pick in enumerate(picks):
-        # Check timeout every 100 iterations
         if i % 100 == 0 and (time.time() - constraint_start) > max_constraint_time:
-            print(f"[TIMING] Constraint checking timeout after {max_constraint_time}s, processed {i}/{len(picks)} combinations")
+            print(
+                f"[TIMING] Constraint checking timeout after {max_constraint_time}s, processed {i} combinations"
+            )
             break
-            
+
         conf = {comp: svc for comp, svc in zip(selected_components, pick)}
-        # Extract workload profile from constraints if provided
-        workload_profile = getattr(constraints, 'workload_profile', None)
+        workload_profile = getattr(constraints, "workload_profile", None)
         cost = calculate_total_cost(conf, workload_profile)
         perf = calculate_performance(conf, metric)
         providers = count_providers(conf)
-        # Apply multi-cloud complexity penalty to budget (5% per additional provider)
         complexity_penalty = max(0, (providers - 1) * 0.05) * cost
         adjusted_cost = cost + complexity_penalty
-        
-        if adjusted_cost <= constraints.maxBudget and perf <= constraints.maxLatency and providers <= constraints.maxProviders and check_dependencies(conf):
+
+        if (
+            adjusted_cost <= constraints.maxBudget
+            and perf <= constraints.maxLatency
+            and providers <= constraints.maxProviders
+            and check_dependencies(conf)
+        ):
             solutions.append(
                 Solution(
                     configuration=conf,
-                    cost=adjusted_cost,  # Use adjusted cost with complexity penalty
+                    cost=adjusted_cost,
                     latency=perf,
                     providers=providers,
                     providerDistribution=provider_distribution(conf),
                 )
             )
-            
-        # Early termination if we have enough solutions
-        # Configurable limit: 500 for research, 50 for production
-        max_solutions = CSP_CONFIG.get("max_feasible_solutions", 500)
-        if len(solutions) >= max_solutions:
-            print(f"[TIMING] Early termination: found {len(solutions)} feasible solutions (limit: {max_solutions})")
-            break
-    
-    total_time = time.time() - start_time
-    print(f"[TIMING] CSP completed: {len(solutions)} feasible solutions in {total_time*1000:.1f}ms")
+
+    return solutions
+
+
+def generate_feasible_solutions(constraints: Constraints) -> List[Solution]:
+    """Constraints Engine (CSP) main entry point.
+
+    - Generates combinations over selected components (or all if not specified)
+    - Applies hard constraints: budget, performance (selected metric), max providers, interdependencies
+    - Supports pruning strategies (exhaustive, heuristic, random_sample, ml placeholder)
+    """
+    import time
+
+    start_time = time.time()
+
+    service_options = get_service_options()
+    metric = getattr(constraints, "performanceMetric", "avg_latency")
+    selected_components = _select_components_for_csp(constraints)
+
+    print(
+        f"[TIMING] CSP starting with {len(selected_components)} components, strategy: {CSP_CONFIG.get('search_strategy', 'exhaustive')}"
+    )
+
+    picks = _build_candidate_picks(selected_components, service_options)
+    solutions = _filter_feasible_solutions(picks, selected_components, constraints, metric)
+
+    elapsed_ms = (time.time() - start_time) * 1000
+    print(
+        f"[TIMING] CSP finished in {elapsed_ms:.1f}ms, found {len(solutions)} feasible solutions"
+    )
     return solutions

@@ -2012,10 +2012,82 @@ class ServiceDataCache:
             "validation_rate": round(validated_count / max(1, len([s for s in service_costs.keys() if s in expected_ranges])) * 100, 1)
         }
 
-    def fetch_cloud_pricing_data(self) -> Dict[str, Any]:
-        print("[LIVE API] Fetching cloud pricing (fast mode)...")
-        import concurrent.futures
-        
+    def _should_use_cached_fetch(self) -> bool:
+        """Return True if a fresh live-pricing fetch is not needed yet."""
+        if not hasattr(self, "_last_fetch_time") or not getattr(self, "_last_fetch_time"):
+            return False
+
+        import time
+
+        return time.time() - self._last_fetch_time < 600  # 10 minutes
+
+
+    def _fetch_all_provider_costs(self) -> tuple[Dict[str, float] | None, Dict[str, float] | None, Dict[str, float] | None]:
+        """Fetch live (or static) pricing for AWS, Azure, and GCP with fallbacks.
+
+        Returns (aws_costs, azure_costs, gcp_costs).
+        """
+        import time
+
+        print("[LIVE API] Fetching live prices from all providers...")
+        self._last_fetch_time = time.time()
+
+        try:
+            try:
+                aws_costs = self.fetch_aws_live_pricing()
+                print(
+                    f"[LIVE API] AWS API SUCCESS: {len(aws_costs) if aws_costs else 0} services"
+                )
+            except Exception as e:
+                print(f"[LIVE API] AWS API failed: {e}")
+                aws_costs = self.fetch_aws_pricing()
+
+            try:
+                azure_costs = self.fetch_azure_pricing()
+                print(
+                    f"[LIVE API] Azure API SUCCESS: {len(azure_costs) if azure_costs else 0} services"
+                )
+            except Exception as e:
+                print(f"[LIVE API] Azure API failed: {e}")
+                azure_costs = None
+
+            try:
+                gcp_costs = self.fetch_gcp_live_pricing()
+                print(
+                    f"[LIVE API] GCP API SUCCESS: {len(gcp_costs) if gcp_costs else 0} services"
+                )
+            except Exception as e:
+                print(f"[LIVE API] GCP API failed: {e}")
+                gcp_costs = self.fetch_gcp_pricing()
+
+        except Exception as e:  # pragma: no cover - broad safety net
+            print(f"[LIVE API] Parallel fetch failed: {e}")
+            aws_costs = self.fetch_aws_pricing()
+            azure_costs = None
+            gcp_costs = self.fetch_gcp_pricing()
+
+        return aws_costs, azure_costs, gcp_costs
+
+
+    @staticmethod
+    def _log_api_success(aws_costs, azure_costs, gcp_costs) -> tuple[Dict[str, bool], float]:
+        """Compute and log per-provider API success and overall success rate."""
+        api_success = {
+            "aws": bool(aws_costs),
+            "azure": bool(azure_costs),
+            "gcp": bool(gcp_costs),
+        }
+        success_rate = sum(api_success.values()) / len(api_success) * 100
+        print(
+            f"[LIVE API] Success rate: {success_rate:.1f}% "
+            f"({sum(api_success.values())}/3 providers)"
+        )
+        return api_success, success_rate
+
+
+    def _fetch_third_party_latency(self):
+        """Fetch latency data from third-party source with timeout wrapper."""
+
         def fetch_with_timeout(fn, timeout=2):
             try:
                 result = fn()
@@ -2025,135 +2097,190 @@ class ServiceDataCache:
                 print(f"[LIVE API] {fn.__name__} FAILED: {e}")
                 return None
 
-        # Check if we have recent cached data to avoid repeated API calls
-        if hasattr(self, '_last_fetch_time') and self._last_fetch_time:
-            import time
-            if time.time() - self._last_fetch_time < 600:  # 10 minutes
-                print("[LIVE API] Using 10-minute cache (avoiding repeated API calls)")
-                return self.cache if self.cache else self.get_fallback_data()
-        
-        # Fetch live data from all providers
-        print("[LIVE API] Fetching live prices from all providers...")
-        try:
-            import time
-            self._last_fetch_time = time.time()
-            
-            # Fetch sequentially to avoid threading issues
-            try:
-                aws_costs = self.fetch_aws_live_pricing()
-                print(f"[LIVE API] AWS API SUCCESS: {len(aws_costs) if aws_costs else 0} services")
-            except Exception as e:
-                print(f"[LIVE API] AWS API failed: {e}")
-                aws_costs = self.fetch_aws_pricing()  # Fallback to static
-            
-            try:
-                azure_costs = self.fetch_azure_pricing()
-                print(f"[LIVE API] Azure API SUCCESS: {len(azure_costs) if azure_costs else 0} services")
-            except Exception as e:
-                print(f"[LIVE API] Azure API failed: {e}")
-                azure_costs = None
-            
-            try:
-                gcp_costs = self.fetch_gcp_live_pricing()
-                print(f"[LIVE API] GCP API SUCCESS: {len(gcp_costs) if gcp_costs else 0} services")
-            except Exception as e:
-                print(f"[LIVE API] GCP API failed: {e}")
-                gcp_costs = self.fetch_gcp_pricing()  # Fallback to static
-                    
-        except Exception as e:
-            print(f"[LIVE API] Parallel fetch failed: {e}")
-            # Fallback to static pricing
-            aws_costs = self.fetch_aws_pricing()
-            azure_costs = None
-            gcp_costs = self.fetch_gcp_pricing()
-
-        # Log API success rates
-        api_success = {
-            'aws': bool(aws_costs),
-            'azure': bool(azure_costs), 
-            'gcp': bool(gcp_costs)
-        }
-        success_rate = sum(api_success.values()) / len(api_success) * 100
-        print(f"[LIVE API] Success rate: {success_rate:.1f}% ({sum(api_success.values())}/3 providers)")
-
         print("[SYNC] Fetching third-party latency data...")
         third_party_latency = fetch_with_timeout(self.fetch_cloudharmony_latency, 3)
         print("[SYNC] Third-party latency fetch completed.")
+        return third_party_latency
 
+
+    @staticmethod
+    def _merge_provider_costs(
+        aws_costs: Dict[str, float] | None,
+        azure_costs: Dict[str, float] | None,
+        gcp_costs: Dict[str, float] | None,
+    ) -> tuple[Dict[str, float], Dict[str, str]]:
+        """Merge per-provider cost dicts and annotate sources for each service."""
         service_costs: Dict[str, float] = {}
         service_sources: Dict[str, str] = {}
 
-        # Prioritize live API data with accurate labeling
-        aws_live_services = ["AWS EC2", "AWS RDS", "AWS S3", "AWS API Gateway", "AWS ElastiCache", "AWS Lambda", "AWS CloudWatch", "AWS SQS", "AWS CloudFront", "AWS ALB", "AWS Backup", "AWS KMS", "AWS EKS", "AWS IAM", "AWS QuickSight", "AWS DynamoDB", "AWS Kinesis"]
-        azure_live_services = ["Azure VM", "Azure Storage", "Azure SQL", "Azure Functions", "Azure API Management", "Azure Cache", "Azure Service Bus", "Azure CDN", "Azure Load Balancer", "Azure Monitor", "Azure Backup", "Azure Key Vault", "Azure AKS", "Azure AD", "Azure Synapse", "Azure Functions Extra", "Azure Event Hubs", "Azure IoT Hub", "Azure Cosmos DB"]
-        gcp_live_services = ["GCP Compute Engine", "GCP SQL", "GCP BigQuery", "GCP Functions", "GCP Memorystore", "GCP Cloud Run", "GCP GKE", "GCP Firestore", "GCP API Gateway", "GCP Pub/Sub", "GCP Cloud CDN", "GCP Load Balancer", "GCP Cloud Monitoring", "GCP Cloud Backup", "GCP Cloud KMS", "GCP IAM", "GCP Cloud Storage", "GCP IoT Core", "GCP Dataflow"]
-        
+        aws_live_services = [
+            "AWS EC2",
+            "AWS RDS",
+            "AWS S3",
+            "AWS API Gateway",
+            "AWS ElastiCache",
+            "AWS Lambda",
+            "AWS CloudWatch",
+            "AWS SQS",
+            "AWS CloudFront",
+            "AWS ALB",
+            "AWS Backup",
+            "AWS KMS",
+            "AWS EKS",
+            "AWS IAM",
+            "AWS QuickSight",
+            "AWS DynamoDB",
+            "AWS Kinesis",
+        ]
+        azure_live_services = [
+            "Azure VM",
+            "Azure Storage",
+            "Azure SQL",
+            "Azure Functions",
+            "Azure API Management",
+            "Azure Cache",
+            "Azure Service Bus",
+            "Azure CDN",
+            "Azure Load Balancer",
+            "Azure Monitor",
+            "Azure Backup",
+            "Azure Key Vault",
+            "Azure AKS",
+            "Azure AD",
+            "Azure Synapse",
+            "Azure Functions Extra",
+            "Azure Event Hubs",
+            "Azure IoT Hub",
+            "Azure Cosmos DB",
+        ]
+        gcp_live_services = [
+            "GCP Compute Engine",
+            "GCP SQL",
+            "GCP BigQuery",
+            "GCP Functions",
+            "GCP Memorystore",
+            "GCP Cloud Run",
+            "GCP GKE",
+            "GCP Firestore",
+            "GCP API Gateway",
+            "GCP Pub/Sub",
+            "GCP Cloud CDN",
+            "GCP Load Balancer",
+            "GCP Cloud Monitoring",
+            "GCP Cloud Backup",
+            "GCP Cloud KMS",
+            "GCP IAM",
+            "GCP Cloud Storage",
+            "GCP IoT Core",
+            "GCP Dataflow",
+        ]
+
         if aws_costs:
             for k, v in aws_costs.items():
                 service_costs[k] = v
-                if k in aws_live_services:
-                    service_sources[k] = "AWS Pricing API (Live)"
-                else:
-                    service_sources[k] = "AWS Pricing API (Static)"
+                service_sources[k] = (
+                    "AWS Pricing API (Live)" if k in aws_live_services else "AWS Pricing API (Static)"
+                )
+
         if azure_costs:
             for k, v in azure_costs.items():
                 service_costs[k] = v
-                if k in azure_live_services:
-                    service_sources[k] = "Azure Retail API (Live)"
-                else:
-                    service_sources[k] = "Azure Retail API (Static)"
+                service_sources[k] = (
+                    "Azure Retail API (Live)" if k in azure_live_services else "Azure Retail API (Static)"
+                )
+
         if gcp_costs:
             for k, v in gcp_costs.items():
                 service_costs[k] = v
-                if k in gcp_live_services:
-                    service_sources[k] = "GCP Billing API (Live)"
-                else:
-                    service_sources[k] = "GCP Billing API (Static)"
+                service_sources[k] = (
+                    "GCP Billing API (Live)" if k in gcp_live_services else "GCP Billing API (Static)"
+                )
 
-        # Add realistic fallback costs for services not fetched from APIs
+        return service_costs, service_sources
+
+
+    @staticmethod
+    def _apply_fallback_costs(service_costs: Dict[str, float], service_sources: Dict[str, str]):
+        """Ensure all services have costs by filling gaps with static fallbacks."""
         fallback_new_services = {
-            "AWS ElastiCache": 50, "Azure Cache": 55, "GCP Memorystore": 36,
-            "AWS SQS": 4, "Azure Service Bus": 6, "GCP Pub/Sub": 4,
-            "AWS CloudFront": 85, "Azure CDN": 90, "GCP Cloud CDN": 80,
-            "AWS ALB": 46, "Azure Load Balancer": 50, "GCP Load Balancer": 47,
-            "AWS CloudWatch": 30, "Azure Monitor": 35, "GCP Cloud Monitoring": 50,
-            "AWS Backup": 50, "Azure Backup": 55, "GCP Cloud Backup": 26,
-            "AWS KMS": 13, "Azure Key Vault": 15, "GCP Cloud KMS": 4,
-            "AWS EKS": 164, "Azure AKS": 170, "GCP GKE": 281,
-            "AWS Lambda": 7, "Azure Functions": 8, "GCP Cloud Run": 15
+            "AWS ElastiCache": 50,
+            "Azure Cache": 55,
+            "GCP Memorystore": 36,
+            "AWS SQS": 4,
+            "Azure Service Bus": 6,
+            "GCP Pub/Sub": 4,
+            "AWS CloudFront": 85,
+            "Azure CDN": 90,
+            "GCP Cloud CDN": 80,
+            "AWS ALB": 46,
+            "Azure Load Balancer": 50,
+            "GCP Load Balancer": 47,
+            "AWS CloudWatch": 30,
+            "Azure Monitor": 35,
+            "GCP Cloud Monitoring": 50,
+            "AWS Backup": 50,
+            "Azure Backup": 55,
+            "GCP Cloud Backup": 26,
+            "AWS KMS": 13,
+            "Azure Key Vault": 15,
+            "GCP Cloud KMS": 4,
+            "AWS EKS": 164,
+            "Azure AKS": 170,
+            "GCP GKE": 281,
+            "AWS Lambda": 7,
+            "Azure Functions": 8,
+            "GCP Cloud Run": 15,
         }
+
         for service, cost in fallback_new_services.items():
             if service not in service_costs:
                 service_costs[service] = cost
-                if service.startswith('AWS'):
+                if service.startswith("AWS"):
                     service_sources[service] = "AWS Pricing API (Static)"
-                elif service.startswith('Azure'):
+                elif service.startswith("Azure"):
                     service_sources[service] = "Azure Retail API (Fallback)"
-                elif service.startswith('GCP'):
+                elif service.startswith("GCP"):
                     service_sources[service] = "GCP Billing API (Static)"
                 else:
                     service_sources[service] = "fallback_priority4"
 
-        # Fast fallback strategy - prioritize speed over live data
-        if success_rate == 0:  # All APIs failed
-            print(f"[LIVE API] All APIs failed, using fast fallback")
-            return self.get_fallback_data()
-        elif success_rate < 100:
-            print(f"[LIVE API] Partial success ({success_rate:.1f}%), filling gaps with fallback")
-            # Quickly fill missing services with fallback
+
+    def _apply_fast_fallback_strategy(
+        self,
+        success_rate: float,
+        service_costs: Dict[str, float],
+        service_sources: Dict[str, str],
+    ) -> Dict[str, float]:
+        """Apply fast fallback logic based on API success_rate and return updated costs.
+
+        May early-return full fallback data when all APIs fail.
+        """
+        if success_rate == 0:
+            print("[LIVE API] All APIs failed, using fast fallback")
+            return self.get_fallback_data()["costs"]
+
+        if success_rate < 100:
+            print(
+                f"[LIVE API] Partial success ({success_rate:.1f}%), filling gaps with fallback"
+            )
             fallback = self.get_fallback_data()
-            for k, v in fallback['costs'].items():
+            for k, v in fallback["costs"].items():
                 if k not in service_costs:
                     service_costs[k] = v
-                    if k.startswith('AWS'):
+                    if k.startswith("AWS"):
                         service_sources[k] = "AWS Pricing API (Fallback)"
-                    elif k.startswith('Azure'):
+                    elif k.startswith("Azure"):
                         service_sources[k] = "Azure Retail API (Fallback)"
-                    elif k.startswith('GCP'):
+                    elif k.startswith("GCP"):
                         service_sources[k] = "GCP Billing API (Fallback)"
                     else:
                         service_sources[k] = "Fallback (Fast Mode)"
 
+        return service_costs
+
+
+    def _build_service_latency(self, third_party_latency: Dict[str, float] | None) -> Dict[str, float]:
+        """Construct the latency map, optionally enriched with third-party data."""
         service_latency = {
             # Original services
             "AWS API Gateway": 10, "AWS IAM": 8, "AWS QuickSight": 15,
@@ -2180,7 +2307,13 @@ class ServiceDataCache:
         if third_party_latency:
             service_latency.update(third_party_latency)
 
-        service_options = {
+        return service_latency
+
+
+    @staticmethod
+    def _build_service_options() -> Dict[str, List[str]]:
+        """Return the service options mapping used by the optimizer."""
+        return {
             # Original 6 components
             "api_gateway": ["AWS API Gateway", "Azure API Management", "GCP API Gateway"],
             "identity_management": ["AWS IAM", "Azure AD", "GCP IAM"],
@@ -2201,10 +2334,12 @@ class ServiceDataCache:
             # New 3 components for complete cross-provider compatibility
             "nosql_database": ["AWS DynamoDB", "Azure Cosmos DB", "GCP Firestore"],
             "event_streaming": ["AWS Kinesis", "Azure Event Hubs", "GCP Dataflow"],
-            "iot_platform": ["Azure IoT Hub", "GCP IoT Core"]
+            "iot_platform": ["Azure IoT Hub", "GCP IoT Core"],
         }
 
-        # Run price sanity check
+
+    def _run_price_sanity_check(self, service_costs: Dict[str, float]) -> Dict[str, Any]:
+        """Run and log the price sanity check for current cost map."""
         sanity_check = self.price_sanity_check(service_costs)
         if sanity_check["alerts"]:
             print(f"[PRICE VALIDATION] {len(sanity_check['alerts'])} price alerts:")
@@ -2213,18 +2348,109 @@ class ServiceDataCache:
                     print(f"  {alert}")
                 except UnicodeEncodeError:
                     print(f"  Price alert: {alert.encode('ascii', 'replace').decode('ascii')}")
-        print(f"[PRICE VALIDATION] {sanity_check['validation_rate']}% of prices validated ({sanity_check['validated_services']}/{sanity_check['total_checked']})")
+        print(
+            f"[PRICE VALIDATION] {sanity_check['validation_rate']}% of prices validated "
+            f"({sanity_check['validated_services']}/{sanity_check['total_checked']})"
+        )
+        return sanity_check
 
-        # Build detailed source tracking
-        pricing_sources = {
+
+    @staticmethod
+    def _build_pricing_sources_metadata(
+        aws_costs,
+        azure_costs,
+        gcp_costs,
+        success_rate: float,
+        service_sources: Dict[str, str],
+        sanity_check: Dict[str, Any],
+        api_success: Dict[str, bool],
+    ) -> Dict[str, Any]:
+        """Assemble pricing source metadata block for the response payload."""
+        return {
             "aws": "AWS Pricing API (Live)" if aws_costs else "Fallback Data",
-            "azure": "Azure Retail API (Live)" if azure_costs else "Fallback Data", 
+            "azure": "Azure Retail API (Live)" if azure_costs else "Fallback Data",
             "gcp": "GCP Billing API (Live)" if gcp_costs else "Fallback Data",
             "success_rate": f"{success_rate:.1f}%",
-            "live_services": len([k for k, v in service_sources.items() if '(Live)' in v]),
-            "fallback_services": len([k for k, v in service_sources.items() if 'Fallback' in v]),
-            "price_validation": sanity_check
+            "live_services": len(
+                [k for k, v in service_sources.items() if "(Live)" in v]
+            ),
+            "fallback_services": len(
+                [k for k, v in service_sources.items() if "Fallback" in v]
+            ),
+            "price_validation": sanity_check,
+            "api_status": api_success,
         }
+
+
+    def fetch_cloud_pricing_data(self) -> Dict[str, Any]:
+        """Fetch cloud pricing, latency, and options with robust fallbacks.
+
+        This is the main pricing orchestration method; its logic is split across
+        helpers to keep it testable and readable while preserving behavior.
+        """
+        print("[LIVE API] Fetching cloud pricing (fast mode)...")
+
+        if self._should_use_cached_fetch():
+            print("[LIVE API] Using 10-minute cache (avoiding repeated API calls)")
+            return self.cache if self.cache else self.get_fallback_data()
+
+        aws_costs, azure_costs, gcp_costs = self._fetch_all_provider_costs()
+        api_success, success_rate = self._log_api_success(
+            aws_costs, azure_costs, gcp_costs
+        )
+
+        third_party_latency = self._fetch_third_party_latency()
+
+        service_costs, service_sources = self._merge_provider_costs(
+            aws_costs, azure_costs, gcp_costs
+        )
+
+        self._apply_fallback_costs(service_costs, service_sources)
+
+        # Fast fallback strategy (may return fallback-only costs)
+        maybe_fallback_costs = self._apply_fast_fallback_strategy(
+            success_rate, service_costs, service_sources
+        )
+        if maybe_fallback_costs is not service_costs:
+            # We returned pure fallback pricing; build a minimal, consistent payload
+            fallback_data = self.get_fallback_data()
+            sanity_check = self._run_price_sanity_check(maybe_fallback_costs)
+            pricing_sources = self._build_pricing_sources_metadata(
+                aws_costs,
+                azure_costs,
+                gcp_costs,
+                success_rate,
+                {},
+                sanity_check,
+                api_success,
+            )
+            return {
+                "costs": maybe_fallback_costs,
+                "latency": fallback_data["latency"],
+                "options": fallback_data["options"],
+                "sources": {},
+                "timestamp": datetime.now().isoformat(),
+                "source": "fallback_realistic_dec2024",
+                "pricing_sources": pricing_sources,
+                "api_status": api_success,
+                "live_data_percentage": 0,
+                "price_validation": sanity_check,
+            }
+
+        service_latency = self._build_service_latency(third_party_latency)
+        service_options = self._build_service_options()
+
+        sanity_check = self._run_price_sanity_check(service_costs)
+
+        pricing_sources = self._build_pricing_sources_metadata(
+            aws_costs,
+            azure_costs,
+            gcp_costs,
+            success_rate,
+            service_sources,
+            sanity_check,
+            api_success,
+        )
 
         return {
             "costs": service_costs,
@@ -2232,11 +2458,18 @@ class ServiceDataCache:
             "options": service_options,
             "sources": service_sources,
             "timestamp": datetime.now().isoformat(),
-            "source": f"live_api_{success_rate:.0f}pct",  # Indicates live API usage
+            "source": f"live_api_{success_rate:.0f}pct",
             "pricing_sources": pricing_sources,
-            "api_status": api_success,  # Per-provider API status
-            "live_data_percentage": round(len([k for k, v in service_sources.items() if '(Live)' in v]) / len(service_sources) * 100, 1) if service_sources else 0,
-            "price_validation": sanity_check
+            "api_status": api_success,
+            "live_data_percentage": round(
+                len([k for k, v in service_sources.items() if "(Live)" in v])
+                / len(service_sources)
+                * 100,
+                1,
+            )
+            if service_sources
+            else 0,
+            "price_validation": sanity_check,
         }
 
     def get_fallback_data(self) -> Dict[str, Any]:

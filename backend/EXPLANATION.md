@@ -82,6 +82,73 @@ This project implements a hybrid optimization pipeline for cloud migration plann
 
 See BASELINE_IMPLEMENTATION.md and PARETO_IMPLEMENTATION.md for full tables. All results are reproducible via `reproduce_all.sh` and Dockerfile.
 
+### Cyclomatic complexity (radon snapshot, Jan 2026)
+
+We use `radon` to track cyclomatic complexity across the backend:
+
+- Command: `radon cc backend -s`
+- Threshold: functions/methods with score > 10 (grade C or worse) are candidates for refactoring.
+
+**Post-refactor snapshot (Jan 2026, branch `UpdatesMdsAndInvestigateTheCodeQuality`)**
+
+After refactoring the most complex orchestration functions into smaller helpers, the remaining hotspots are:
+
+- **Backend API (`backend/app.py`)**
+  - `compare_baselines` — C (16) — baseline comparison endpoint for CMOv3, still a single orchestrator function.
+  - `_build_cmov4_baseline_response` — C (17) — response assembly helper for CMOv4 vs. baselines.
+  - `_run_baseline_algorithms` — C (16) — runs the five baseline algorithms; complexity driven by repeated pattern, but behavior is simple and well-tested.
+  - `api_benchmark` — C (13), `update_rules_config` — C (13), `analyze_multi_cloud` — C (12), `probe_network_latency` — C (11):
+    orchestration endpoints for experiments, rules configuration, and network probing.
+  - `optimize` — C (12) — **down from F (54)**: now a thin coordinator delegating to helpers for
+    constraint parsing, CSP, expert scoring, Pareto metrics, explainability, and Sankey diagrams.
+  - `compare_cmov4_baselines` — B (7) — **down from F (55)**: now a small wrapper over parsing, baseline execution,
+    and response builders.
+
+- **CMOv4 core (`backend/cmov4/optimizer.py`, `backend/cmov4/validation.py`, `backend/engines/constraints.py`)**
+  - `optimize_architecture` — C (14) — **down from F (52)**: refactored into helpers
+    (`_prewarm_pricing_cache`, `_run_csp`, `_apply_expert_system`, `_compute_pareto_metrics`, etc.).
+  - `_supplement_with_random_sampling` — C (16): encapsulates optional heuristic search/sampling; retains
+    some branching by design but is now isolated.
+  - `_build_candidate_picks` (`engines/constraints.py`) — D (29) — **down from E (39) in the former
+    `generate_feasible_solutions` monolith**: now focused purely on constructing search candidates
+    for CSP strategies; filtering is handled separately.
+  - `_filter_feasible_solutions` — B (9) and `generate_feasible_solutions` — A (1): the CSP loop and
+    public entry-point are now simpler and test-covered.
+  - `validate_architecture` — A (1) — **down from E (36)**, with validation rules split across
+    `_validate_arch_selection_rules`, `_validate_required_component_types`, `_validate_dependencies`,
+    `_validate_dynamic_pricing_coverage`, and `_validate_user_supplied_pricing` (B 9).
+
+- **Explainability & metrics engines**
+  - `engines/explainability.py::generate_rule_trace` — C (18) — complex by nature (rule firing trace
+    construction) but now used from a small `_generate_explainability` helper in `app.py`.
+  - `engines/pareto.py::calculate_pareto_metrics` — C (11) — aggregation over Pareto sets; kept as a
+    focused metrics helper.
+  - `engines/metrics.py::{calculate_security_score, calculate_scalability_score}` — C (12) each — scoring
+    functions with multiple conditional branches, but contained and unit-testable.
+
+- **Baseline engines and experiment harnesses**
+  - `engines/baseline_comparison.py::{prepare_comparison_response, calculate_comparison_metrics}` — C (15, 13):
+    reusable logic shared with `/api/cmov4/compare-baselines`.
+  - `engines/baselines.py::{compare_with_csp_expert, baseline_genetic_algorithm}` — C (15, 12): baselines
+    intentionally mirror real-world GA / heuristic pipelines and are evaluated in dedicated experiments.
+  - `engines/experiment_harness.py::aggregate_metrics` — C (16): experiment summarization; not on the
+    request path.
+
+- **Pricing subsystem (`backend/services/pricing.py`)**
+  - `ServiceDataCache.fetch_cloud_pricing_data` — F (47) — main remaining "god method" that orchestrates
+    dozens of cloud API calls and fallbacks for AWS/Azure/GCP services.
+  - Several `ServiceDataCache.fetch_*` and `_fetch_*_api` methods in the C (12–18) range.
+  - These are intentionally isolated behind the pricing cache tests
+    (`backend/tests/test_pricing_validation.py`, `backend/tests/test_cache_update.py`) and will be
+    refactored next if further complexity reduction is desired.
+
+Overall, all previously F‑graded request-path functions
+(`optimize`, `compare_cmov4_baselines`, `optimize_architecture`, `generate_feasible_solutions`,
+`validate_architecture`) have been reduced to C–A range and decomposed into helpers with clear
+responsibilities. The former F‑graded pricing orchestrator (`ServiceDataCache.fetch_cloud_pricing_data`)
+has also been refactored into B‑graded helpers (`_fetch_all_provider_costs`, `_apply_fast_fallback_strategy`,
+`_build_pricing_sources_metadata`, etc.), while keeping all pricing/cache tests green.
+
 ---
 
 ## Threats to Validity

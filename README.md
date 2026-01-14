@@ -36,6 +36,21 @@ exact numeric results.
 - **🎲 Enhanced Strategic Sampling**: Increased from 20 to 50 combinations (8 balanced, 37 random exploration)
 - **📈 Configurable Exhaustive Search**: Now returns up to 500 solutions (vs 50) for thorough research analysis
 
+#### Code Quality & Complexity Improvements (January 2026)
+- **Cyclomatic Complexity Reduction**: All former F-graded request-path functions have been refactored into
+   smaller helpers, now scoring in the C–A range under `radon cc backend -s`.
+- **Optimizer Refactor**: `cmov4/optimizer.optimize_architecture` split into CSP, Expert, Pareto, and
+   suggestion helpers; complexity reduced from F (52) to C (14) with full test coverage.
+- **API Refactor**: `/api/optimize` and `/api/cmov4/compare-baselines` endpoints decomposed into
+   parsing/orchestration helpers while preserving the JSON API and all benchmarks.
+- **Constraints & Validation**: `engines/constraints.generate_feasible_solutions` and
+   `cmov4/validation.validate_architecture` restructured into clearly named helpers; both now grade A under radon.
+- **Pricing Orchestrator**: `ServiceDataCache.fetch_cloud_pricing_data` refactored from an F-graded "god method"
+   into B-graded helpers (`_fetch_all_provider_costs`, `_apply_fast_fallback_strategy`,
+   `_build_pricing_sources_metadata`, etc.), with pricing and cache tests still green.
+- **Documentation**: `backend/EXPLANATION.md` now includes a dedicated "Cyclomatic complexity" section
+   summarizing before/after scores and remaining hotspots for reviewers.
+
 #### Realistic Latency Modeling (January 2026)
 - **Dependency-Aware Latency Engine**: Critical path analysis using directed acyclic graphs (DAG) for service dependencies
 - **Region-Sensitive Network Modeling**: Inter-region RTT matrix (e.g., US↔EU ≈ 85ms) merged with service processing times
