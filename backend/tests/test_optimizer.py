@@ -235,29 +235,68 @@ class TestRuleEvaluation:
     def test_preferred_provider_bonus(self):
         """Test preferred provider gets bonus"""
         constraints = Constraints(maxBudget=5000, maxLatency=12, maxProviders=2)
+        preferences_none = Preferences()
         preferences_azure = Preferences(preferredProvider='Azure')
         preferences_aws = Preferences(preferredProvider='AWS')
-        
-        solutions = generate_feasible_solutions(constraints)
-        
-        if not solutions:
-            pytest.skip("No solutions generated")
-        
-        # Find solutions with different main providers
-        azure_sols = [s for s in solutions if any('Azure' in v for v in s.configuration.values())]
-        aws_sols = [s for s in solutions if any('AWS' in v for v in s.configuration.values())]
-        
-        if not azure_sols or not aws_sols:
-            pytest.skip("Need both Azure and AWS solutions")
-        
-        # Azure preference should favor Azure solutions
-        ranked_azure = evaluate_solutions(solutions, preferences_azure, max_budget=5000)
-        ranked_aws = evaluate_solutions(solutions, preferences_aws, max_budget=5000)
-        
-        # Top solution with Azure preference should consider Azure favorably
-        # (This is a soft preference, not a hard requirement)
-        assert len(ranked_azure) > 0
-        assert len(ranked_aws) > 0
+
+        # Construct two comparable solutions differing mainly by provider.
+        # This makes the test deterministic and independent of whatever
+        # generate_feasible_solutions happens to return.
+        base_cost = 100.0
+        base_latency = 10.0
+
+        azure_sol = Solution(
+            configuration={'api_gateway': 'Azure API Management', 'database': 'Azure SQL'},
+            cost=base_cost,
+            latency=base_latency,
+            providers=1,
+            providerDistribution={'Azure': 2},
+        )
+        aws_sol = Solution(
+            configuration={'api_gateway': 'AWS API Gateway', 'database': 'AWS RDS'},
+            cost=base_cost,
+            latency=base_latency,
+            providers=1,
+            providerDistribution={'AWS': 2},
+        )
+
+        solutions = [azure_sol, aws_sol]
+
+        # Baseline ranking with no preferred provider
+        ranked_none = evaluate_solutions(
+            solutions,
+            preferences_none,
+            max_budget=float(constraints.maxBudget),
+        )
+        score_azure_base = next(
+            s.score for s in ranked_none if s.providerDistribution.get('Azure', 0) > 0
+        )
+        score_aws_base = next(
+            s.score for s in ranked_none if s.providerDistribution.get('AWS', 0) > 0
+        )
+
+        # With Azure preference, Azure score should not decrease (soft bonus)
+        ranked_azure = evaluate_solutions(
+            solutions,
+            preferences_azure,
+            max_budget=float(constraints.maxBudget),
+        )
+        score_azure_pref = next(
+            s.score for s in ranked_azure if s.providerDistribution.get('Azure', 0) > 0
+        )
+
+        # With AWS preference, AWS score should not decrease (soft bonus)
+        ranked_aws = evaluate_solutions(
+            solutions,
+            preferences_aws,
+            max_budget=float(constraints.maxBudget),
+        )
+        score_aws_pref = next(
+            s.score for s in ranked_aws if s.providerDistribution.get('AWS', 0) > 0
+        )
+
+        assert score_azure_pref >= score_azure_base
+        assert score_aws_pref >= score_aws_base
 
 
 # Test runner

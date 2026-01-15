@@ -129,6 +129,14 @@ def api_benchmark():
     print(f"[DEBUG] preferences: {preferences}", file=sys.stderr)
     if preferences:
         scenario['preferences'] = preferences
+
+    # If a single preferred provider is specified, restrict CMOv4 to that provider only
+    # by updating requiredProviders in the scenario constraints. This keeps CMOv4
+    # solutions and Sankey diagrams consistent with the "one cloud" selection while
+    # still allowing CMOv3 baselines to compute maxProviders from this list.
+    preferred = preferences.get('preferredProvider') if preferences else None
+    if preferred:
+        scenario.setdefault('constraints', {})['requiredProviders'] = [preferred]
     
     print(f"[DEBUG] scenario with usage_profile and preferences: {scenario}", file=sys.stderr)
     results = run_benchmark([scenario])

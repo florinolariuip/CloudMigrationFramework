@@ -70,10 +70,11 @@
   // Latency model selection
   const [latencyModel, setLatencyModel] = useState('avg_latency');
 
-      // Custom scenario
-      const [customArchPattern, setCustomArchPattern] = useState('microservices');
-      const [customComponents, setCustomComponents] = useState([]);
-      const [customProviders, setCustomProviders] = useState(['AWS', 'Azure', 'GCP']);
+    // Custom scenario
+    const [customArchPattern, setCustomArchPattern] = useState('microservices');
+    const [customComponents, setCustomComponents] = useState([]);
+    // Always keep all three providers selected for academic consistency
+    const [customProviders, setCustomProviders] = useState(['AWS', 'Azure', 'GCP']);
       const [searchStrategy, setSearchStrategy] = useState('heuristic');
       const [sampleSize, setSampleSize] = useState('1000');
 
@@ -544,8 +545,8 @@
           )}
 
           {/* Validation Cards */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
-            {/* Unit Tests Card */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+            {/* Unit Tests Card (Core Optimization Suite) */}
             <div className="bg-gradient-to-br from-emerald-500/20 to-green-500/20 backdrop-blur-md rounded-xl p-6 border border-emerald-500/30 shadow-xl">
               <div className="flex items-start justify-between mb-4">
                 <div>
@@ -553,7 +554,7 @@
                     <span className="text-2xl">✅</span>
                     Unit Test Coverage
                   </h3>
-                  <p className="text-emerald-200/80 text-sm mt-1">Comprehensive validation suite</p>
+                  <p className="text-emerald-200/80 text-sm mt-1">Core optimization validation suite</p>
                 </div>
                 <div className="bg-emerald-500/30 rounded-lg px-3 py-1 text-emerald-200 font-bold text-sm">
                   14/14 PASSED
@@ -589,8 +590,52 @@
               
               <div className="pt-3 border-t border-emerald-500/30">
                 <p className="text-xs text-emerald-200/70">
-                  All core algorithms validated: constraint satisfaction, deduplication (50% reduction), 
+                  All core optimization algorithms validated: constraint satisfaction, deduplication (~50% reduction), 
                   Pareto non-dominance, budget-adaptive thresholds, and instance count scaling.
+                </p>
+              </div>
+            </div>
+
+            {/* Extended Backend Tests Card */}
+            <div className="bg-gradient-to-br from-emerald-500/15 to-teal-500/20 backdrop-blur-md rounded-xl p-6 border border-emerald-400/30 shadow-xl">
+              <div className="flex items-start justify-between mb-4">
+                <div>
+                  <h3 className="text-xl font-bold text-emerald-200 flex items-center gap-2">
+                    <span className="text-2xl">🧪</span>
+                    Extended Backend Tests
+                  </h3>
+                  <p className="text-emerald-100/80 text-sm mt-1">Pricing, caching, explainability & baselines</p>
+                </div>
+                <div className="bg-emerald-500/20 rounded-lg px-3 py-1 text-emerald-100 font-bold text-xs text-right">
+                  Full backend suite
+                  <br />
+                  <span className="font-normal opacity-80">32 tests · 10 subtests</span>
+                </div>
+              </div>
+
+              <ul className="text-xs text-emerald-100/90 space-y-2 mb-4 list-disc list-inside">
+                <li>
+                  <span className="font-semibold">Pricing validation:</span> live Azure Retail API vs. static tables, 
+                  fallback coverage, and price sanity checks.
+                </li>
+                <li>
+                  <span className="font-semibold">Caching behavior:</span> ServiceDataCache TTL refresh, stale vs. fresh 
+                  pricing, and cache invalidation paths.
+                </li>
+                <li>
+                  <span className="font-semibold">Explainability metrics:</span> explanation accuracy, label thresholds 
+                  (High / Moderate / Needs Review), and consistency across runs.
+                </li>
+                <li>
+                  <span className="font-semibold">Baseline comparisons:</span> CMOv3 vs. CMOv4 cost/latency parity checks 
+                  and sanity checks for hypervolume-based improvements.
+                </li>
+              </ul>
+
+              <div className="pt-3 border-t border-emerald-500/30">
+                <p className="text-xs text-emerald-200/70">
+                  These tests complement the core 14/14 optimization suite and validate the surrounding infrastructure: 
+                  live pricing, caching, explainability metrics, and baseline comparison logic.
                 </p>
               </div>
             </div>
@@ -771,10 +816,18 @@
 
               <div className="bg-gradient-to-r from-orange-500/20 to-red-500/20 backdrop-blur-md rounded-xl p-6 border border-orange-500/30">
                 <h3 className="font-semibold text-orange-200 mb-3">Providers</h3>
-                <div className="flex gap-4">
+                <p className="text-xs text-orange-200/80 mb-2">
+                  Fixed for experiments: all three major cloud providers are always considered.
+                </p>
+                <div className="flex gap-4 opacity-70 cursor-not-allowed">
                   {['AWS','Azure','GCP'].map(p => (
-                    <label key={p} className="text-sm flex items-center gap-2 px-4 py-2 bg-white/10 backdrop-blur-md border border-orange-500/30 rounded-lg hover:bg-white/20 transition cursor-pointer">
-                      <input type="checkbox" checked={customProviders.includes(p)} onChange={() => setCustomProviders(prev => prev.includes(p) ? prev.filter(x=>x!==p) : [...prev, p])} className="w-4 h-4" />
+                    <label key={p} className="text-sm flex items-center gap-2 px-4 py-2 bg-white/10 backdrop-blur-md border border-orange-500/30 rounded-lg">
+                      <input
+                        type="checkbox"
+                        checked={customProviders.includes(p)}
+                        readOnly
+                        className="w-4 h-4 cursor-not-allowed"
+                      />
                       <span className="text-orange-100">{p}</span>
                     </label>
                   ))}

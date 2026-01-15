@@ -222,9 +222,23 @@ def _supplement_with_random_sampling(
     costs = get_service_costs()
     latencies = get_service_latency()
 
-    max_budget = constraints.get("maxBudget", 10000)
+    max_budget = constraints.get("maxBudget", 5000)
     max_latency = constraints.get("maxLatency", 150)
     max_providers = constraints.get("maxProviders", 3)
+
+    # If the scenario specifies requiredProviders, restrict service options
+    # to only those providers. This keeps randomly supplemented solutions
+    # aligned with the user's provider selection and ensures Sankey
+    # diagrams reflect only the allowed providers.
+    required_providers = constraints.get("requiredProviders")
+    if required_providers:
+        required_set = set(required_providers)
+        filtered_options = {}
+        for comp, svc_list in options.items():
+            allowed = [svc for svc in svc_list if svc.split()[0] in required_set]
+            if allowed:
+                filtered_options[comp] = allowed
+        options = filtered_options
 
     max_attempts = 50
     target_supplement = max(0, 20 - len(feasible_solutions))
@@ -309,7 +323,7 @@ def _build_suggestions_if_empty(
         return suggestions
 
     component_count = len(selected_components) if selected_components else 0
-    max_budget = constraints.get("maxBudget", 10000)
+    max_budget = constraints.get("maxBudget", 5000)
     max_latency = constraints.get("maxLatency", 150)
     max_providers = constraints.get("maxProviders", 3)
 
