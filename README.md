@@ -437,7 +437,7 @@ All parameters are configurable for experimentation:
 
 ### Enterprise Cloud Migration
 - **Scenario**: Migrate on-premises application to multi-cloud environment
-- **Constraints**: Budget $5000/month, latency <150ms, max 2 providers
+- **Constraints**: Budget $5000/month, latency <150ms, up to 3 providers (AWS, Azure, GCP)
 - **Output**: Optimal service selection across AWS, Azure, GCP with cost/latency breakdown
 
 ### Academic Research

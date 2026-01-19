@@ -1,6 +1,6 @@
 algorithm,cost,latency,hypervolume,success,iterations,reason
-Random Selection,6104.89,21.27777777777778,,True,1,Found valid solution after 1 random attempts
+Random Selection,1323.74,20.38888888888889,,True,1,Found valid solution after 1 random attempts
 Greedy-Cost,436.5,21.166666666666664,,True,1,Greedy cost minimization successful
 Greedy-Latency,1082.32,14.0,,True,1,Greedy latency minimization successful
-Genetic Algorithm,465.88,20.77777777777778,,True,600,GA converged after 30 generations
+Genetic Algorithm,575.41,20.5,,True,600,GA converged after 30 generations
 Weighted Sum,1078.05,20.0,,True,1,"Weighted sum (cost=0.50, latency=0.50) successful"

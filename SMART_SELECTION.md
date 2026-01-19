@@ -182,7 +182,7 @@ Controls how many solutions the CSP explores:
 - Architecture pattern: Microservices
 - Search strategy: Adaptive
 - Sample size: 1000
-- Providers: All three (AWS, Azure, GCP)
+- Providers: All three (AWS, Azure, GCP). In the CMOv4 UI these are fixed for the main experiments; custom scripts or API clients may still override `requiredProviders` for alternative studies.
 
 ---
 

@@ -357,7 +357,7 @@ def load_balancer_availability(self, cost):
 
 ### 6.1 Search Strategy Comparison
 
-**Test Configuration:**
+**Test Configuration (example scenario):**
 - 15 components, 3 providers each
 - Budget: $3000, Latency: 12ms, Max Providers: 2
 - Machine: MacBook Pro M1

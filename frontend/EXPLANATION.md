@@ -71,7 +71,7 @@ improvements (reduced cyclomatic complexity in critical request paths and pricin
 ## Configuration Options
 
 ### 1. Hard Constraints (CSP Phase)
-- **Max Budget**: Default $10,000/month (updated from restrictive $5,000)
+- **Max Budget**: Default $5,000/month
 - **Max Latency**: Default 150ms (updated from restrictive 12ms)
 - **Max Providers**: Default 3 providers (updated from restrictive 2)
 - **Performance Metric**: Average latency, tail latency (p95), or throughput
@@ -113,7 +113,7 @@ improvements (reduced cyclomatic complexity in critical request paths and pricin
 
 ### CMOv3 (Production System)
 1. **Access**: Navigate to `http://localhost:8080`
-2. **Configure**: Set realistic constraints (budget $10K, latency 150ms, 3 providers)
+2. **Configure**: Use the default experimental constraints (budget $5K, latency 150ms, 3 providers). In the UI, the provider count is fixed to 3 (AWS, Azure, GCP) for reproducible multi-cloud experiments.
 3. **Optimize**: Run CSP+Expert optimization (<500ms)
 4. **Analyze**: Review Pareto frontier, explainability, and baseline comparisons
 5. **Export**: Download results for academic analysis
@@ -126,7 +126,7 @@ improvements (reduced cyclomatic complexity in critical request paths and pricin
 5. **Generate Report**: Create professional PDF documentation
 
 ### Best Practices
-- **Start with defaults**: Use updated realistic constraints ($10K budget, 150ms latency)
+- **Start with defaults**: Use updated realistic constraints ($5K budget, 150ms latency, 3 providers)
 - **Use timeout protection**: All operations complete within 10 seconds
 - **Handle zero solutions**: Follow intelligent suggestions when constraints too restrictive
 - **Compare architectures**: Use both CMOv3 and CMOv4 for comprehensive analysis
@@ -147,7 +147,7 @@ Explanation Accuracy is computed on the client using score integrity, constraint
 
 ## Example Combinations
 
-- **Providers:** Mix AWS, Azure, and GCP services as allowed by your maxProviders setting.
+- **Providers:** Mix AWS, Azure, and GCP services. For the public UI and paper experiments, we fix `maxProviders = 3` (all three providers); alternative provider counts are only used in custom API/experiment configurations.
 - **Services:** For each component (API Gateway, Database, etc.), select from available provider options.
 - **SKUs:** (Planned) Select specific SKUs for each service for more accurate cost modeling.
 
@@ -167,9 +167,9 @@ Explanation Accuracy is computed on the client using score integrity, constraint
 
 ### Common Issues & Solutions
 - **Zero feasible solutions**: System now provides intelligent suggestions
-  - Increase budget from $10K to $15K+
+  - Increase budget from $5K to $10K+
   - Relax latency from 150ms to 200ms+
-  - Allow more providers (increase from 3)
+  - (Advanced only, via API/experiments) adjust provider-related constraints; the UI keeps 3 providers fixed for consistency.
 - **Performance issues**: All operations now complete within 10 seconds
 - **Pricing problems**: Live Azure API with 100% success rate, fallback mechanisms
 - **Baseline freezes**: Fixed genetic algorithm optimization (40s+ → <10s)
