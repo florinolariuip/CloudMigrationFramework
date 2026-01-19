@@ -2,9 +2,9 @@
 
 ## Overview
 
-The **Normalized MCDA Interface** (`index_normalized.html`) provides an advanced, academically rigorous approach to cloud migration optimization using **6-metric normalization** with **configurable weights** and **real-time validation**.
+The **Normalized MCDA Interface** (`index_normalized.html`) is an advanced, research-oriented UI built on top of the same CSP + Expert + Pareto optimization pipeline used by CMOv3/CMOv4. It exposes **6-metric normalization** with **configurable weights** and **real-time validation** for scenarios where a single aggregated score is useful in addition to the Pareto frontier.
 
-This implementation follows established MCDA research methodologies and provides transparency in multi-objective decision making.
+This implementation follows established MCDA research methodologies and provides transparency in multi-objective decision making. It complements (rather than replaces) the main `index.html` and `cmov4.html` flows by re-scoring feasible solutions returned by the backend using a normalized weighted-sum model.
 
 ---
 
@@ -83,18 +83,20 @@ Frontend Display
 Pareto Frontier + Sankey + Explanation Card
 ```
 
-### API Endpoint
+### API Usage
 
-**POST** `/api/experiment`
+In the current implementation, normalized MCDA runs on top of the standard optimization APIs (for example, `/api/optimize` or `/api/benchmark`), which first generate a set of feasible solutions via CSP + Expert + Pareto. Those solutions are then passed through the normalized MCDA scoring function (`evaluate_solutions_normalized`) in `backend/engines/rules.py`.
 
-**Request:**
+An earlier experimental setup used a dedicated endpoint such as `/api/experiment`. The effective payload shape is still the same when invoking MCDA scoring explicitly:
+
+**Example request body:**
 ```json
 {
-  "constraints": {
-    "maxBudget": 5000,
-    "maxLatency": 12,
-    "maxProviders": 3
-  },
+   "constraints": {
+      "maxBudget": 5000,
+      "maxLatency": 150,
+      "maxProviders": 3
+   },
   "weights": {
     "cost": 0.30,
     "latency": 0.20,
@@ -146,7 +148,7 @@ Pareto Frontier + Sankey + Explanation Card
 
 ### 1. **Constraints Panel**
 - Max Budget: Default $5,000
-- Max Latency: Default 12ms
+- Max Latency: Default 150ms (tight experimental scenarios may still use values like 12ms)
 - Max Providers: Default 3 (1, 2, or 3)
 
 ### 2. **Weights Configuration**

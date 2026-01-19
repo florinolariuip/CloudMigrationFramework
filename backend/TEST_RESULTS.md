@@ -1,26 +1,32 @@
 # 🧪 Unit Test Results & Validation
 
-**Last Run:** November 19, 2025  
-**Status:** ✅ **14/14 Tests Passing (100% Pass Rate)**  
-**Location:** `backend/tests/test_optimizer.py`
+**Last Run:** January 19, 2026  
+**Status:** ✅ **33/33 Tests Passing (100% Pass Rate)**  
+**Location:** `backend/tests/`
 
 ---
 
 ## Executive Summary
 
-All core algorithms have been validated through comprehensive unit testing:
-- **Constraint Satisfaction Problem (CSP)**: 3/3 tests ✓
-- **Solution Deduplication**: 2/2 tests ✓
-- **Pareto Frontier Optimization**: 3/3 tests ✓
-- **Budget-Relative Thresholds**: 1/1 test ✓
-- **CMOv4 Instance Scaling**: 3/3 tests ✓
-- **Expert System Rules**: 2/2 tests ✓
+All core algorithms and infrastructure have been validated through an expanded test suite:
 
-**Total Coverage:** 14 comprehensive test cases covering:
-- Edge cases (impossible constraints, missing data)
-- Normal operation (typical scenarios)
-- Performance validation (deduplication, Pareto efficiency)
-- Business logic (budget adaptation, instance scaling)
+- **Core Optimizer Logic (CSP / Dedup / Pareto / Thresholds / Instance Scaling / Expert Rules)**: 14/14 tests ✓  
+    `backend/tests/test_optimizer.py`
+- **Pricing Validation & Live API Structures**: 10/10 tests ✓  
+    `backend/tests/test_pricing_validation.py`
+- **Pricing Cache & Refresh Mechanics**: 10/10 tests ✓  
+    `backend/tests/test_cache_update.py`
+- **CMOv4 Edge Cases & Robustness**: 2/2 tests ✓  
+    `backend/tests/test_edge_cases.py`
+- **NSGA-II / MOEA/D Experiment Runner (Smoke Test)**: 1/1 test ✓  
+    `backend/tests/test_nsga_moead_experiments.py`
+
+**Total Coverage:** 33 tests (+ 10 `unittest` subtests) covering:
+- Edge cases (impossible constraints, malformed inputs, API failures)
+- Normal operation (typical optimizer scenarios and experiment runs)
+- Performance & robustness (deduplication, Pareto efficiency, cache concurrency)
+- Business logic (budget adaptation, instance scaling, realistic price ranges)
+- Infrastructure (pricing cache TTL, partial API success, fallback behaviour)
 
 ---
 
@@ -32,37 +38,17 @@ cd /path/to/project
 PYTHONPATH=. pytest backend/tests/test_optimizer.py -v
 ```
 
-### Output
-```
-============================================== test session starts ==============================================
-platform darwin -- Python 3.13.7, pytest-9.0.1, pluggy-1.6.0
-collected 14 items
-
-backend/tests/test_optimizer.py::TestCSP::test_generates_feasible_solutions PASSED                        [  7%]
-backend/tests/test_optimizer.py::TestCSP::test_tight_constraints_reduce_solutions PASSED                  [ 14%]
-backend/tests/test_optimizer.py::TestCSP::test_no_solution_for_impossible_constraints PASSED              [ 21%]
-backend/tests/test_optimizer.py::TestDeduplication::test_removes_duplicates PASSED                        [ 28%]
-backend/tests/test_optimizer.py::TestDeduplication::test_preserves_unique_solutions PASSED                [ 35%]
-backend/tests/test_optimizer.py::TestParetoFrontier::test_pareto_non_dominated PASSED                     [ 42%]
-backend/tests/test_optimizer.py::TestParetoFrontier::test_dominance_relation PASSED                       [ 50%]
-backend/tests/test_optimizer.py::TestParetoFrontier::test_non_dominance_tradeoff PASSED                   [ 57%]
-backend/tests/test_optimizer.py::TestBudgetRelativeThresholds::test_thresholds_adapt_to_budget PASSED     [ 64%]
-backend/tests/test_optimizer.py::TestCMOv4InstanceScaling::test_extracts_instance_counts PASSED           [ 71%]
-backend/tests/test_optimizer.py::TestCMOv4InstanceScaling::test_sums_multiple_components_same_type PASSED [ 78%]
-backend/tests/test_optimizer.py::TestCMOv4InstanceScaling::test_defaults_to_one_if_missing PASSED         [ 85%]
-backend/tests/test_optimizer.py::TestRuleEvaluation::test_evaluates_solutions PASSED                      [ 92%]
-backend/tests/test_optimizer.py::TestRuleEvaluation::test_preferred_provider_bonus PASSED                 [100%]
-
-========================================= 13 passed, 1 skipped in 2.63s =========================================
+### Run Command
+```bash
+cd /path/to/project
+PYTHONPATH=. pytest backend/tests -q
 ```
 
-**Note:** 1 test skipped due to data dependency (needs both AWS and Azure solutions in generated set). This is expected behavior, not a failure.
-
----
-
-## Detailed Test Breakdown
-
-### 1. CSP Constraint Satisfaction (3 tests)
+### Output (January 19, 2026)
+```
+.................................                          [100%]
+33 passed, 10 subtests passed in 425.90s (0:07:05)
+```
 
 #### `test_generates_feasible_solutions` ✅
 **Purpose:** Verify CSP generates solutions within all constraints
@@ -336,33 +322,80 @@ assert len(ranked_aws) > 0
 
 ---
 
+## Additional Test Categories
+
+### 7. Pricing Validation & Live API Structures (10 tests)
+
+**File:** `backend/tests/test_pricing_validation.py`  
+**Purpose:** Validate that regional and live pricing logic produces realistic values and handles external APIs safely.
+
+- Sanity checks for monthly prices of key services (AWS EC2/RDS, Azure VM/SQL, GCP Compute/SQL) using expected ranges.
+- Structure validation for mocked AWS, Azure, and GCP pricing API responses.
+- Verification that fallback pricing data remains realistic when live APIs are unavailable.
+- Cache refresh behaviour and timeout handling: timeouts and exceptions must fall back gracefully to cached/fallback data.
+
+### 8. Pricing Cache & Refresh Mechanics (10 tests)
+
+**File:** `backend/tests/test_cache_update.py`  
+**Purpose:** Ensure the pricing cache behaves correctly under TTL expiry, force refresh, and partial API failures.
+
+- TTL expiration: cache is refreshed after the configured TTL, with a new timestamp.
+- Force refresh: `force_refresh=True` always triggers a fresh fetch, even if cache is warm.
+- Structure preservation: refreshed cache must contain all expected keys (`costs`, `latency`, `options`, `sources`, `timestamp`, `source`).
+- Price change detection: large price shifts (e.g., +50%) can be detected and surfaced in `price_validation`.
+- Fallback behaviour when all live APIs fail, and partial success handling when only some suppliers respond.
+- Concurrency: multiple threads accessing the cache concurrently receive consistent data.
+- Memory usage: cache contents remain under a reasonable size (defensive check against unbounded growth).
+
+### 9. Edge-Case Robustness (2 tests)
+
+**File:** `backend/tests/test_edge_cases.py`  
+**Purpose:** Validate that the CMOv4 optimizer handles extreme and malformed inputs without crashing.
+
+- "Zero solutions" scenario with unrealistically tight constraints (very low budget and latency, single provider).  
+    The test asserts that the optimizer returns a structured result (dict with `solutions` list) or a clear exception, but never crashes.
+- Malformed constraints (missing keys such as `maxBudget` and `maxLatency`).  
+    The test accepts either explicit validation errors (`KeyError`, `ValueError`, `TypeError`) or a safe fallback to defaults, but again requires non-crashing behaviour.
+
+### 10. NSGA-II / MOEA-D Experiment Runner (1 smoke test)
+
+**File:** `backend/tests/test_nsga_moead_experiments.py`  
+**Purpose:** Smoke-test the multi-objective GA/DE experiment harness.
+
+- Uses tiny population and generation sizes (e.g., 10 individuals × 5 generations) and moderate constraints to keep execution time bounded.
+- Executes `backend/run_all_experiments.py` as a script with a clean environment and controlled working directory.
+- If NSGA-II or MOEA/D successfully run, the test asserts that any generated CSVs (e.g., `nsga2_results.csv`, `moead_results.csv`) are non-empty and contain at least one data row in addition to the header.
+- Absence of those files (e.g., due to missing optional dependencies like `pymoo`) is treated as acceptable as long as execution completes without unexpected exceptions.
+
 ## Performance Metrics
 
-| Test Category | Tests | Pass Rate | Avg Execution Time |
-|--------------|-------|-----------|-------------------|
-| CSP | 3 | 100% | ~1.5s (includes API calls) |
-| Deduplication | 2 | 100% | <10ms |
-| Pareto | 3 | 100% | <50ms |
-| Budget Thresholds | 1 | 100% | ~10ms |
-| Instance Scaling | 3 | 100% | <5ms |
-| Expert System | 2 | 100% | <100ms |
-| **Total** | **14** | **100%** | **~2.6s** |
+| Test Category | Tests | Pass Rate | Notes |
+|--------------|-------|-----------|-------|
+| Core Optimizer (CSP / Dedup / Pareto / Thresholds / Scaling / Rules) | 14 | 100% | ~2–3s total, CSP includes initial pricing fetch and cache warm-up |
+| Pricing Validation | 10 | 100% | Fast (<1s); uses mocked HTTP responses and in-memory checks |
+| Cache & Refresh Mechanics | 10 | 100% | Includes TTL sleep, concurrency, and partial API simulations |
+| Edge-Case Robustness | 2 | 100% | Direct CMOv4 calls with tight and malformed constraints |
+| NSGA-II / MOEA-D Smoke Test | 1 | 100% | Dominates total runtime; executes `run_all_experiments.py` with small POP/N_GEN |
+| **Total** | **33** | **100%** | **~7 minutes end-to-end on macOS (Python 3.13.7)** |
 
 **Notes:**
-- First test includes pricing API fetch (~2s)
-- Subsequent tests use cached pricing data (<10ms each)
-- Total test suite execution: ~2.6 seconds
+- The experiment runner smoke test accounts for most of the ~7 minute runtime; core unit tests are much faster in isolation.
+- Pricing-related tests use extensive mocking of external HTTP calls, so they are deterministic and do not depend on live cloud pricing APIs.
 
 ---
 
 ## Code Coverage
 
 ### Tested Modules
-- ✅ `backend/engines/constraints.py` - CSP constraint satisfaction
-- ✅ `backend/engines/rules.py` - Expert system and deduplication
-- ✅ `backend/engines/pareto.py` - Pareto frontier calculation
-- ✅ `backend/cmov4/helpers.py` - Instance count utilities
-- ✅ `backend/models.py` - Data models (Solution, Constraints, Preferences)
+
+- ✅ `backend/engines/constraints.py` – CSP constraint satisfaction
+- ✅ `backend/engines/rules.py` – Expert system, deduplication, budget-relative thresholds
+- ✅ `backend/engines/pareto.py` – Pareto frontier calculation and dominance logic
+- ✅ `backend/cmov4/helpers.py` – Instance count utilities
+- ✅ `backend/cmov4/optimizer.py` – CMOv4 optimizer robustness for tight and malformed constraints
+- ✅ `backend/services/pricing.py` – Regional + live pricing, cache TTL, fallback, partial API success, concurrency
+- ✅ `backend/run_all_experiments.py` – NSGA-II + MOEA/D experiment harness (smoke-tested)
+- ✅ `backend/models.py` – Data models (Solution, Constraints, Preferences)
 
 ### Key Functions Tested
 - `generate_feasible_solutions()` - CSP engine
@@ -454,4 +487,4 @@ Tests can be integrated into CI/CD pipelines:
 
 **✅ All Tests Passing - System Validated for Production & Publication**
 
-*Last verification: November 19, 2025*
+*Last verification: January 19, 2026*

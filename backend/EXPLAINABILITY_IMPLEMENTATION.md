@@ -1,30 +1,37 @@
 # Explainability Implementation
 
 ## Overview
-This document describes the explainability features of the Hybrid CSP + Expert System approach for cloud migration optimization, emphasizing academic rigor and transparency.
+This document describes the explainability features of the Hybrid CSP + Expert System + Pareto approach implemented in CMOv3 and CMOv4. The goal is to make every optimization run auditable end‑to‑end: from raw constraints and pricing, through rule evaluation, to the final Pareto‑ranked solutions and academic PDF reports.
 
 ## Key Explainability Features
 
-1. **Constraint Proofs**
-   - Shows exact calculations for each constraint (budget, latency, provider count, dependencies).
-   - Example: Budget check displays the sum of all service costs and compares to the allowed maximum.
-   - Provides mathematical traceability for all constraint validation.
+1. **Constraint Proofs (backend.engines.explainability.generate_constraint_proof)**
+   - For each evaluated solution, the backend constructs a constraint proof object that shows how key constraints were checked:
+     - Budget: total monthly cost versus `maxBudget` (default ≈ $5,000).
+     - Latency: end‑to‑end latency versus `maxLatency` (default ≈ 150 ms).
+     - Provider limits: number of distinct providers versus `maxProviders` (default = 3).
+     - Feasibility flags from the CSP engine.
+   - These proofs are attached to the JSON payload returned by the optimization and benchmark endpoints and can be rendered directly in the UI or exported into the academic PDF report.
 
-2. **Rule Traces**
-   - Logs which expert rules fired for each solution and why.
-   - Includes rule name, condition evaluated, and points added or subtracted.
-   - Provides full transparency into the scoring logic.
-   - Supports reproducibility and auditability.
+2. **Rule Traces (backend.engines.explainability.generate_rule_trace)**
+   - The Expert System (implemented on top of the rules engine in `backend.engines.rules`) evaluates every feasible solution with 20+ business rules.
+   - For each solution, the backend builds a rule trace that contains:
+     - Rule identifier and category (e.g., provider diversity, latency sensitivity, budget adaptation).
+     - Condition outcome (triggered / not triggered).
+     - Score impact (points added or subtracted from the solution score).
+   - Rule traces are returned alongside solutions in API responses so the frontend and PDF generator can show “why this architecture scored higher”.
 
-3. **Decision Path**
-   - Step-by-step reasoning from constraints to final solution selection.
-   - Details how many combinations were generated, filtered, scored, and ranked.
-   - Enables validation of optimization process.
+3. **Decision Path (backend.engines.explainability.generate_decision_path)**
+   - The decision path summarizes the full journey from raw constraints and preferences to the final ranked set of solutions. It typically includes:
+     - How many combinations the CSP engine generated (strategic sampling in CMOv4, exhaustive or constrained search in CMOv3).
+     - How many solutions remained after constraint filtering and deduplication.
+     - How many solutions were scored by the Expert System and how many survived Pareto filtering.
+   - This path is used both in the API responses and in the academic report generator to provide a high‑level narrative of the optimization process.
 
-4. **Comparison with Baselines**
-   - Shows how explainability in the hybrid approach exceeds that of baseline algorithms.
-   - Baselines typically lack detailed reasoning or constraint proofs.
-   - Quantified through explainability scoring in academic experiments.
+4. **Explainability Metrics and Comparison with Baselines (backend.engines.explainability.compare_explainability)**
+   - The framework includes utilities to compare the explainability of the hybrid approach against baseline algorithms (GA, greedy, random, weighted sum).
+   - Baselines are executed through `backend.engines.baselines`, and their outputs are wrapped with minimal metadata (cost, latency, iterations, convergence reason).
+   - The hybrid approach enriches these results with constraint proofs, rule traces, and decision paths; the comparison function highlights this gap so that academic experiments can report not only performance metrics but also explainability advantages.
 
 ## Research Value
 - Explainability supports reproducibility, auditability, and trust in optimization results.
@@ -33,61 +40,32 @@ This document describes the explainability features of the Hybrid CSP + Expert S
 - Addresses the "black-box" problem common in optimization algorithms.
 
 ---
-For examples, see the per-run explainability data and decision traces in the main application interface.
+For examples, see the per‑run explainability data and decision traces in the main application interface and in the academic PDF report.
 
 ---
 
-## What the Sankey shows (experiments)
+## Visual Explainability: Sankey and Latency Graphs
 
-- Cost allocation by component/provider within a selected solution.
-- Identify cost drivers (thick flows) and optimization targets.
+- **Cost Sankey diagrams** (`backend.engines.sankey.generate_sankey_data`)
+   - Show cost allocation by component and provider within a selected solution.
+   - Highlight cost drivers via thicker flows (for example, expensive databases or cross‑region data transfer).
+   - Are generated on demand for any solution returned by the optimizer and embedded both in the frontend and in the academic report.
+- **Latency Sankey / critical‑path views** (`backend.engines.sankey.generate_latency_sankey` and `backend/engines/latency_graph.py`)
+   - Visualize latency contributions along the critical path in the architecture graph.
+   - Help explain why two solutions with similar average latency may still differ in tail behavior or dependency structure.
 
-### Example interpretation (first run per N)
+### Example Interpretation (from experiments)
 
-- N=5: Non‑dominated points; Sankey highlights drivers between Min Cost (170.77, 11.20ms, 1 provider) and Min Latency (255.01, 10.00ms, 1 provider).
-- N=10: Balanced (543.79, 9.70ms, 2 providers) shows cross‑provider split—trading locality/performance vs. price.
-- N=15: Degenerate frontier (676.37, 9.00ms, 1 provider) → single dominant cost path; limited optimization room.
+- For small component counts (e.g., 5 components), non‑dominated solutions often reflect simple single‑provider deployments where Sankey diagrams highlight which core service dominates cost.
+- For medium architectures (e.g., 10 components), “balanced” solutions show clear cross‑provider splits, making it easy to explain how moving specific components between providers trades cost against latency.
+- For larger architectures (e.g., 15 components), degenerate frontiers can emerge where one configuration dominates in both cost and latency; here, Sankey still helps identify which components leave little room for further optimization.
 
-## Rule trace (template)
+## Academic PDF Report Integration
 
-Use this table to log rule effects from the backend explainability payload.
+The academic report generator (`backend/academic_report_generator.py`) consumes the same explainability payloads returned by the API:
 
-| Rule ID | Description | Triggered | Effect | Note |
-|---|---|---|---|---|
-| R-CACHE-1 | Prefer cache with read‑heavy workloads | Yes/No | Lowers read latency | — |
-| R-CDN-2 | Use CDN when global users | Yes/No | Improves latency, adds provider | — |
-| R-PROV-1 | Limit providers ≤ 2 | Yes | Prunes multi‑cloud variants | Binding constraint |
+- Constraint proofs and decision paths are summarized in dedicated sections that describe the optimization process and feasibility checks.
+- Rule traces feed into narrative explanations of why selected architectures are preferable (for example, emphasizing cache usage for read‑heavy workloads or CDN adoption for global traffic).
+- Pareto frontiers and Sankey diagrams are embedded as figures to visually communicate trade‑offs and cost/latency drivers.
 
-## Extremes table (from experiments)
-
-| N | Type | Cost ($) | Latency (ms) | Providers |
-|---:|---|---:|---:|---:|
-| 5 | Min Cost | 170.77 | 11.20 | 1 |
-| 5 | Min Latency | 255.01 | 10.00 | 1 |
-
----
-
-## New Experiments: Evolutionary and Oracle Baselines
-
-Explainability is preserved for all baseline algorithms in the experimental framework. NSGA-II, MOEA/D, and oracle exhaustive results are logged with full configuration and metrics. All runs use fixed seeds for reproducibility.
-
----
-
-## Threats to Validity
-
-- **Explainability Gap**: Baseline algorithms lack detailed reasoning; only the hybrid approach provides full constraint and rule trace logs.
-- **Stochasticity**: Evolutionary results are averaged over fixed seeds; logs are available for all runs.
-- **Reproducibility**: All code, seeds, and requirements are pinned and documented in the experiments/ directory.
-| 5 | Balanced | 226.01 | 10.20 | 2 |
-| 10 | Min Cost | 530.87 | 10.30 | 2 |
-| 10 | Min Latency | 566.75 | 9.50 | 1 |
-| 10 | Balanced | 543.79 | 9.70 | 2 |
-| 15 | Min Cost | 676.37 | 9.00 | 1 |
-| 15 | Min Latency | 676.37 | 9.00 | 1 |
-| 15 | Balanced | 676.37 | 9.00 | 1 |
-
-## Takeaways
-
-- Sankey + extremes clarify why points are non‑dominated (which costs shift).
-- Rules explain pruning and structure; pair with provider counts to show constraint compliance.
-- Use these visuals and tables directly in the paper (figures and appendix).
+This ensures that the explainability layer is not just a debugging aid but a first‑class component of the research reports generated from the framework.

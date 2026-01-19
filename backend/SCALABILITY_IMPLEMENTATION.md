@@ -362,6 +362,8 @@ def load_balancer_availability(self, cost):
 - Budget: $3000, Latency: 12ms, Max Providers: 2
 - Machine: MacBook Pro M1
 
+> **Note:** This is a **stress-test example**, not the default configuration used in the main UI and paper experiments. The primary CMOv3/CMOv4 defaults are a budget of approximately $5,000/month, a latency target around 150ms, and up to 3 providers (AWS, Azure, GCP). The tighter 12ms / 2-provider setup is used only to probe scalability and constraint tightness.
+
 | Strategy | Time | Solutions | Quality | Feasible |
 |----------|------|-----------|---------|----------|
 | Exhaustive | 120-180s | All valid | Optimal | ✅ |

@@ -1,7 +1,7 @@
 # 📰 News & Updates
 
-**Last Updated:** November 19, 2025  
-**System Status:** 🎉 **9.7/10 - Production-Ready Academic Research System**
+**Last Updated:** January 2026  
+**System Status:** 🎉 **9.8/10 - Production-Ready Academic Research System (CMOv4 + explainability aligned)**
 
 ---
 

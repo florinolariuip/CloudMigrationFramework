@@ -303,6 +303,6 @@ curl http://localhost:5055/api/benchmark?scenario=0 | jq '.pricing_sources'
 
 ---
 
-**Last Updated**: November 19, 2025  
-**Version**: 2.0 (Regional Pricing)  
-**Status**: ✅ Production Ready for Academic Use
+**Last Updated**: January 2026  
+**Version**: 2.1 (Regional + Workload-Based Pricing)  
+**Status**: ✅ Production Ready for Academic Use (CMOv3/CMOv4)
