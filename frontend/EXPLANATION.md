@@ -62,9 +62,9 @@ The frontend cards summarize the status of the backend validation suite:
   - Pricing validation: live Azure Retail API vs static tables, fallback coverage, and price sanity checks
   - Caching behavior: `ServiceDataCache` TTL refresh, stale vs fresh pricing, and cache invalidation
   - Explainability metrics: explanation accuracy and label thresholds (High / Moderate / Needs Review)
-  - Baseline comparisons: CMOv3 vs CMOv4 cost/latency parity and hypervolume-based improvement checks
+  - Baseline comparisons: CMOv3 vs CMOv4 cost/latency parity; Pareto front size and quality are further analysed in the experiments and paper (e.g., via hypervolume/coverage metrics), not in the daily test suite
 
-The full backend test suite (≈32 tests + 10 parameterized subtests) is run regularly via `pytest backend/tests`,
+The full backend test suite (33 tests + 10 parameterized subtests) is run regularly via `pytest backend/tests`,
 and all results shown in the CMOv4 dashboard correspond to a green test suite and the latest code-quality
 improvements (reduced cyclomatic complexity in critical request paths and pricing orchestration).
 

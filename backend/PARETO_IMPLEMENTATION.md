@@ -9,7 +9,7 @@ Pareto optimization is used to identify solutions that are non-dominated with re
 - The optimizer evaluates all candidate solutions from the CSP+Expert system.
 - For each solution, it checks if there exists another solution that is better in every objective.
 - Non-dominated solutions are collected as the Pareto front.
-- Metrics (hypervolume, spacing, coverage) quantify frontier quality.
+- In the core backend implementation (`backend/engines/pareto.py`), the primary output is the **set of non-dominated solutions**; higher-level experimental scripts in `experiments/` can compute secondary metrics (e.g., hypervolume, spacing, coverage) over these fronts when needed.
 
 ## Objectives
 - **Cost**: Total migration and operational cost (minimize).
@@ -34,25 +34,18 @@ Pareto optimization provides a rigorous method for multi-objective decision maki
 
 ### Method
 
-- Objectives: minimize Cost ($), minimize Latency (ms).
-- Dominance: A dominates B if A is no worse in all objectives and strictly better in at least one.
-- Frontier extraction: non-dominated filter over feasible set; metrics include hypervolume and spacing.
+- **Objectives:** minimize Cost ($), minimize Latency (ms).
+- **Dominance:** A dominates B if A is no worse in all objectives and strictly better in at least one.
+- **Frontier extraction:** non-dominated filter over the feasible set produced by the CSP+Expert pipeline.
+- **Metrics:** standard indicators such as hypervolume, spacing, and coverage are used in the **experimental analysis** (see the `experiments/` directory and the paper), while the production backend exposes the Pareto front itself.
 
-### Extreme solutions (first run per N)
+Rather than pinning specific dollar / millisecond values that depend on evolving pricing data, we treat the concrete Pareto fronts as **run-time artefacts**:
 
-| N | Type | Cost ($) | Latency (ms) | Providers |
-|---:|---|---:|---:|---:|
-| 5 | Min Cost | 170.77 | 11.20 | 1 |
-| 5 | Min Latency | 255.01 | 10.00 | 1 |
-| 5 | Balanced | 226.01 | 10.20 | 2 |
-| 10 | Min Cost | 530.87 | 10.30 | 2 |
-| 10 | Min Latency | 566.75 | 9.50 | 1 |
-| 10 | Balanced | 543.79 | 9.70 | 2 |
-| 15 | Min Cost | 676.37 | 9.00 | 1 |
-| 15 | Min Latency | 676.37 | 9.00 | 1 |
-| 15 | Balanced | 676.37 | 9.00 | 1 |
-
-Notes:
+- For given constraints (e.g., budget ≈ $5,000/month, latency ≈ 150 ms, up to 3 providers) and a 15-component enterprise architecture, the CSP+Expert stage yields a few dozen to a few hundred feasible solutions.
+- The Pareto filter typically reduces this to a **small frontier (often 5–20 solutions)** spanning:
+	- a clear cost range (e.g., "minimum cost" vs. "low latency" extremes), and
+	- a modest latency trade-off (e.g., 10–20% improvement in latency for a moderate cost increase).
+- Exact numbers for any given run are stored in CSV files (e.g., under `backend/results/`) and reported in the paper, but are not hard-coded here to avoid future drift when pricing or constraints change.
 
 ---
 
@@ -71,21 +64,22 @@ Notes:
 | 15 | Oracle | 676.37 | 9.00 | 676.37 | 1 |
 
 > **Configuration & limitations.** NSGA-II and MOEA/D are run via
-> `backend/run_all_experiments.py`, which uses the `pymoo_runners`
-> wrappers with a moderate population size and generation budget chosen
-> to keep runtimes reasonable in this academic setting. These numbers
-> are intended as illustrative evolutionary baselines, not as fully
-> tuned state-of-the-art MOEAs. The "Oracle" rows capture a conceptual
-> exhaustive search for small N; the corresponding
-> `run_oracle_exhaustive` helper is explicitly marked as future work
-> and is not part of the current codebase.
+> `backend/run_all_experiments.py`, which uses lightweight wrappers
+> (e.g., `pymoo_runners`) with a moderate population size and
+> generation budget chosen to keep runtimes reasonable in this
+> academic setting. The numbers shown above are **illustrative
+> evolutionary baselines**, not fully tuned state-of-the-art MOEAs.
+> The "Oracle" rows capture a **conceptual** exhaustive search for
+> small N; the corresponding `run_oracle_exhaustive` helper is
+> explicitly marked as future work and **is not implemented in the
+> current codebase**.
 
 ---
 
 ## Threats to Validity
 
-- **Frontier Quality**: Evolutionary algorithms may miss rare optima; oracle exhaustive is only feasible for small N (≤5).
-- **Stochasticity**: Results for NSGA-II/MOEA/D are averaged over fixed seeds; all experimental data is available in experiments/results/.
-- **Reproducibility**: All code, seeds, and requirements are pinned and documented in the experiments/ directory.
-- **Statistical Validation**: 30-run experiments with significance testing ensure frontier quality claims are empirically supported.
+- **Frontier Quality:** Evolutionary algorithms may miss rare optima; the oracle exhaustive baseline is only tractable for very small N and remains conceptual in the current codebase.
+- **Stochasticity:** NSGA-II/MOEA/D are stochastic; experimental campaigns for the paper use fixed random seeds and, where needed, multiple runs to assess stability, but the default `backend/run_all_experiments.py` entry point is a **single-run driver**.
+- **Reproducibility:** All optimisation code and experiment scripts live under `backend/` and `experiments/`, with dependencies pinned in the relevant `requirements.txt` files. Result CSVs produced by experiment runs are stored under `backend/results/` and `experiments/results/`.
+- **Statistical Validation:** Statistical tests (e.g., comparing hypervolume or coverage across algorithms over many runs) are part of the **paper's experimental protocol**, not of the day-to-day backend service. This document focuses on the implementation of Pareto extraction and how experiments are orchestrated, rather than on a baked-in 30-run pipeline.
 
