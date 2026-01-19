@@ -6,15 +6,15 @@ If you are evaluating this project for a paper or academic review, these
 are the key entry points:
 
 - **System & API overview**: `backend/EXPLANATION.md`  
-- **Baselines & 30-run statistics**: `backend/BASELINE_IMPLEMENTATION.md`  
+- **Baselines & experimental statistics (as used in the paper)**: `backend/BASELINE_IMPLEMENTATION.md`  
 - **Scalability & GA convergence analysis**: `backend/SCALABILITY_IMPLEMENTATION.md`  
 - **Pareto / NSGA-II / MOEA/D experiments**: `backend/PARETO_IMPLEMENTATION.md`  
 - **Experiment harnesses & how to run them**: `experiments/README.md`
 
 To quickly validate that implementation and experiments are in sync:
 
-- Backend tests: `pytest backend/tests`  
-- Experiment smoke tests: `pytest experiments/tests`  
+- Backend tests (~33 tests + 10 subtests): `pytest backend/tests`  
+- NSGA-II / MOEA-D smoke test: `pytest backend/tests/test_nsga_moead_experiments.py`  
 
 These tests exercise the same pipelines used to generate the tables and
 figures referenced in the documentation and paper, without hard-coding
@@ -79,7 +79,7 @@ A **research-grade cloud migration optimizer** that combines Constraint Satisfac
 
 **Performance**: CMOv4 achieves **4,000× faster execution** than Genetic Algorithms while delivering better cost-latency balance and multiple solution options.
 
-**Academic Rigor**: Validated through 30-run multi-experiment studies with statistical significance testing (paired t-tests, Cohen's d effect sizes), GA convergence analysis, and comprehensive explainability evaluation.
+**Academic Rigor**: In the associated paper, we report 30-run multi-experiment studies with statistical significance testing (paired t-tests, Cohen's d effect sizes), GA convergence analysis, and comprehensive explainability evaluation built on top of this implementation.
 
 ---
 
@@ -168,7 +168,7 @@ python -m http.server 8080
 #### 2. **Multi-Objective Optimization**
 - **Pareto Frontier**: Find optimal trade-offs between cost and latency
 - **Extreme Solutions**: Identify min-cost, min-latency, and balanced options
-- **Metrics**: Hypervolume (quality), spacing (distribution), coverage rate (efficiency)
+- **Metrics (experiments)**: Downstream analysis in the `experiments/` layer and the paper uses hypervolume (quality), spacing (distribution), and coverage rate (efficiency) computed over the Pareto fronts returned by the backend.
 
 #### 3. **Explainability**
 - **Constraint Proofs**: Shows why each constraint is satisfied
@@ -183,7 +183,7 @@ python -m http.server 8080
   - **457,000× faster** than Greedy Cost (0.03ms vs 13,716ms)
   - **24% cheaper** than GA while maintaining comparable latency
   - **Multiple solutions** (4 Pareto options) vs single solution from baselines
-- **Statistical Rigor**: 30-run experiments with paired t-tests, Cohen's d effect sizes, and convergence analysis
+- **Statistical Rigor (paper)**: 30-run experiments with paired t-tests, Cohen's d effect sizes, and convergence analysis reported in the paper, built on top of the implementation and experiment harnesses in this repo
 
 #### 5. **Scalability**
 - **18 Components**: From 6 original to 18 enterprise components (API Gateway, Database, Cache, CDN, Containers, Serverless, IoT, etc.)
@@ -277,7 +277,7 @@ This system demonstrates:
    - Shared implementation between CMOv3 and CMOv4 ensures consistency
 3. **Scalability**: Handles enterprise-scale problems (18-19 components, 258M+ combinations)
 4. **Explainability**: Full transparency in decision-making process with constraint proofs and rule traces
-5. **Multi-Objective**: Pareto frontier with accurate metrics (hypervolume, spacing, coverage)
+5. **Multi-Objective**: Pareto frontier exposed by the backend; the experiments and paper compute additional metrics (hypervolume, spacing, coverage) over these fronts.
 6. **Real-World Applicability**: Uses live cloud pricing data from AWS, Azure, GCP APIs
 
 ### Metrics & Analysis
@@ -295,7 +295,7 @@ The system provides extensive metrics for research:
 - **Feasible Breakdown**: feasible_pre_dedup, feasible_post_dedup, duplicates_removed
 - **Performance**: CSP time, Expert time, Pareto time, total execution time
 - **Solution Quality**: Cost, latency, provider diversity, constraint satisfaction
-- **Pareto Metrics**: Hypervolume (quality), spacing (distribution), coverage rate (efficiency)
+- **Pareto Metrics (experiments)**: Hypervolume (quality), spacing (distribution), coverage rate (efficiency) computed in the experimental analysis over the Pareto fronts returned by the backend
 - **Comparison Data**: CMOv4 vs. 5 baselines across multiple dimensions
 - **Run Logs**: All optimization runs logged for empirical validation
 - **Explanation Accuracy**: Composite metric derived from score integrity, constraint proofs ratio, and rule coverage
