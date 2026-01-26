@@ -1,175 +1,229 @@
 # Optimization Preferences in CMOv4
 
 ## Overview
-Preferences allow you to guide the optimization engine to favor solutions that align with your business priorities. They work by **adding bonus points** to solutions that meet certain criteria during the expert system scoring phase.
+
+Preferences let you bias the optimization engine toward solutions that better match your business priorities, **without changing the underlying Pareto frontier**. They are implemented in the expert system: during scoring, solutions that satisfy selected preferences receive configurable **bonus points**.
+
+Preferences in CMOv4 are:
+
+- **Soft**: they shift scores and rankings, but do not filter out solutions.
+- **Server-side configured**: thresholds and bonuses live in `backend/config.py`.
+- **Explained**: applied bonuses are surfaced in the explanation output.
 
 ## Available Preferences
 
-### 1. **Preferred Cloud Provider**
+### 1. Preferred Cloud Provider
+
 - **Options**: No Preference, AWS, Azure, GCP
-- **Impact**: +8 bonus points if the solution's main provider matches your preference
-- **Use Case**: 
-  - Existing cloud contracts or credits
-  - Team expertise with specific provider
-  - Compliance requirements for specific regions
+- **Effect**: Solutions whose main provider matches your choice receive a **provider bonus**.
+- **Typical use cases**:
+  - Existing contracts or credits with a provider
+  - Team expertise on a specific platform
+  - Compliance or data residency constraints
 
-**Example**: If you select "AWS" as preferred provider:
-- Solution using mostly AWS services: Gets +8 bonus points
-- Solution using Azure/GCP: No bonus
+**Example:**
 
-### 2. **Prioritize Cost Efficiency** ✓
-- **Threshold**: Solutions below $2,600/month
-- **Impact**: +5 bonus points for cost-efficient solutions
-- **Use Case**:
-  - Tight budget constraints
-  - Cost-sensitive projects
-  - Startups or proof-of-concepts
+- Preference: `preferredProvider = "AWS"`
+- Solution using mostly AWS services → gets the provider bonus
+- Solution using only Azure/GCP → no provider bonus
 
-**Example Scoring**:
-- Solution A: $2,400/month → Gets +5 bonus points ✓
-- Solution B: $2,800/month → No bonus (above threshold)
+### 2. Prioritize Cost Efficiency
 
-### 3. **Prioritize Performance** ⚡
-- **Threshold**: Solutions below 10.5ms latency
-- **Impact**: +5 bonus points for high-performance solutions
-- **Use Case**:
-  - Real-time applications
-  - Low-latency requirements
-  - Customer experience focus
+- **Idea**: Favor solutions whose **monthly cost** stays below a configured cost threshold.
+- **Effect**: If `prioritizeCost = true` and the total cost is below the configured threshold, the solution receives a **cost bonus**.
+- **Typical use cases**:
+  - Tight or fixed budgets
+  - Cost-sensitive internal tools or POCs
+  - Early-stage startups
 
-**Example Scoring**:
-- Solution A: 9.8ms latency → Gets +5 bonus points ✓
-- Solution B: 12ms latency → No bonus (above threshold)
+**Example scoring sketch:**
 
-## How Preferences Influence Optimization
+- Solution A: cost below the configured “cost priority” threshold → gets the cost bonus
+- Solution B: cost above that threshold → no cost bonus
+
+### 3. Prioritize Performance
+
+- **Idea**: Favor solutions with **low end-to-end latency** under a performance threshold.
+- **Effect**: If `prioritizePerformance = true` and the predicted latency is below the configured threshold, the solution receives a **performance bonus**.
+- **Typical use cases**:
+  - Real-time or interactive workloads
+  - User-facing APIs with strict SLAs
+  - Trading / analytics pipelines where latency matters
+
+**Example scoring sketch:**
+
+- Solution A: latency below the performance threshold → gets the performance bonus
+- Solution B: latency above that threshold → no performance bonus
+
+> Threshold values and bonus magnitudes are **configurable**, not hard-coded into the preference model. See `EXPERT_RULES_CONFIG` below.
+
+## How Preferences Flow Through the System
 
 ### Data Flow
-```
-Frontend Selection
-       ↓
-API Request (preferences in payload)
-       ↓
-Backend benchmark.py (extracts preferences)
-       ↓
-optimizer.py (creates Preferences object)
-       ↓
-Expert System rules.py (applies bonus rules)
-       ↓
-Ranked Solutions (sorted by score)
+
+```text
+Frontend (user selects preferences)
+        ↓
+API payload (preferences included in request)
+        ↓
+Backend benchmark flow (extract preferences)
+        ↓
+Optimizer (builds Preferences object)
+        ↓
+Expert System (rules.py applies bonuses)
+        ↓
+Ranked solutions (sorted by final score)
 ```
 
-### Scoring Impact
+Concretely:
 
-**Without Preferences** (Default):
-```
-Solution A: Cost=$2,400, Latency=10ms, Provider=AWS
-Base Score: 75 points
-Final Score: 75 points
+- The frontend sends a `preferences` object as part of the benchmark request payload.
+- The backend parses that into a `Preferences` / `UserPreferences` structure.
+- The expert system (`backend/engines/rules.py`) reads both:
+  - Objective metrics (cost, latency, provider),
+  - User preferences,
+  - And configuration from `EXPERT_RULES_CONFIG`,
+  and then adds bonus points to the base score when conditions are met.
+
+### Scoring Illustration
+
+**Without preferences (baseline):**
+
+```text
+Solution A: cost = low, latency = medium, provider = AWS
+Base expert score: 75
+Final score: 75  (no bonuses applied)
 ```
 
-**With Cost Priority + AWS Preference**:
-```
-Solution A: Cost=$2,400, Latency=10ms, Provider=AWS
-Base Score: 75 points
-+ Cost Priority Bonus: +5 points (below $2,600)
-+ Preferred Provider Bonus: +8 points (AWS)
-Final Score: 88 points ⬆️
+**With Cost Priority + AWS Preference:**
+
+```text
+Solution A: cost < cost_threshold, latency = medium, provider = AWS
+Base expert score: 75
++ cost priority bonus
++ preferred provider bonus
+Final score: 75 + cost_bonus + provider_bonus
 ```
 
-**With Performance Priority**:
+**With Performance Priority Only:**
+
+```text
+Solution B: cost = higher, latency < perf_threshold, provider = Azure
+Base expert score: 70
++ performance priority bonus
+Final score: 70 + performance_bonus
 ```
-Solution B: Cost=$2,800, Latency=9ms, Provider=Azure
-Base Score: 70 points
-+ Performance Priority Bonus: +5 points (below 10.5ms)
-Final Score: 75 points ⬆️
-```
+
+The **relative ordering** of solutions changes because some get additional points.
 
 ## Combining Preferences
 
-You can enable multiple preferences simultaneously:
+All three preferences can be enabled at once:
 
-**Cost + Performance + AWS**:
-```
-Solution C: Cost=$2,500, Latency=10ms, Provider=AWS
-Base Score: 80 points
-+ Cost Priority: +5
-+ Performance Priority: +5
-+ Preferred Provider: +8
-Final Score: 98 points ⬆️⬆️⬆️
-```
+- `preferredProvider = "Azure"`
+- `prioritizeCost = true`
+- `prioritizePerformance = true`
 
-This creates a **strong bias** toward solutions that meet all three criteria.
+A solution that:
+
+- Uses Azure as main provider,
+- Has cost below the cost threshold,
+- Has latency below the performance threshold,
+
+will receive **all three bonuses**, creating a strong bias toward that type of solution. Other solutions are still present on the Pareto front but may rank lower in the list.
 
 ## Real-World Scenarios
 
-### Scenario 1: Startup on AWS Credits
-```
-✓ Preferred Provider: AWS
-✓ Prioritize Cost Efficiency
-✗ Prioritize Performance
+### Scenario 1: Startup with Provider Credits
 
-Result: Optimizer favors cheap AWS solutions, even if latency is higher
-```
-
-### Scenario 2: High-Performance Trading Platform
-```
-✗ Preferred Provider: No Preference
-✗ Prioritize Cost Efficiency
-✓ Prioritize Performance
-
-Result: Optimizer favors fastest solutions across all providers
+```text
+Preferred Provider: AWS
+Prioritize Cost:    true
+Prioritize Perf:    false
 ```
 
-### Scenario 3: Balanced Enterprise Migration
+- Effect: AWS-based solutions that are relatively cheap rise to the top,
+  even if they are not the absolute fastest.
+
+### Scenario 2: Latency-Critical Platform
+
+```text
+Preferred Provider: No Preference
+Prioritize Cost:    false
+Prioritize Perf:    true
 ```
-✓ Preferred Provider: Azure (existing contract)
-✓ Prioritize Cost Efficiency
-✓ Prioritize Performance
 
-Result: Optimizer seeks Azure solutions that are both fast AND cheap
+- Effect: The optimizer favors the fastest solutions across all providers;
+  cost matters less in the ranking.
+
+### Scenario 3: Enterprise with Existing Azure Contract
+
+```text
+Preferred Provider: Azure
+Prioritize Cost:    true
+Prioritize Perf:    true
 ```
 
-## Code References
+- Effect: Azure solutions that are both cost-effective and low-latency
+  receive the largest scoring advantage.
 
-### Backend Configuration (`backend/config.py`)
+## Configuration and Code References
+
+### Expert Rules Configuration (`backend/config.py`)
+
+The thresholds and bonus amounts are defined in `EXPERT_RULES_CONFIG`:
+
 ```python
 EXPERT_RULES_CONFIG = {
-    "preferred_provider_bonus": 8,      # Bonus for using preferred cloud
-    "cost_priority_threshold": 2600,    # Threshold for cost bonus
-    "cost_priority_bonus": 5,           # Bonus amount for cost
-    "performance_priority_threshold": 10.5,  # Threshold for perf bonus
-    "performance_priority_bonus": 5,    # Bonus amount for performance
+    "preferred_provider_bonus": ...,
+    "cost_priority_threshold": ...,
+    "cost_priority_bonus": ...,
+    "performance_priority_threshold": ...,
+    "performance_priority_bonus": ...,
 }
 ```
 
+- **Threshold keys** control when a bonus is applied (e.g., max cost, max latency).
+- **Bonus keys** control how many points are added to the expert score.
+
+Exact values may change over time; they’re kept in config to make tuning easier without touching the rules engine code.
+
 ### Rules Engine (`backend/engines/rules.py`)
 
-**Preferred Provider Rule** (Line 98):
+The expert system implements checks similar to:
+
 ```python
+# Preferred provider
 if self.preferences.preferredProvider and main_provider == self.preferences.preferredProvider:
     self.final_score += self.rules_config["preferred_provider_bonus"]
-```
 
-**Cost Priority Rule** (Line 109):
-```python
+# Cost priority
 if self.preferences.prioritizeCost and cost < self.rules_config["cost_priority_threshold"]:
     self.final_score += self.rules_config["cost_priority_bonus"]
-```
 
-**Performance Priority Rule** (Line 120):
-```python
+# Performance priority
 if self.preferences.prioritizePerformance and latency < self.rules_config["performance_priority_threshold"]:
     self.final_score += self.rules_config["performance_priority_bonus"]
 ```
 
+(The actual line numbers can change; follow the rule names rather than specific line references.)
+
 ## Frontend Integration (CMOv4)
 
 ### UI Controls
-- **Dropdown**: Select preferred cloud provider
-- **Checkboxes**: Toggle cost and performance priorities
-- **Live**: Changes apply immediately to next benchmark run
 
-### API Payload
+In the CMOv4 frontend (e.g. `cmov4.html`):
+
+- **Dropdown**: Preferred cloud provider (No Preference / AWS / Azure / GCP).
+- **Checkboxes / toggles**:
+  - “Prioritize lower cost”
+  - “Prioritize lower latency”
+- Changes affect the **next** benchmark or optimization run.
+
+### API Payload Shape
+
+Preferences are sent in a `preferences` field:
+
 ```json
 {
   "preferences": {
@@ -180,43 +234,41 @@ if self.preferences.prioritizePerformance and latency < self.rules_config["perfo
 }
 ```
 
-## Tuning Guide
+The backend treats this block as optional; if omitted, default behavior is “no special preference” (pure expert rules based on objectives only).
 
-### When to Use Cost Priority
-- Budget < $3,000/month
-- Proof-of-concept projects
-- Non-critical workloads
-- Development/staging environments
+## Relationship to the Pareto Frontier
 
-### When to Use Performance Priority
-- Latency SLA < 15ms
-- Real-time applications
-- Customer-facing services
-- High-throughput requirements
+Preferences **do not modify**:
 
-### When to Set Preferred Provider
-- Existing cloud contracts
-- Regional compliance needs
-- Team has provider-specific expertise
-- Using provider-specific credits
+- How the Pareto frontier is computed,
+- The set of feasible solutions.
 
-## Impact on Pareto Frontier
+The frontier is still constructed purely from objective trade-offs (cost, latency, and other objectives).
 
-Preferences **do not change** the Pareto frontier (it's still based on objective cost/latency trade-offs), but they **do influence**:
+Preferences **do modify**:
 
-1. **Top Solution Ranking**: Solutions matching preferences rank higher
-2. **Alternative Recommendations**: Preferred alternatives bubble up
-3. **Explainability**: Rules show which bonuses were applied
+1. **Ranking**: which solution appears as the “top suggestion”.
+2. **Alternative suggestions**: which non-top solutions are highlighted.
+3. **Explainability output**: the explanation explicitly lists which bonuses were applied and why (e.g., “AWS preferred provider bonus applied”, “cost below threshold bonus applied”).
+
+This separation is important for the paper and for reviewers: **objective evaluation vs. subjective ranking** are kept distinct.
 
 ## Limitations
 
-- Preferences are **soft constraints** (they influence scoring but don't filter solutions)
-- Thresholds are **fixed** in CMOv4 (no UI tuning yet, unlike CMOv3)
-- Bonus values are **configured server-side** (backend/config.py)
+- Preferences are **soft**: they bias scores but never make a solution infeasible.
+- Thresholds and bonuses are **global** in CMOv4; users do not (yet) tune numeric values from the UI.
+- Only a single preferred provider can be selected at a time.
 
-## Future Enhancements
+## Possible Future Extensions
 
-1. **Dynamic Thresholds**: Allow users to adjust cost/latency thresholds in UI
-2. **Weight Tuning**: Customize bonus point values per preference
-3. **Multi-Provider Preference**: Prefer 2 out of 3 providers
-4. **Custom Rules**: Define business-specific preference rules
+1. **UI-tunable thresholds**  
+   Expose cost and latency thresholds in the frontend so users can interactively steer how strict the preferences are.
+
+2. **Configurable weights per user**  
+   Allow users or scenarios to override bonus magnitudes on a per-run basis.
+
+3. **Multi-provider preferences**  
+   Support sets like “prefer AWS or Azure” with per-provider weights.
+
+4. **Custom business rules**  
+   Let advanced users define organization-specific rules that plug into the same expert system (e.g., “no data outside EU”, “prefer managed services over IaaS”).

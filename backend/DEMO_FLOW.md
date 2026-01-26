@@ -8,12 +8,12 @@ This document provides a **step-by-step demonstration flow** for presenting the 
 
 ## 🎯 Demo Objectives
 
-1. Showcase the **hybrid CSP+Expert approach**
-2. Demonstrate **6-metric MCDA** with real-time weighting
+1. Showcase the **hybrid CSP + Expert approach**
+2. Demonstrate **6-metric MCDA** with interactive weighting
 3. Highlight **automatic explainability** features
-4. Show **scalability** (21M+ combinations)
-5. Present **Pareto frontier** and **Sankey diagrams**
-6. Prove **production-readiness** and **academic rigor**
+4. Show that the engine scales to **large configuration spaces**
+5. Present the **Pareto frontier** and **Sankey-style cost/latency breakdowns**
+6. Connect the live demo to the **evaluation and experiments** from the paper
 
 **Target Audience:** Academic reviewers, industry professionals, potential users  
 **Duration:** 15-20 minutes (live demo) + 10 minutes Q&A  
@@ -24,7 +24,8 @@ This document provides a **step-by-step demonstration flow** for presenting the 
 ## 📋 Pre-Demo Checklist
 
 ### Technical Setup (5 minutes before)
-- [ ] Start backend server: `PYTHONPATH="." python backend/app.py`
+- [ ] Start backend server: `PYTHONPATH="." python backend/app.py`  
+   (for a more realistic setup, you can also use the provided Gunicorn task "Run Gunicorn server on port 5000")
 - [ ] Start frontend server: `cd frontend && python -m http.server 8080`
 - [ ] Open browser to `http://localhost:8080/index_normalized.html`
 - [ ] Clear browser cache
@@ -68,7 +69,7 @@ This document provides a **step-by-step demonstration flow** for presenting the 
 
 ### Actions:
 
-1. **Set Constraints:**
+1. **Set Constraints:** (these match the default demo/paper settings)
    ```
    Max Budget: $5,000
    Max Latency: 12ms
@@ -89,10 +90,10 @@ This document provides a **step-by-step demonstration flow** for presenting the 
 
 ### Talking Points While Processing:
 > "Behind the scenes, the system is:
-> - Generating feasible configurations (filtering 21M+ combinations)
+> - Generating feasible configurations from a very large search space
 > - Applying expert rules
 > - Normalizing across 6 metrics
-> - Calculating Pareto frontier
+> - Computing the Pareto frontier
 > - Generating automatic explanations"
 
 ---
@@ -211,10 +212,11 @@ This document provides a **step-by-step demonstration flow** for presenting the 
 > "The Pareto frontier shows optimal trade-offs between cost and latency. Each point is a non-dominated solution."
 
 - **Point to:**
-  - Min-cost solution (left)
-  - Min-latency solution (right)
-  - Balanced solutions (middle)
-  - Hypervolume, spacing metrics
+   - Min-cost solution (left)
+   - Min-latency solution (right)
+   - Balanced solutions (middle)
+
+> "In the **paper’s experiments**, we analyze fronts like this using standard metrics such as hypervolume and spacing. Those metrics are computed offline in the experiments layer, not in this live UI."
 
 ### 4.3 Sankey Diagrams (1 minute)
 
@@ -235,33 +237,30 @@ This document provides a **step-by-step demonstration flow** for presenting the 
 ### Scenario: "Enterprise-Scale Problem"
 
 **Script:**
-> "Let me show you scalability. This problem has **15 components** with **21+ million possible combinations**..."
+> "Let me show you scalability. This problem has many components and, behind the scenes, a very large number of possible configurations..."
 
 **Actions:**
 1. Navigate to `index.html` (React version)
 2. Show component selection (15 components)
 3. Run optimization
-4. Show execution time (~250ms)
+4. Briefly mention that optimization remains responsive for this larger scenario.
 
 **Key Message:**
-> "Sub-second optimization for enterprise-scale problems. The CSP engine prunes 99.9% of infeasible solutions, making this computationally tractable."
+> "The CSP engine aggressively prunes infeasible solutions, keeping optimization tractable even when the underlying configuration space is huge."
 
 ---
 
-## **Part 6: Baseline Comparison (1 minute)**
+## **Part 6: Baseline Comparison & Experiments (1 minute)**
 
-**If in index.html:**
+**If in index.html or referring to the paper:**
 
 **Script:**
-> "We compared our approach to 5 baseline algorithms..."
+> "In the paper, we compare our approach against several baseline algorithms (e.g., random search and greedy heuristics) in a controlled experimental setup. Across those experiments, our hybrid CSP + Expert approach consistently achieves better cost/latency trade-offs while also providing explanations, which the baselines do not."
 
-**Show comparison table:**
-- CSP+Expert vs Random: 35% better cost
-- CSP+Expert vs Greedy: 10% better
-- CSP+Expert: Best explainability (10/10)
+- Instead of showing hard-coded improvement percentages, refer reviewers to the experimental results section of the paper and the scripts under `experiments/` for exact numbers.
 
 **Key Message:**
-> "Our hybrid approach outperforms baselines while providing unique explainability."
+> "Our hybrid approach performs competitively against standard baselines and adds explainability on top, as documented in the experimental evaluation."
 
 ---
 
@@ -270,42 +269,40 @@ This document provides a **step-by-step demonstration flow** for presenting the 
 ### Show Documentation
 
 **Script:**
-> "This isn't just a prototype—it's publication-ready research..."
+> "This isn't just a prototype—it's the implementation underpinning our publication-ready research..."
 
 **Navigate to docs:**
 - Click "📚 Documentation"
 - Show EXPLANATION.md
 - Scroll to highlight:
-  - Academic foundation (MCDA, WSM, Min-max normalization)
-  - Complexity analysis
-  - Evaluation metrics
-  - References
+   - Academic foundation (MCDA, WSM, Min-max normalization)
+   - Complexity analysis
+   - Evaluation metrics used in the **paper’s experiments** (e.g., hypervolume, coverage, spacing)
+   - References
 
 **Show code quality:**
 - Open browser console
 - Show clean error handling
-- Demonstrate reproducibility
+- Demonstrate how experiments can be reproduced using the scripts/tests documented in the repo
 
 **Key Message:**
-> "Every decision is documented, every algorithm is referenced, and everything is reproducible. This meets the highest academic standards."
+> "Every decision is documented, every algorithm is referenced, and the experiments built on top of this implementation are reproducible. This meets the expectations for a rigorous academic artifact."
 
 ---
 
-## **Part 8: Production Readiness (1 minute)**
+## **Part 8: Engineering Robustness (1 minute)**
 
 **Script:**
-> "Finally, this is production-ready..."
+> "Finally, let me briefly touch on the engineering side..."
 
 **Highlight:**
-- Deployed on Heroku (v42)
-- 42 version deployments tracked
-- All bugs fixed (show Git history)
-- Consistent configuration ($5k default)
-- Live pricing integration
-- Error handling for edge cases
+- Can be served behind a standard WSGI server (e.g., Gunicorn), with helper scripts/tasks included in the repo
+- Live pricing integration with real cloud provider data, plus fallbacks when external APIs are unavailable
+- Error handling and timeouts for edge cases
+- Consistent configuration defaults (e.g., 5k budget, 3 providers) used across UI and experiments
 
 **Key Message:**
-> "This has been battle-tested through 42 deployments, all issues documented and resolved. It's ready for real-world use."
+> "This implementation has been iterated on and hardened with robust error handling and realistic integrations. It’s not just a toy example; it’s engineered to behave sensibly under failure modes and to support the experiments in the paper."
 
 ---
 
@@ -314,14 +311,14 @@ This document provides a **step-by-step demonstration flow** for presenting the 
 ### Summary Script:
 > "To summarize, this framework offers:
 >
-> **1. Novel Approach:** Hybrid CSP+Expert with automated explainability  
+> **1. Novel Approach:** Hybrid CSP + Expert with automated explainability  
 > **2. Comprehensive Analysis:** 6-metric MCDA with configurable weights  
-> **3. Scalability:** 21M+ combinations in sub-second  
+> **3. Scalability:** CSP-based pruning to handle large configuration spaces  
 > **4. Transparency:** Automatic architecture detection and recommendations  
-> **5. Production-Ready:** Deployed, tested, documented  
-> **6. Academic Rigor:** Publication-ready with full evaluation
+> **5. Robust Implementation:** Tested, documented, and integrated with live pricing  
+> **6. Academic Rigor:** Implementation and experiments designed for publication
 >
-> The key innovation is **automatic explanation generation**—no other cloud optimization tool provides this level of transparency and insight.
+> The key innovation is **automatic explanation generation**—no other cloud optimization tool we’re aware of provides this level of transparency and insight.
 >
 > Questions?"
 
