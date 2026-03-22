@@ -1,0 +1,10 @@
+n_components,algorithm,min_cost,min_latency,balanced_cost,pareto_solutions
+5,NSGA-II,170.77,10.0,226.01,7
+5,MOEA/D,170.77,10.0,226.01,7
+5,Oracle,170.77,10.0,226.01,7
+10,NSGA-II,530.87,9.5,543.79,3
+10,MOEA/D,530.87,9.5,543.79,3
+10,Oracle,530.87,9.5,543.79,3
+15,NSGA-II,676.37,9.0,676.37,1
+15,MOEA/D,676.37,9.0,676.37,1
+15,Oracle,676.37,9.0,676.37,1

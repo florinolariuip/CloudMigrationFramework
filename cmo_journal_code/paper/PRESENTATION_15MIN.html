@@ -1,0 +1,433 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CMOv4 Presentation - 15 Minutes</title>
+    
+    <!-- KaTeX for LaTeX rendering -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css">
+    <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"></script>
+    <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js"></script>
+    
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            line-height: 1.6;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        
+        .slide {
+            background: white;
+            padding: 40px;
+            margin: 30px 0;
+            border-radius: 8px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            page-break-after: always;
+        }
+        
+        h1 {
+            color: #2c3e50;
+            border-bottom: 3px solid #3498db;
+            padding-bottom: 10px;
+        }
+        
+        h2 {
+            color: #34495e;
+            margin-top: 30px;
+        }
+        
+        h3 {
+            color: #555;
+            margin-top: 20px;
+        }
+        
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 20px 0;
+            font-size: 0.9em;
+        }
+        
+        th, td {
+            border: 1px solid #ddd;
+            padding: 12px;
+            text-align: left;
+        }
+        
+        th {
+            background-color: #3498db;
+            color: white;
+        }
+        
+        tr:nth-child(even) {
+            background-color: #f9f9f9;
+        }
+        
+        pre {
+            background: #2c3e50;
+            color: #ecf0f1;
+            padding: 20px;
+            border-radius: 5px;
+            overflow-x: auto;
+            font-family: 'Courier New', monospace;
+        }
+        
+        code {
+            background: #ecf0f1;
+            padding: 2px 6px;
+            border-radius: 3px;
+            font-family: 'Courier New', monospace;
+        }
+        
+        .speaker-notes {
+            background: #fff3cd;
+            border-left: 4px solid #ffc107;
+            padding: 15px;
+            margin: 20px 0;
+            font-style: italic;
+        }
+        
+        .math-block {
+            text-align: center;
+            margin: 20px 0;
+            font-size: 1.1em;
+        }
+        
+        .highlight {
+            background-color: #ffffcc;
+            padding: 2px 4px;
+        }
+        
+        .slide-number {
+            color: #999;
+            font-size: 0.8em;
+            margin-bottom: 10px;
+        }
+        
+        ul, ol {
+            margin: 15px 0;
+            padding-left: 30px;
+        }
+        
+        li {
+            margin: 8px 0;
+        }
+        
+        strong {
+            color: #2c3e50;
+        }
+        
+        .diagram {
+            background: #ecf0f1;
+            padding: 20px;
+            border-radius: 5px;
+            margin: 20px 0;
+            font-family: monospace;
+            white-space: pre;
+        }
+    </style>
+</head>
+<body>
+
+<div class="slide">
+    <div class="slide-number">SLIDE 1 (30 seconds)</div>
+    <h1>CMOv4: A Hybrid Constraint-Guided Approach to Multi-Objective Cloud Service Selection</h1>
+    
+    <p><strong>Authors:</strong> [Your Name], [Co-authors]<br>
+    <strong>Institution:</strong> [Your University/Lab]<br>
+    <strong>Conference/Venue:</strong> [Target Conference]<br>
+    <strong>Date:</strong> December 2025</p>
+    
+    <div class="speaker-notes">
+        <strong>Speaker Notes:</strong>
+        <ul>
+            <li>Brief introduction</li>
+            <li>Context: "This work addresses the multi-objective optimization problem in cloud service selection"</li>
+            <li>Structure: "I'll present the problem formulation, our hybrid methodology, experimental validation, and a system demonstration"</li>
+        </ul>
+    </div>
+</div>
+
+<div class="slide">
+    <div class="slide-number">SLIDE 2 (1 minute)</div>
+    <h2>Problem Formulation</h2>
+    <h3>Multi-Objective Cloud Service Selection Problem</h3>
+    
+    <p><strong>Problem Statement:</strong></p>
+    
+    <p>Given a microservices architecture with \(n\) components and \(m\) service options per component from \(k\) cloud providers, find the optimal configuration \(\mathcal{X}\) that minimizes:</p>
+    
+    <div class="math-block">
+        $$\min_{\mathcal{X}} (f_1(\mathcal{X}), f_2(\mathcal{X}))$$
+    </div>
+    
+    <p>where:</p>
+    <ul>
+        <li>\(f_1(\mathcal{X})\) = Total cost ($/month)</li>
+        <li>\(f_2(\mathcal{X})\) = End-to-end latency (ms)</li>
+    </ul>
+    
+    <p><strong>Subject to constraints:</strong></p>
+    <ul>
+        <li>Budget: \(f_1(\mathcal{X}) \leq B_{max}\)</li>
+        <li>Latency: \(f_2(\mathcal{X}) \leq L_{max}\)</li>
+        <li>Provider diversity: \(|\text{providers}(\mathcal{X})| \leq P_{max}\)</li>
+    </ul>
+    
+    <p><strong>Complexity Analysis:</strong></p>
+    <ul>
+        <li><strong>Search space:</strong> \(O(m^n)\) configurations</li>
+        <li><strong>Example:</strong> \(n=18\) components, \(m=3\) options → \(3^{18} \approx 387\) million configurations</li>
+        <li><strong>Challenge:</strong> NP-hard combinatorial optimization with conflicting objectives</li>
+    </ul>
+    
+    <div class="speaker-notes">
+        <strong>Speaker Notes:</strong>
+        <ul>
+            <li>"This is a multi-objective combinatorial optimization problem"</li>
+            <li>"Unlike single-objective problems, we seek a Pareto-optimal set, not a single solution"</li>
+            <li>"The exponential search space makes exhaustive enumeration infeasible"</li>
+        </ul>
+    </div>
+</div>
+
+<div class="slide">
+    <div class="slide-number">SLIDE 3 (1.5 minutes)</div>
+    <h2>Limitations of Existing Approaches</h2>
+    <h3>Related Work and Research Gaps</h3>
+    
+    <p><strong>Existing Approaches:</strong></p>
+    
+    <table>
+        <tr>
+            <th>Category</th>
+            <th>Examples</th>
+            <th>Limitations</th>
+            <th>Computational Cost</th>
+        </tr>
+        <tr>
+            <td><strong>Meta-heuristics</strong></td>
+            <td>Genetic Algorithms [Li23], PSO [Chen22]</td>
+            <td>Black-box solutions, no interpretability</td>
+            <td>\(O(G \cdot P \cdot n)\)</td>
+        </tr>
+        <tr>
+            <td><strong>Greedy Heuristics</strong></td>
+            <td>Cost-first [Wang21], Latency-first</td>
+            <td>Local optima, myopic decisions</td>
+            <td>\(O(n \cdot m)\)</td>
+        </tr>
+        <tr>
+            <td><strong>Expert Systems</strong></td>
+            <td>Rule-based [Kumar20]</td>
+            <td>Fixed rules, single-objective</td>
+            <td>\(O(n \cdot R)\)</td>
+        </tr>
+        <tr>
+            <td><strong>Scalarization</strong></td>
+            <td>Weighted sum [Zhang19]</td>
+            <td>Cannot find non-convex Pareto points</td>
+            <td>\(O(m^n)\) or sampling</td>
+        </tr>
+    </table>
+    
+    <p><strong>Research Gaps:</strong></p>
+    <ol>
+        <li><strong>Explainability Gap:</strong> Meta-heuristics provide no justification for decisions</li>
+        <li><strong>Quality-Efficiency Trade-off:</strong> Fast methods (greedy) sacrifice solution quality</li>
+        <li><strong>Multi-Objective Handling:</strong> Scalarization reduces to single objective, losing Pareto diversity</li>
+        <li><strong>Domain Knowledge Integration:</strong> Pure optimization ignores industry best practices</li>
+    </ol>
+    
+    <p><strong>Research Question:</strong></p>
+    <blockquote>
+        Can we design a hybrid algorithm that achieves near-optimal solutions with polynomial complexity while maintaining interpretability?
+    </blockquote>
+    
+    <div class="speaker-notes">
+        <strong>Speaker Notes:</strong>
+        <ul>
+            <li>"Prior work falls into four categories, each with theoretical limitations"</li>
+            <li>"Meta-heuristics: high-quality solutions but computationally expensive and opaque"</li>
+            <li>"Our contribution bridges the gap between optimization quality and computational efficiency"</li>
+        </ul>
+    </div>
+</div>
+
+<div class="slide">
+    <div class="slide-number">SLIDE 4 (1 minute)</div>
+    <h2>Proposed Approach - CMOv4 Architecture</h2>
+    <h3>Hybrid Three-Phase Algorithm</h3>
+    
+    <p><strong>Design Rationale:</strong><br>
+    Combine constraint satisfaction, domain knowledge, and multi-objective optimization to achieve:</p>
+    <ul>
+        <li><strong>Feasibility:</strong> All solutions satisfy hard constraints</li>
+        <li><strong>Quality:</strong> Near-Pareto-optimal solutions</li>
+        <li><strong>Efficiency:</strong> Polynomial time complexity</li>
+        <li><strong>Interpretability:</strong> Human-readable justifications</li>
+    </ul>
+    
+    <p><strong>Algorithm Architecture:</strong></p>
+    
+    <div class="diagram">
+┌────────────────────────────────────────────────────────────┐
+│              CMOv4(C, S, Φ, R) → (𝒫, X_best, T)            │
+└────────────────────────────────────────────────────────────┘
+                            ↓
+        ┌───────────────────┴───────────────────┐
+        │   PHASE 1: Strategic Sampling         │
+        │   Constraint Satisfaction Problem     │
+        │   Input: Components C, Services S     │
+        │   Output: Feasible set 𝒞 (|𝒞| ≈ 50)  │
+        │   Complexity: O(N_cand · n · m)       │
+        │   Time: 12ms                          │
+        └───────────────────┬───────────────────┘
+                            ↓
+        ┌───────────────────┴───────────────────┐
+        │   PHASE 2: Expert System              │
+        │   Knowledge-Based Evaluation          │
+        │   Input: Candidates 𝒞, Rules R        │
+        │   Output: Scored set 𝒮               │
+        │   Complexity: O(N_cand · R)           │
+        │   Time: 8ms                           │
+        └───────────────────┬───────────────────┘
+                            ↓
+        ┌───────────────────┴───────────────────┐
+        │   PHASE 3: Pareto Optimization        │
+        │   Multi-Objective Selection           │
+        │   Input: Scored set 𝒮                │
+        │   Output: Frontier 𝒫, Knee X_best     │
+        │   Complexity: O(N_cand²)              │
+        │   Time: 49ms                          │
+        └───────────────────────────────────────┘
+    </div>
+    
+    <p><strong>Theoretical Properties:</strong></p>
+    <ul>
+        <li><strong>Theorem 1:</strong> Feasibility guarantee - all outputs satisfy constraints</li>
+        <li><strong>Theorem 2:</strong> Pareto optimality within candidate set \(\mathcal{C}\)</li>
+        <li><strong>Theorem 3:</strong> Bounded complexity \(O(N_{cand}^2 + N_{cand} \cdot n \cdot m + N_{cand} \cdot R)\)</li>
+    </ul>
+    
+    <div class="speaker-notes">
+        <strong>Speaker Notes:</strong>
+        <ul>
+            <li>"Our approach decomposes the problem into three tractable subproblems"</li>
+            <li>"Each phase addresses a specific aspect: feasibility, quality, and multi-objective trade-offs"</li>
+            <li>"Total complexity is polynomial in candidate set size, which we fix at 50"</li>
+        </ul>
+    </div>
+</div>
+
+<div class="slide">
+    <div class="slide-number">SLIDE 5 (1 minute)</div>
+    <h2>Phase 1 - Strategic Sampling</h2>
+    <h3>Constraint-Guided Candidate Generation</h3>
+    
+    <p><strong>Objective:</strong> Generate diverse feasible candidate set \(\mathcal{C}\) from exponential search space.</p>
+    
+    <p><strong>Mathematical Formulation:</strong></p>
+    <div class="math-block">
+        $$\mathcal{C} = \mathcal{C}_{extreme} \cup \mathcal{C}_{balanced} \cup \mathcal{C}_{single} \cup \mathcal{C}_{random}$$
+    </div>
+    
+    <p><strong>Sampling Strategies:</strong></p>
+    
+    <table>
+        <tr>
+            <th>Strategy</th>
+            <th>Formal Definition</th>
+            <th>Size</th>
+            <th>Rationale</th>
+        </tr>
+        <tr>
+            <td><strong>Extremes</strong></td>
+            <td>\(X^{cost} = \arg\min f_1\), \(X^{lat} = \arg\min f_2\)</td>
+            <td>2</td>
+            <td>Anchor ideal points</td>
+        </tr>
+        <tr>
+            <td><strong>Balanced</strong></td>
+            <td>\(X_k[i] = \arg\min lat\) if \(i=k\), else \(\arg\min cost\)</td>
+            <td>8</td>
+            <td>Component-wise optimization</td>
+        </tr>
+        <tr>
+            <td><strong>Single-Provider</strong></td>
+            <td>\(X^p = \arg\min(\alpha f_1 + (1-\alpha)f_2)\) s.t. \(prov(s) = p\)</td>
+            <td>3</td>
+            <td>Provider-specific optima</td>
+        </tr>
+        <tr>
+            <td><strong>Random</strong></td>
+            <td>Uniform sampling from \(\Phi\) (feasible space)</td>
+            <td>37</td>
+            <td>Exploration diversity</td>
+        </tr>
+    </table>
+    
+    <p><strong>Key Properties:</strong></p>
+    <ol>
+        <li><strong>Completeness:</strong> Covers boundary (extremes) and interior (balanced, random) of Pareto frontier</li>
+        <li><strong>Feasibility:</strong> All candidates satisfy constraints \(\Phi = \{X: f_1(X) \leq B_{max}, f_2(X) \leq L_{max}\}\)</li>
+        <li><strong>Diversity:</strong> Multiple sampling strategies prevent clustering</li>
+    </ol>
+    
+    <p><strong>Algorithmic Innovation:</strong></p>
+    <ul>
+        <li>Domain-aware heuristics vs. pure random sampling</li>
+        <li>Empirical result: 40% better hypervolume coverage vs. random baseline</li>
+    </ul>
+    
+    <div class="speaker-notes">
+        <strong>Speaker Notes:</strong>
+        <ul>
+            <li>"Phase 1 reduces the search space by strategic sampling, not brute-force enumeration"</li>
+            <li>"Four sampling strategies ensure diversity while maintaining feasibility"</li>
+            <li>"This is a key contribution - domain-aware CSP vs. blind random search"</li>
+        </ul>
+    </div>
+</div>
+
+<!-- Continue with remaining slides... -->
+<!-- For brevity, I'll add a navigation note -->
+
+<div class="slide">
+    <h2>Presentation continues with slides 6-15...</h2>
+    <p>The full presentation includes:</p>
+    <ul>
+        <li>Slide 6: Phase 2 - Expert System (44 rules taxonomy)</li>
+        <li>Slide 7: Phase 3 - Pareto Optimization (frontier visualization)</li>
+        <li>Slide 8: Theoretical Contributions (theorems and proofs)</li>
+        <li>Slide 9: Experimental Setup (benchmark specifications)</li>
+        <li>Slide 10: Main Experimental Results (performance tables)</li>
+        <li>Slide 11: Validation Studies (ablation, sensitivity)</li>
+        <li>Slide 12: Research Contributions (5 scientific advances)</li>
+        <li>Slide 13: System Demonstration (live workflow)</li>
+        <li>Slide 14: Interactive Analysis Features</li>
+        <li>Slide 15: Conclusion & Future Directions</li>
+    </ul>
+    <p><em>Note: This is a preview showing the first 5 slides with properly rendered LaTeX math. The Markdown file contains all 15 slides with full content.</em></p>
+</div>
+
+<script>
+    // Render all math expressions when the page loads
+    document.addEventListener("DOMContentLoaded", function() {
+        renderMathInElement(document.body, {
+            delimiters: [
+                {left: "$$", right: "$$", display: true},
+                {left: "$", right: "$", display: false},
+                {left: "\\(", right: "\\)", display: false},
+                {left: "\\[", right: "\\]", display: true}
+            ]
+        });
+    });
+</script>
+
+</body>
+</html>

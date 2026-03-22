@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Documentation - Cloud Migration Optimizer</title>
+  <link rel="icon" type="image/svg+xml" href="favicon.svg">
+  <link rel="alternate icon" href="favicon.svg">
+  <meta name="color-scheme" content="dark light">
+  <!-- GitHub Markdown CSS -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/github-markdown-css/5.2.0/github-markdown.min.css" integrity="sha512-lLBTOp8hT3kST3m8J4wYMu2nQItxwnzq26GmOaWZkQ4g0U6mTjgN8Z3rJkY9H3W8n7dNwQkqJg8S3mH8X6rKmw==" crossorigin="anonymous" referrerpolicy="no-referrer" />
+  <style>
+    :root { --bg: #0b1020; --bg-2:#0e1730; --fg: #e6edf3; --muted:#9fb3c8; --brand:#3b82f6; }
+    body { margin:0; background: linear-gradient(180deg, var(--bg) 0%, var(--bg-2) 100%); color: var(--fg); font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Ubuntu, Cantarell, Noto Sans, Helvetica Neue, Arial, Apple Color Emoji, Segoe UI Emoji; }
+    .topbar { position: sticky; top:0; z-index:10; backdrop-filter: blur(10px); background: rgba(11,16,32,0.6); border-bottom: 1px solid rgba(59,130,246,0.25); }
+    .topbar .inner { max-width: 1100px; margin: 0 auto; padding: 12px 16px; display: flex; align-items: center; gap: 10px; }
+    .app-title { font-weight: 700; letter-spacing: 0.2px; }
+    .badge { font-size: 12px; padding:4px 10px; border-radius: 999px; background: rgba(59,130,246,.15); color:#93c5fd; border:1px solid rgba(59,130,246,.35); }
+    .btn { appearance:none; border:1px solid rgba(148,163,184,.25); color:#e5e7eb; background:#121a33; border-radius:10px; padding:8px 12px; cursor:pointer; transition:.15s; }
+    .btn:hover { border-color: rgba(148,163,184,.45); background:#0f162c; }
+    .wrap { max-width: 1100px; margin: 20px auto; padding: 0 16px 40px; }
+    .card { background: rgba(255,255,255,0.03); border:1px solid rgba(148,163,184,.15); border-radius: 14px; box-shadow: 0 10px 30px rgba(0,0,0,0.2); }
+    .markdown-body { box-sizing: border-box; min-width: 200px; max-width: 100%; padding: 30px; color: var(--fg); }
+    .markdown-body h1, .markdown-body h2, .markdown-body h3, .markdown-body h4 { border-bottom-color: rgba(148,163,184,.2) !important; }
+    .markdown-body table { display: block; overflow: auto; }
+    .loading { color:#93c5fd; font-size:14px; }
+    .error { color:#fca5a5; font-size:14px; }
+    @media (max-width: 768px) { .markdown-body { padding: 20px; } }
+  </style>
+</head>
+<body>
+  <div class="topbar">
+    <div class="inner">
+      <span class="badge">Documentation</span>
+      <div class="app-title">Cloud Migration Optimizer</div>
+      <div style="margin-left:auto; display:flex; gap:8px;">
+        <a href="index.html" class="btn">← Main Page</a>
+        <button class="btn" id="copyBtn">Copy Link</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="wrap">
+    <div style="margin-bottom:24px; display:flex; gap:8px; flex-wrap:wrap;">
+  <button class="btn" data-doc="NEWS.md" style="background: linear-gradient(135deg, #10b981 0%, #059669 100%); border-color: #10b981; color: white; font-weight: 600; position: relative;">
+    <span style="position: absolute; top: -8px; right: -8px; background: #ef4444; color: white; font-size: 10px; padding: 2px 6px; border-radius: 999px; font-weight: 700;">NEW</span>
+    News & Updates
+  </button>
+  <button class="btn" data-doc="TEST_RESULTS.md" style="background: linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%); border-color: #3b82f6; color: white; font-weight: 600;">
+    ✓ Test Results
+  </button>
+  <button class="btn" data-doc="EXPLANATION.md">General Explanation</button>
+  <button class="btn" data-doc="SCALABILITY_IMPLEMENTATION.md">Scalability Implementation</button>
+  <button class="btn" data-doc="PARETO_IMPLEMENTATION.md">Pareto Implementation</button>
+  <button class="btn" data-doc="BASELINE_IMPLEMENTATION.md">Baseline Comparison</button>
+  <button class="btn" data-doc="EXPLAINABILITY_IMPLEMENTATION.md">Explainability</button>
+  <button class="btn" data-doc="NORMALIZED_MCDA.md">Normalized MCDA</button>
+  <button class="btn" data-doc="MEASUREMENT_PLAN.md">Measurement Plan</button>
+  <button class="btn" data-doc="DEMO_FLOW.md">Demo Guide</button>
+  <button class="btn" data-doc="JOURNAL_ARTICLE_GUIDE.md">Journal Article Guide</button>
+    </div>
+    <div class="card">
+      <article id="content" class="markdown-body">
+        <div class="loading">Loading documentation…</div>
+      </article>
+    </div>
+    <footer style="margin-top:48px; border-top:1px solid rgba(59,130,246,0.2); padding:24px 0 0; text-align:center; color:#93c5fd; font-size:15px;">
+      Hybrid CSP + Expert System Approach | Based on Research by Olariu & Alboaie (2025)
+    </footer>
+  </div>
+
+  <!-- Marked (Markdown renderer) and DOMPurify (sanitize) -->
+  <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/dompurify@3.0.9/dist/purify.min.js"></script>
+  <script>
+    (function() {
+      const params = new URLSearchParams(location.search);
+      const contentEl = document.getElementById('content');
+      const docButtons = Array.from(document.querySelectorAll('[data-doc]'));
+      const defaultDoc = 'NEWS.md';
+      let initialDoc = params.get('doc') || defaultDoc;
+
+      function setHTML(html) { contentEl.innerHTML = html; }
+      function escapeHTML(s) { return s.replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
+
+      async function load(mdFile, updateURL = true) {
+  // Fetch from local backend for development, fallback to Heroku for production
+  const localUrl = `http://localhost:5055/api/docs/${mdFile}`;
+  const prodUrl = `https://migration-framework-c77589bc07d3.herokuapp.com/api/docs/${mdFile}`;
+  
+  // Try local first, fallback to production
+  let url = localUrl;
+  let usedFallback = false;
+  
+        try {
+          setHTML('<div class="loading">Loading documentation…</div>');
+          let res = await fetch(url, { credentials: 'omit' });
+          
+          // If local fails (404 or network error), try production
+          if (!res.ok && !usedFallback) {
+            url = prodUrl;
+            usedFallback = true;
+            res = await fetch(url, { credentials: 'omit' });
+          }
+          
+          if (!res.ok) throw new Error(`HTTP ${res.status}`);
+          const md = await res.text();
+          // Render markdown with marked, sanitize with DOMPurify
+          const rawHTML = marked.parse(md, { mangle: false, headerIds: true });
+          const cleanHTML = DOMPurify.sanitize(rawHTML, { USE_PROFILES: { html: true } });
+          setHTML(cleanHTML);
+          document.title = (md.match(/^#\s+(.+)$/m)?.[1] || 'Documentation') + ' · Docs';
+          if (updateURL) {
+            history.replaceState(null, '', `?doc=${encodeURIComponent(mdFile)}`);
+          }
+        } catch (e) {
+          setHTML(`<div class="error">Failed to load: ${escapeHTML(String(e))}<br/><small>Source: ${escapeHTML(url)}</small></div>`);
+        }
+      }
+
+      // Tab bar event listeners
+      docButtons.forEach(btn => {
+        btn.addEventListener('click', () => {
+          docButtons.forEach(b => b.classList.remove('bg-blue-600', 'text-white'));
+          btn.classList.add('bg-blue-600', 'text-white');
+          load(btn.getAttribute('data-doc'), true);
+        });
+      });
+
+      // Set initial active tab based on query param
+      let found = false;
+      docButtons.forEach(btn => {
+        if (btn.getAttribute('data-doc') === initialDoc) {
+          btn.classList.add('bg-blue-600', 'text-white');
+          found = true;
+        } else {
+          btn.classList.remove('bg-blue-600', 'text-white');
+        }
+      });
+      if (!found) docButtons[0].classList.add('bg-blue-600', 'text-white');
+      load(initialDoc, false);
+
+      document.getElementById('copyBtn').addEventListener('click', async () => {
+        try { await navigator.clipboard.writeText(location.href); } catch {}
+      });
+    })();
+  </script>
+</body>
+</html>

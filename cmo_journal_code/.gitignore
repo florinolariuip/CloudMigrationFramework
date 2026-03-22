@@ -1,0 +1,51 @@
+**/*.tex
+# Ignore all manuscript.md files in any subdirectory
+**/manuscript.md
+backend/.backend.log
+
+# Python
+*.py[cod]
+*$py.class
+*.so
+__pycache__/
+*.egg
+*.egg-info/
+dist/
+build/
+*.whl
+
+# Virtual environments
+.venv/
+venv/
+ENV/
+env/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Process IDs
+*.pid
+.backend.pid
+
+# Logs
+*.log
+debug.log
+
+# Temporary files
+*.tmp
+*.temp
+.cache/
+
+# Test cache
+.pytest_cache/
+
+# Jupyter notebooks
+.ipynb_checkpoints/

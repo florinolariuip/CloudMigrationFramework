@@ -1,0 +1,310 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Experiment Figures & Tables - CMO</title>
+  <link rel="icon" type="image/svg+xml" href="favicon.svg">
+  <link rel="alternate icon" href="favicon.svg">
+  <meta name="color-scheme" content="dark light">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/github-markdown-css/5.2.0/github-markdown.min.css" crossorigin="anonymous" />
+  <style>
+    body { background: #0b1020; color: #e6edf3; font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Ubuntu, Cantarell, Noto Sans, Helvetica Neue, Arial, Apple Color Emoji, Segoe UI Emoji; margin:0; }
+    .topbar { position: sticky; top:0; z-index:10; backdrop-filter: blur(10px); background: rgba(11,16,32,0.6); border-bottom: 1px solid rgba(59,130,246,0.25); }
+    .topbar .inner { max-width: 1100px; margin: 0 auto; padding: 12px 16px; display: flex; align-items: center; gap: 10px; }
+    .app-title { font-weight: 700; letter-spacing: 0.2px; }
+    .badge { font-size: 12px; padding:4px 10px; border-radius: 999px; background: rgba(59,130,246,.15); color:#93c5fd; border:1px solid rgba(59,130,246,.35); }
+    .btn { appearance:none; border:1px solid rgba(148,163,184,.25); color:#e5e7eb; background:#121a33; border-radius:10px; padding:8px 12px; cursor:pointer; transition:.15s; }
+    .btn:hover { border-color: rgba(148,163,184,.45); background:#0f162c; }
+    .wrap { max-width: 1100px; margin: 20px auto; padding: 0 16px 40px; }
+    .card { background: rgba(255,255,255,0.03); border:1px solid rgba(148,163,184,.15); border-radius: 14px; box-shadow: 0 10px 30px rgba(0,0,0,0.2); }
+    .markdown-body { box-sizing: border-box; min-width: 200px; max-width: 100%; padding: 30px; color: var(--fg); }
+    .markdown-body h1, .markdown-body h2, .markdown-body h3, .markdown-body h4 { border-bottom-color: rgba(148,163,184,.2) !important; }
+    .markdown-body table { display: block; overflow: auto; }
+    .loading { color:#93c5fd; font-size:14px; }
+    .error { color:#fca5a5; font-size:14px; }
+    @media (max-width: 768px) { .markdown-body { padding: 20px; } }
+    .figures-list { display: flex; flex-wrap: wrap; gap: 24px; margin: 32px 0; }
+    .fig-card { background: #181f36; border-radius: 10px; padding: 18px; box-shadow: 0 2px 8px #0002; border:1px solid #223; max-width: 420px; }
+    .fig-card img { max-width: 100%; border-radius: 6px; background: #fff; }
+    .fig-card .caption { color: #93c5fd; font-size: 15px; margin-top: 8px; }
+  </style>
+</head>
+<body>
+  <div class="topbar">
+    <div class="inner">
+      <span class="badge">Results</span>
+      <div class="app-title">Experiment Figures & Tables</div>
+      <div style="margin-left:auto; display:flex; gap:8px;">
+        <a href="index.html" class="btn">← Main Page</a>
+        <a href="docs.html" class="btn">Documentation</a>
+      </div>
+    </div>
+  </div>
+  <div class="wrap">
+    <div style="display:flex; align-items:center; gap:16px; margin-bottom:18px;">
+      <button class="btn" id="refreshBtn">🔄 Refresh Experiments</button>
+      <span id="lastRun" style="color:#93c5fd; font-size:15px;"></span>
+      <span id="loadingOverlay" style="display:none; color:#93c5fd; font-size:16px; margin-left:16px;">⏳ Running experiments…</span>
+    </div>
+    <div class="card markdown-body" style="margin-bottom:24px; padding:18px 30px;">
+      <h3 style="margin-top:0;">Experiment Parameters</h3>
+      <form id="paramsForm" style="display:flex; flex-wrap:wrap; gap:18px; align-items:center;">
+        <label>Budget ($): <input type="number" id="budgetInput" min="1000" max="50000" value="20000" style="width:90px;" /></label>
+        <label>Latency (ms): <input type="number" id="latencyInput" min="10" max="500" value="100" style="width:70px;" /></label>
+        <label>Providers: <input type="number" id="providersInput" min="1" max="20" value="10" style="width:60px;" /></label>
+        <label>Population Size: <input type="number" id="popSizeInput" min="10" max="200" value="50" style="width:70px;" /></label>
+        <label>Generations: <input type="number" id="nGenInput" min="10" max="500" value="100" style="width:70px;" /></label>
+        <label>Search Strategy:
+          <select id="searchStrategyInput" style="width:140px;">
+            <option value="exhaustive">Exhaustive</option>
+            <option value="heuristic">Heuristic</option>
+            <option value="random_sample">Random Sample</option>
+          </select>
+        </label>
+        <button type="submit" class="btn" style="margin-left:18px;">Run with Parameters</button>
+      </form>
+    </div>
+    <div class="card markdown-body" id="explanationsCard">
+      <div class="loading">Loading explanations…</div>
+    </div>
+    <h2>Figures</h2>
+    <div class="figures-list" id="figuresList">
+      <!-- Dynamic figures will be loaded here -->
+    </div>
+    <h2>Tables</h2>
+    <div class="card markdown-body" id="tablesCard">
+      <div class="loading">Loading tables…</div>
+    </div>
+    <h2 style="margin-bottom:0;">NSGA-II Results</h2>
+    <div style="margin-bottom:10px; color:#60a5fa; font-size:15px;">
+      <b>NSGA-II</b> (Non-dominated Sorting Genetic Algorithm II) is a popular multi-objective evolutionary algorithm. It sorts solutions by dominance and crowding distance, evolving a diverse Pareto front. NSGA-II is well-suited for problems where you want a spread of trade-off solutions.<br>
+      <span style="color:#3b82f6;">NSGA-II uses genetic operations and non-dominated sorting to find optimal trade-offs.</span>
+    </div>
+    <div class="card markdown-body" id="nsga2Card">
+      <div class="loading">Loading NSGA-II results…</div>
+    </div>
+    <h2 style="margin-bottom:0;">MOEA/D Results</h2>
+    <div style="margin-bottom:10px; color:#fbbf24; font-size:15px;">
+      <b>MOEA/D</b> (Multi-Objective Evolutionary Algorithm based on Decomposition) decomposes the multi-objective problem into many single-objective subproblems and solves them in parallel. It uses reference directions to guide the search and is effective for problems with complex Pareto fronts.<br>
+      <span style="color:#f59e42;">MOEA/D promotes diversity by solving many subproblems simultaneously.</span>
+    </div>
+    <div class="card markdown-body" id="moeadCard">
+      <div class="loading">Loading MOEA/D results…</div>
+    </div>
+  </div>
+  <script>
+  const API_BASE = 'https://migration-framework-c77589bc07d3.herokuapp.com';
+      // Utility to show/hide loading overlay
+      function setLoading(isLoading) {
+        document.getElementById('loadingOverlay').style.display = isLoading ? '' : 'none';
+        document.getElementById('refreshBtn').disabled = isLoading;
+      }
+
+      // Load last run timestamp
+      function loadLastRun() {
+        fetch(API_BASE + '/results/last_run.txt')
+          .then(r => r.ok ? r.text() : Promise.reject('Not found'))
+          .then(ts => {
+            document.getElementById('lastRun').textContent = 'Last run: ' + ts;
+          })
+          .catch(() => {
+            document.getElementById('lastRun').textContent = 'Last run: N/A';
+          });
+      }
+
+      // Load explanations, figures, tables, MOEA/D results
+      function loadFiguresAndTables() {
+        // NSGA-II Results
+        fetch(API_BASE + '/results/nsga2_results.csv')
+          .then(r => r.ok ? r.text() : Promise.reject('Not found'))
+          .then(csv => {
+            const rows = csv.trim().split('\n');
+            if (rows.length < 2) {
+              document.getElementById('nsga2Card').innerHTML = '<div class="error">No NSGA-II results found.</div>';
+              return;
+            }
+            const numSolutions = rows.length - 1;
+            const cards = rows.slice(1).map((row, i) => {
+              const cells = row.split(',');
+              let hvDisplay = 'N/A';
+              if (cells[3] && cells[3].trim() !== '') {
+                hvDisplay = `<span style='color:#3b82f6;font-weight:600;'>${parseFloat(cells[3]).toPrecision(5)}</span>`;
+              }
+              // NSGA-II card: blue accent, DNA icon, slightly different layout
+              return `<div style='background:#101a2c;border-radius:12px;padding:18px;margin-bottom:14px;box-shadow:0 2px 8px #0002;border:2px solid #3b82f6;max-width:340px;display:inline-block;margin-right:18px;'>
+                <div style='font-weight:600;color:#60a5fa;font-size:16px;margin-bottom:6px;'><span style="font-size:18px;">🧬</span> NSGA-II #${i+1}</div>
+                <div style='color:#e6edf3;font-size:15px;'>
+                  <b>Cost:</b> $${parseFloat(cells[1]).toFixed(2)}<br>
+                  <b>Latency:</b> ${parseFloat(cells[2]).toFixed(2)} ms<br>
+                  <b>Hypervolume:</b> ${hvDisplay}
+                </div>
+              </div>`;
+            }).join('');
+            document.getElementById('nsga2Card').innerHTML = `<div style='display:flex;flex-wrap:wrap;gap:10px;'>${cards}</div>`;
+          })
+          .catch(() => {
+            document.getElementById('nsga2Card').innerHTML = '<div class="error">No NSGA-II results found.</div>';
+          });
+      // Parameter form handler
+      document.getElementById('paramsForm').addEventListener('submit', function(e) {
+        e.preventDefault();
+        setLoading(true);
+        // Collect values
+        const budget = document.getElementById('budgetInput').value;
+        const latency = document.getElementById('latencyInput').value;
+        const providers = document.getElementById('providersInput').value;
+        const popSize = document.getElementById('popSizeInput').value;
+        const nGen = document.getElementById('nGenInput').value;
+        const searchStrategy = document.getElementById('searchStrategyInput').value;
+        // Send to backend
+        fetch(API_BASE + '/api/refresh_experiments', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            budget: Number(budget),
+            latency: Number(latency),
+            providers: Number(providers),
+            pop_size: Number(popSize),
+            n_gen: Number(nGen),
+            search_strategy: searchStrategy
+          })
+        })
+        .then(r => r.json())
+        .then(resp => {
+          setLoading(false);
+          if (resp.status === 'ok') {
+            loadFiguresAndTables();
+          } else {
+            document.getElementById('figuresList').innerHTML = '<div class="error">Experiment refresh failed: ' + (resp.message || 'Unknown error') + '</div>';
+            document.getElementById('tablesCard').innerHTML = '<div class="error">Experiment refresh failed: ' + (resp.message || 'Unknown error') + '</div>';
+            document.getElementById('moeadCard').innerHTML = '<div class="error">Experiment refresh failed: ' + (resp.message || 'Unknown error') + '</div>';
+          }
+        })
+        .catch(() => {
+          setLoading(false);
+          document.getElementById('figuresList').innerHTML = '<div class="error">Failed to trigger experiment refresh.</div>';
+          document.getElementById('tablesCard').innerHTML = '<div class="error">Failed to trigger experiment refresh.</div>';
+          document.getElementById('moeadCard').innerHTML = '<div class="error">Failed to trigger experiment refresh.</div>';
+        });
+      });
+        loadLastRun();
+        // Explanations
+        fetch(API_BASE + '/results/experiment_explanations.md')
+          .then(r => r.ok ? r.text() : Promise.reject('Not found'))
+          .then(md => {
+            const content = window.marked.parse(md);
+            document.getElementById('explanationsCard').innerHTML = content;
+          })
+          .catch(() => {
+            document.getElementById('explanationsCard').innerHTML = '<div class="error">No explanations found. Run experiments to generate results.</div>';
+          });
+        // Figures
+        fetch(API_BASE + '/api/results/images')
+          .then(r => r.ok ? r.json() : Promise.reject('No images'))
+          .then(files => {
+            const container = document.getElementById('figuresList');
+            if (!files.length) {
+              container.innerHTML = '<div class="error">No figures found. Run experiments to generate results.</div>';
+              return;
+            }
+            container.innerHTML = files.map(f => `
+              <div class="fig-card">
+                <img src="${API_BASE}/results/${f}" alt="${f}" />
+                <div class="caption">${f.replace(/_/g, ' ').replace(/\.[a-z]+$/i, '')}</div>
+              </div>
+            `).join('');
+          })
+          .catch(() => {
+            document.getElementById('figuresList').innerHTML = '<div class="error">No figures found. Run experiments to generate results.</div>';
+          });
+        // Tables
+        fetch(API_BASE + '/results/experiment_tables.md')
+          .then(r => r.ok ? r.text() : Promise.reject('Not found'))
+          .then(md => {
+            const content = window.marked.parse(md);
+            document.getElementById('tablesCard').innerHTML = content;
+          })
+          .catch(() => {
+            document.getElementById('tablesCard').innerHTML = '<div class="error">No tables found. Run experiments to generate results.</div>';
+          });
+        // MOEA/D Results
+        fetch(API_BASE + '/results/moead_results.csv')
+          .then(r => r.ok ? r.text() : Promise.reject('Not found'))
+          .then(csv => {
+            const rows = csv.trim().split('\n');
+            if (rows.length < 2) {
+              document.getElementById('moeadCard').innerHTML = '<div class="error">No MOEA/D results found.</div>';
+              return;
+            }
+            const header = rows[0].split(',');
+            // Table style: striped, compact, highlight header
+            const table = `<table style="width:100%;border-collapse:collapse;font-size:15px;">
+              <thead style="background:#223;color:#93c5fd;">
+                <tr>${header.map(h => `<th style='padding:8px 6px;border-bottom:2px solid #3b82f6;'>${h}</th>`).join('')}</tr>
+              </thead>
+              <tbody>
+                ${rows.slice(1).map((row,i) => `<tr style='background:${i%2===0?'#181f36':'#121a33'};'>${row.split(',').map(cell => `<td style='padding:7px 6px;border-bottom:1px solid #223;'>${cell}</td>`).join('')}</tr>`).join('')}
+              </tbody>
+            </table>`;
+            // Card-based display for MOEA/D solutions
+            const numSolutions = rows.length - 1;
+            const explanation = `<div style='margin-bottom:18px;color:#93c5fd;font-size:15px;'>
+              <b>MOEA/D Results:</b> Multi-Objective Evolutionary Algorithm based on Decomposition was run to find Pareto-optimal solutions for cloud migration, optimizing for both cost and latency.<br>
+              <b>Number of solutions found:</b> ${numSolutions}<br>
+              <b>What was run:</b> MOEA/D explored many possible service configurations, seeking trade-offs where no solution is strictly better in both objectives.<br>
+              <b>Interpretation:</b> In this run, all solutions have identical cost and latency values. This suggests the search space is highly constrained, the objectives or constraints are set so only one configuration is feasible and optimal, or the algorithm parameters (population size, generations) are too low for meaningful exploration.<br>
+              <b>What to do next:</b> Try increasing population size and generations, or vary constraints and scenario parameters to reveal more diverse trade-offs.<br>
+            </div>`;
+            // Parse rows for cards
+            const cards = rows.slice(1).map((row, i) => {
+              const cells = row.split(',');
+              let hvDisplay = 'N/A';
+              if (cells[3] && cells[3].trim() !== '') {
+                hvDisplay = `<span style='color:#3b82f6;font-weight:600;'>${parseFloat(cells[3]).toPrecision(5)}</span>`;
+              }
+              return `<div style='background:#181f36;border-radius:12px;padding:18px;margin-bottom:14px;box-shadow:0 2px 8px #0002;border:1px solid #223;max-width:340px;display:inline-block;margin-right:18px;'>
+                <div style='font-weight:600;color:#3b82f6;font-size:16px;margin-bottom:6px;'>Solution #${i+1}</div>
+                <div style='color:#e6edf3;font-size:15px;'>
+                  <b>Cost:</b> $${parseFloat(cells[1]).toFixed(2)}<br>
+                  <b>Latency:</b> ${parseFloat(cells[2]).toFixed(2)} ms<br>
+                  <b>Hypervolume:</b> ${hvDisplay}
+                </div>
+              </div>`;
+            }).join('');
+            document.getElementById('moeadCard').innerHTML = explanation + `<div style='display:flex;flex-wrap:wrap;gap:10px;'>${cards}</div>`;
+          })
+          .catch(() => {
+            document.getElementById('moeadCard').innerHTML = '<div class="error">No MOEA/D results found.</div>';
+          });
+      }
+
+      // Refresh button handler
+      document.getElementById('refreshBtn').addEventListener('click', () => {
+        setLoading(true);
+        fetch(API_BASE + '/api/refresh_experiments', { method: 'POST' })
+          .then(r => r.json())
+          .then(resp => {
+            setLoading(false);
+            if (resp.status === 'ok') {
+              loadFiguresAndTables();
+            } else {
+              document.getElementById('figuresList').innerHTML = '<div class="error">Experiment refresh failed: ' + (resp.message || 'Unknown error') + '</div>';
+              document.getElementById('tablesCard').innerHTML = '<div class="error">Experiment refresh failed: ' + (resp.message || 'Unknown error') + '</div>';
+              document.getElementById('moeadCard').innerHTML = '<div class="error">Experiment refresh failed: ' + (resp.message || 'Unknown error') + '</div>';
+            }
+          })
+          .catch(() => {
+            setLoading(false);
+            document.getElementById('figuresList').innerHTML = '<div class="error">Failed to trigger experiment refresh.</div>';
+            document.getElementById('tablesCard').innerHTML = '<div class="error">Failed to trigger experiment refresh.</div>';
+            document.getElementById('moeadCard').innerHTML = '<div class="error">Failed to trigger experiment refresh.</div>';
+          });
+      });
+
+      // Initial load
+      setLoading(false);
+      loadFiguresAndTables();
+    </script>
+  </body>
+</html>

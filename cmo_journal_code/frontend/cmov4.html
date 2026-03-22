@@ -1,0 +1,2171 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Cloud Migration Optimizer v4</title>
+  <link rel="icon" type="image/svg+xml" href="favicon.svg">
+  <link rel="alternate icon" href="favicon.svg">
+  <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+  <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.plot.ly/plotly-2.27.0.min.js"></script>
+</head>
+<body class="bg-gradient-to-br from-slate-900 via-blue-900 to-slate-900">
+  <nav class="bg-slate-900/80 backdrop-blur-md shadow-lg px-6 py-4 flex items-center justify-between border-b border-blue-500/30">
+    <div class="flex items-center gap-2">
+      <span class="font-bold text-xl bg-gradient-to-r from-cyan-400 to-blue-500 bg-clip-text text-transparent">Cloud Migration Optimizer v4</span>
+    </div>
+    <div class="flex gap-4">
+      <a href="index.html" class="text-blue-400 hover:text-cyan-400 transition">CMOv3</a>
+      <a href="cmov4-components.html" class="text-green-400 hover:text-emerald-400 transition">🧩 Components</a>
+      <a href="docs.html" class="text-blue-400 hover:text-cyan-400 transition">Docs</a>
+    </div>
+  </nav>
+  <div id="root" class="max-w-6xl mx-auto mt-8 px-4"></div>
+
+  <script type="text/babel">
+    const { useState, useEffect } = React;
+
+    const scenarios = [
+      { name: "5 Components", key: 0, description: "Monolith, React, Python, Postgres, Redis, Prometheus" },
+      { name: "10 Components", key: 1, description: "Microservices, Angular, Java, MySQL, Memcached, Grafana, RabbitMQ, S3, Nginx, Vault" },
+      { name: "18 Components", key: 2, description: "Event-driven, Vue, Go, SQL Server, MongoDB, Redis, Datadog, Kafka, Kinesis, Blob, HAProxy, Restic, Keycloak, Cloudflare, Mixpanel, AWS KMS, Docker, Lambda, Auth0, AWS IoT" }
+    ];
+
+    // Dynamic API base URL - works locally and on Heroku
+    const API_BASE = (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')
+      ? 'http://localhost:5055'
+      : '';
+
+    function App() {
+      const [mode, setMode] = useState('preset');
+      const [selected, setSelected] = useState(0);
+      const [loading, setLoading] = useState(false);
+      const [results, setResults] = useState(null);
+      const [rawV4, setRawV4] = useState(null);
+      const [showRaw, setShowRaw] = useState(false);
+      
+      // Baseline comparison
+      const [baselineComparison, setBaselineComparison] = useState(null);
+      const [loadingBaselines, setLoadingBaselines] = useState(false);
+
+      // Workload profile
+      const [requestsPerMonth, setRequestsPerMonth] = useState('1000000');
+      const [crossAzGb, setCrossAzGb] = useState('100');
+      const [internetEgressGb, setInternetEgressGb] = useState('500');
+      const [ebsGb, setEbsGb] = useState('1000');
+      const [rdsBackupGb, setRdsBackupGb] = useState('200');
+      const [s3Gb, setS3Gb] = useState('5000');
+
+      // Preferences
+      const [preferredProvider, setPreferredProvider] = useState('');
+      const [prioritizeCost, setPrioritizeCost] = useState(false);
+      const [prioritizePerformance, setPrioritizePerformance] = useState(false);
+
+      // Custom scenario constraints
+  const [maxBudget, setMaxBudget] = useState('5000');
+      const [maxLatency, setMaxLatency] = useState('150');
+  // Latency model selection
+  const [latencyModel, setLatencyModel] = useState('avg_latency');
+
+    // Custom scenario
+    const [customArchPattern, setCustomArchPattern] = useState('microservices');
+    const [customComponents, setCustomComponents] = useState([]);
+    // Always keep all three providers selected for academic consistency
+    const [customProviders, setCustomProviders] = useState(['AWS', 'Azure', 'GCP']);
+      const [searchStrategy, setSearchStrategy] = useState('heuristic');
+      const [sampleSize, setSampleSize] = useState('1000');
+
+  // Network latency override state (fetched on load)
+  const [networkLatency, setNetworkLatency] = useState(null);
+  const [loadingNetworkLatency, setLoadingNetworkLatency] = useState(true);
+  const [networkLatencyError, setNetworkLatencyError] = useState(null);
+  const [showNetworkLatencyBanner, setShowNetworkLatencyBanner] = useState(true);
+
+      const architecturePatterns = [
+        { id: 'monolith', name: 'Monolith', recommended: ['web','compute','database','cache','monitoring'] },
+        { id: 'microservices', name: 'Microservices', recommended: ['web','compute','database','nosql','cache','monitoring','message_queue','load_balancer','storage','identity'] },
+        { id: 'event-driven', name: 'Event-Driven', recommended: ['web','compute','database','nosql','cache','monitoring','message_queue','event_streaming','serverless_compute','storage','analytics','iot'] }
+      ];
+
+      const componentTypes = [
+        { type: 'web', label: 'Web Frontend' },
+        { type: 'compute', label: 'Application Server' },
+        { type: 'database', label: 'Database' },
+        { type: 'nosql', label: 'NoSQL Database' },
+        { type: 'cache', label: 'Cache' },
+        { type: 'monitoring', label: 'Monitoring' },
+        { type: 'message_queue', label: 'Message Queue' },
+        { type: 'event_streaming', label: 'Event Streaming' },
+        { type: 'storage', label: 'Object Storage' },
+        { type: 'load_balancer', label: 'Load Balancer' },
+        { type: 'backup', label: 'Backup' },
+        { type: 'security', label: 'Security / Secrets' },
+        { type: 'cdn', label: 'CDN' },
+        { type: 'analytics', label: 'Analytics' },
+        { type: 'encryption', label: 'Encryption / KMS' },
+        { type: 'containers', label: 'Containers' },
+        { type: 'serverless_compute', label: 'Serverless' },
+        { type: 'identity', label: 'Identity Management' },
+        { type: 'iot', label: 'IoT Platform' },
+      ];
+
+      const searchStrategies = [
+        { id: 'heuristic', name: 'Smart Heuristic (CMOv4)', description: '~50 strategic combinations: min-cost, min-latency, balanced, provider-specific, random' },
+        { id: 'random_sample', name: 'Random Sampling', description: 'Fast, explores diverse solutions (legacy)' },
+        { id: 'exhaustive', name: 'Exhaustive Search', description: 'Thorough, checks all combinations (very slow)' }
+      ];
+
+      const applyRecommendedComponents = () => {
+        const p = architecturePatterns.find(x => x.id === customArchPattern);
+        if (p) setCustomComponents(p.recommended);
+      };
+
+      // Auto-apply recommended components when architecture pattern changes
+      useEffect(() => {
+        applyRecommendedComponents();
+      }, [customArchPattern]);
+
+      // ===== NORMALIZATION FUNCTION (v2.0.1 - WITH TIMING FIX) =====
+      function normalizeV4(v4) {
+        console.log('[normalizeV4 v2.0.1 LOADED] Input metrics:', v4?.metrics);
+        if (!v4) return null;
+        const paretoSolutions = v4.pareto_frontier || [];
+        const metrics = v4.metrics || {};
+        const extremes = v4.extreme_solutions || {};
+        
+        console.log('[normalizeV4] Extracting timing - total_time_ms:', metrics.total_time_ms);
+        
+        return {
+          metrics: {
+            feasible_space_size: metrics.feasible_count || 0,
+            pareto_frontier_size: metrics.pareto_count || paretoSolutions.length || 0,
+            // CRITICAL: Include timing data for baseline comparison
+            total_time_ms: metrics.total_time_ms || 0,
+            csp_time_ms: metrics.csp_time_ms || 0,
+            expert_time_ms: metrics.expert_time_ms || 0,
+            pareto_time_ms: metrics.pareto_time_ms || 0,
+          },
+          paretoFrontier: {
+            size: metrics.pareto_count || paretoSolutions.length || 0,
+            solutions: paretoSolutions,
+            metrics: {
+              hypervolume: metrics.pareto_metrics?.hypervolume || metrics.hypervolume || 0,
+              spacing: metrics.pareto_metrics?.spacing || metrics.spacing || 0,
+              coverage_rate: metrics.pareto_metrics?.coverage_rate || metrics.coverage_rate || 0,
+              cost_range: metrics.pareto_metrics?.cost_range || metrics.cost_range || {},
+              latency_range: metrics.pareto_metrics?.latency_range || metrics.latency_range || {},
+            },
+            extremeSolutions: {
+              minCost: extremes.min_cost || null,
+              minLatency: extremes.min_latency || null,
+              balanced: extremes.balanced || null,
+            }
+          },
+          solutions: v4.solutions || [],
+          topSolution: v4.solutions && v4.solutions.length ? v4.solutions[0] : null,
+          explanations: v4.explanations || [],
+          suggestions: v4.suggestions || [],
+          sankeyDiagram: null,
+          latencyModel: metrics.latency_model || 'avg_latency',
+        };
+      }
+
+      async function enrichWithSankey(normalized) {
+        try {
+          if (!normalized?.topSolution?.configuration) return normalized;
+          const sol = normalized.topSolution;
+          const payloadBase = {
+            configuration: sol.configuration,
+            cost: sol.cost,
+            latency: sol.latency,
+            providers: sol.providers,
+            providerDistribution: sol.providerDistribution || undefined,
+          };
+          const [costRes, latRes] = await Promise.all([
+            fetch(`${API_BASE}/api/sankey`, { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ ...payloadBase, type: 'cost' }) }),
+            fetch(`${API_BASE}/api/sankey`, { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ ...payloadBase, type: 'latency' }) }),
+          ]);
+          const costFlow = costRes.ok ? await costRes.json() : null;
+          const latencyFlow = latRes.ok ? await latRes.json() : null;
+          return { ...normalized, sankeyDiagram: { costFlow, latencyFlow } };
+        } catch (e) {
+          console.warn('Sankey enrichment failed:', e);
+          return normalized;
+        }
+      }
+
+      const handleRun = async () => {
+        setLoading(true); setResults(null); setRawV4(null);
+        try {
+          const qs = new URLSearchParams({
+            scenario: String(selected),
+            requests_per_month: String(requestsPerMonth),
+            cross_az_gb: String(crossAzGb),
+            internet_egress_gb: String(internetEgressGb),
+            ebs_gb: String(ebsGb),
+            rds_backup_gb: String(rdsBackupGb),
+            s3_gb: String(s3Gb),
+            preferred_provider: preferredProvider || '',
+            prioritize_cost: prioritizeCost ? '1' : '0',
+            prioritize_performance: prioritizePerformance ? '1' : '0',
+            latency_model: String(latencyModel)
+          }).toString();
+          const res = await fetch(`${API_BASE}/api/benchmark?${qs}`);
+          const data = await res.json();
+          const v4 = data?.v4;
+          setRawV4(v4);
+          let normalized = normalizeV4(v4);
+          normalized = await enrichWithSankey(normalized);
+          setResults(normalized);
+        } catch (e) {
+          setResults({ error: 'Failed to run benchmark.' });
+        } finally {
+          setLoading(false);
+        }
+      };
+
+      // Fetch network latency override on mount
+      useEffect(() => {
+        fetchNetworkLatency();
+      }, []);
+
+      const fetchNetworkLatency = async () => {
+        setLoadingNetworkLatency(true);
+        setNetworkLatencyError(null);
+        try {
+          const res = await fetch(`${API_BASE}/api/network-latency`);
+          if (!res.ok) throw new Error('Failed to fetch network latency info');
+          const data = await res.json();
+          setNetworkLatency(data);
+        } catch (e) {
+          console.error('Failed to fetch network latency info:', e);
+          setNetworkLatencyError(e.message);
+        } finally {
+          setLoadingNetworkLatency(false);
+        }
+      };
+
+      const handleCustomRun = async () => {
+        setLoading(true); setResults(null); setRawV4(null);
+        try {
+          const techStackMap = {
+            'web': { framework: 'React' },
+            'compute': { language: 'Python' },
+            'database': { engine: 'Postgres' },
+            'cache': { engine: 'Redis' },
+            'monitoring': { tool: 'Prometheus' },
+            'message_queue': { engine: 'RabbitMQ' },
+            'storage': { engine: 'S3' },
+            'load_balancer': { engine: 'Nginx' },
+            'backup': { tool: 'Velero' },
+            'security': { tool: 'Vault' },
+            'cdn': { engine: 'Cloudflare' },
+            'analytics': { tool: 'Mixpanel' },
+            'encryption': { tool: 'AWS KMS' },
+            'containers': { engine: 'Docker' },
+            'serverless_compute': { engine: 'AWS Lambda' },
+            'nosql': { engine: 'MongoDB' },
+            'event_streaming': { engine: 'Kinesis' },
+            'identity': { tool: 'Auth0' },
+            'iot': { platform: 'AWS IoT' }
+          };
+          const components = customComponents.map((type, idx) => ({
+            name: `Component${idx+1}`,
+            type,
+            instance_count: 1,
+            tech_stack: techStackMap[type] || {},
+            dependencies: []
+          }));
+          const scenario = {
+            architecture: {
+              architecture_pattern: customArchPattern,
+              components,
+              relationships: [],
+              multi_tenancy: customArchPattern !== 'monolith',
+              selection_rules: [],
+            },
+            constraints: {
+              maxBudget: Number(maxBudget),
+              maxLatency: Number(maxLatency),
+              requiredProviders: customProviders,
+              performanceMetric: latencyModel,
+              usage_profile: {
+                requests_per_month: Number(requestsPerMonth),
+                cross_az_gb: Number(crossAzGb),
+                internet_egress_gb: Number(internetEgressGb),
+                ebs_gb: Number(ebsGb),
+                rds_backup_gb: Number(rdsBackupGb),
+                s3_gb: Number(s3Gb)
+              }
+            },
+            preferences: {
+              preferredProvider: preferredProvider || null,
+              prioritizeCost: prioritizeCost,
+              prioritizePerformance: prioritizePerformance
+            },
+            config: { search_strategy: searchStrategy, sample_size: Number(sampleSize) }
+          };
+          const res = await fetch(`${API_BASE}/api/benchmark/dynamic`, {
+            method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ scenario })
+          });
+          const data = await res.json();
+          const v4 = data?.v4;
+          setRawV4(v4);
+          let normalized = normalizeV4(v4);
+          normalized = await enrichWithSankey(normalized);
+          setResults(normalized);
+        } catch (e) {
+          setResults({ error: 'Failed to run custom benchmark.' });
+        } finally {
+          setLoading(false);
+        }
+      };
+
+      const downloadPDFReport = async (results) => {
+        try {
+          // Prepare scenario info - ensure all numeric values are numbers
+          const scenarioInfo = {
+            scenario_name: mode === 'preset' ? `Preset Scenario ${selected}` : 'Custom Scenario',
+            architecture_pattern: customArchPattern || 'microservices',
+            components_count: mode === 'custom' ? customComponents.length : (selected === 0 ? 5 : selected === 1 ? 10 : 18),
+            max_budget: Number(maxBudget) || 5000,
+            max_latency: Number(maxLatency) || 150,
+            requests_per_month: Number(requestsPerMonth) || 1000000,
+            cross_az_gb: Number(crossAzGb) || 100,
+            internet_egress_gb: Number(internetEgressGb) || 500,
+            ebs_gb: Number(ebsGb) || 200,
+            rds_backup_gb: Number(rdsBackupGb) || 50,
+            s3_gb: Number(s3Gb) || 1000,
+            preferred_provider: preferredProvider || 'None',
+            prioritize_cost: Boolean(prioritizeCost),
+            prioritize_performance: Boolean(prioritizePerformance),
+            search_strategy: searchStrategy || 'adaptive',
+            sample_size: Number(sampleSize) || 100,
+            latency_model: (results?.latencyModel || latencyModel || 'avg_latency')
+          };
+
+          // Prepare solution data - ensure numeric fields are numbers
+          const solution = {
+            ...results.topSolution,
+            cost: Number(results.topSolution.cost) || 0,
+            latency: Number(results.topSolution.latency) || 0,
+            providers: Number(results.topSolution.providers) || 1,
+            score: Number(results.topSolution.score) || 0,
+            pareto_rank: 1,
+            pareto_frontier_info: results.paretoFrontier,
+            explanations: results.explanations || [],
+          };
+
+          // Call PDF generation endpoint
+          const response = await fetch(`${API_BASE}/api/cmov4/generate-pdf`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ solution, scenario_info: scenarioInfo }),
+          });
+
+          if (!response.ok) {
+            const errorData = await response.json().catch(() => ({ error: response.statusText }));
+            throw new Error(errorData.error || `PDF generation failed: ${response.statusText}`);
+          }
+
+          // Download the PDF
+          const blob = await response.blob();
+          const url = window.URL.createObjectURL(blob);
+          const a = document.createElement('a');
+          a.href = url;
+          a.download = `CMOv4_Report_${new Date().toISOString().replace(/[:.]/g, '-')}.pdf`;
+          document.body.appendChild(a);
+          a.click();
+          window.URL.revokeObjectURL(url);
+          document.body.removeChild(a);
+        } catch (error) {
+          console.error('PDF download error:', error);
+          alert(`Failed to download PDF report: ${error.message}`);
+        }
+      };
+
+      const runBaselineComparison = async () => {
+        if (!results || !results.topSolution) {
+          alert('Please run optimization first to generate results.');
+          return;
+        }
+        
+        setLoadingBaselines(true);
+        try {
+          // Extract actual components from the benchmark results
+          const actualComponents = results.topSolution.configuration 
+            ? Object.keys(results.topSolution.configuration) 
+            : (mode === 'custom' ? customComponents : ['web', 'compute', 'database', 'cache', 'monitoring']);
+          
+          console.log('Benchmark results:', results);
+          console.log('Extracted components:', actualComponents);
+          console.log('Max budget:', maxBudget, 'Max latency:', maxLatency);
+          console.log('Pareto frontier from benchmark:', results.paretoFrontier);
+          console.log('Pareto solutions array:', results.paretoFrontier?.solutions);
+          console.log('Timing data:', results.timing);
+          
+          // Prepare scenario parameters using actual benchmark constraints and timing
+          const scenario = {
+            components: actualComponents,
+            maxBudget: Number(maxBudget) || 5000,
+            maxLatency: Number(maxLatency) || 150,
+            maxProviders: 3,
+            // Send the existing Pareto frontier solutions array from the benchmark
+            paretoFrontier: results.paretoFrontier?.solutions || [],
+            // Send accurate timing data from CMOv4 optimization
+            // IMPORTANT: CMOv4 returns timing in results.metrics, not results.timing
+            timing: {
+              csp_time_ms: results.metrics?.csp_time_ms || 0,
+              expert_time_ms: results.metrics?.expert_time_ms || 0,
+              pareto_time_ms: results.metrics?.pareto_time_ms || 0,
+              total_time_ms: results.metrics?.total_time_ms || 0
+            }
+          };
+          
+          console.log('[Baseline Comparison] Full results object:', results);
+          console.log('[Baseline Comparison] results.metrics:', results.metrics);
+          console.log('[Baseline Comparison] Scenario:', scenario);
+          console.log('[Baseline Comparison] CMOv4 Timing:', scenario.timing);
+          console.log('[DEBUG] total_time_ms value:', results.metrics?.total_time_ms);
+          
+          // TEMPORARY DEBUG: Show timing value on screen
+          if (!results.metrics?.total_time_ms || results.metrics?.total_time_ms === 0) {
+            alert('⚠️ DEBUG: total_time_ms is missing or zero!\n\nresults.metrics = ' + JSON.stringify(results.metrics, null, 2));
+          }
+          
+          console.log('Sending scenario to backend:', scenario);
+
+          const res = await fetch(`${API_BASE}/api/cmov4/compare-baselines`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ scenario })
+          });
+
+          if (!res.ok) {
+            throw new Error(`HTTP ${res.status}: ${res.statusText}`);
+          }
+
+          const data = await res.json();
+          setBaselineComparison(data);
+          console.log('Baseline comparison results:', data);
+        } catch (e) {
+          console.error('Baseline comparison failed:', e);
+          alert(`Baseline comparison failed: ${e.message}`);
+        } finally {
+          setLoadingBaselines(false);
+        }
+      };
+
+      return (
+        <div className="p-4 min-h-screen">
+          <div className="mb-6 flex items-center gap-4">
+            <button 
+              onClick={() => setMode('preset')} 
+              className={`px-6 py-3 rounded-xl font-semibold transition ${mode==='preset' ? 'bg-gradient-to-r from-blue-600 to-cyan-600 text-white shadow-lg' : 'bg-white/10 backdrop-blur-md border border-blue-500/30 text-blue-300 hover:bg-white/20'}`}>
+              Preset Scenarios
+            </button>
+            <button 
+              onClick={() => setMode('custom')} 
+              className={`px-6 py-3 rounded-xl font-semibold transition ${mode==='custom' ? 'bg-gradient-to-r from-purple-600 to-pink-600 text-white shadow-lg' : 'bg-white/10 backdrop-blur-md border border-purple-500/30 text-purple-300 hover:bg-white/20'}`}>
+              Custom Scenario
+            </button>
+          </div>
+
+          {/* Network Latency Configuration Banner */}
+          {loadingNetworkLatency && (
+            <div className="bg-blue-500/20 backdrop-blur-md rounded-xl p-4 mb-6 border border-blue-500/30 flex items-center gap-3">
+              <div className="w-5 h-5 border-2 border-blue-400/30 border-t-blue-400 rounded-full animate-spin" />
+              <span className="text-blue-200">Loading network latency configuration...</span>
+            </div>
+          )}
+          {networkLatencyError && (
+            <div className="bg-red-500/20 backdrop-blur-md rounded-xl p-4 mb-6 border border-red-500/30">
+              <div className="flex items-center justify-between">
+                <span className="text-red-200">⚠️ Error loading network latency info: {networkLatencyError}</span>
+                <button onClick={() => fetchNetworkLatency()} className="px-3 py-1 bg-red-600 text-white rounded hover:bg-red-700 transition text-sm">
+                  Retry
+                </button>
+              </div>
+            </div>
+          )}
+          {networkLatency && !loadingNetworkLatency && (
+            <div className="bg-cyan-500/10 backdrop-blur-md rounded-xl mb-6 border border-cyan-500/20">
+              <div className="flex items-center justify-between p-4 cursor-pointer" onClick={() => setShowNetworkLatencyBanner(!showNetworkLatencyBanner)}>
+                <div className="text-cyan-200">
+                  <div className="font-semibold">Network latency configuration</div>
+                  {!showNetworkLatencyBanner && (
+                    <div className="text-xs text-cyan-300 mt-0.5">
+                      Override: {networkLatency.status?.has_override ? 'Active' : 'None'}
+                      {typeof networkLatency.status?.entries === 'number' && ` • Entries: ${networkLatency.status.entries}`}
+                    </div>
+                  )}
+                </div>
+                <div className="flex items-center gap-2">
+                  <button onClick={(e) => { e.stopPropagation(); fetchNetworkLatency(); }} className="px-3 py-1 bg-cyan-600 text-white rounded hover:bg-cyan-700 transition text-sm">
+                    Refresh
+                  </button>
+                  <svg className={`w-5 h-5 text-cyan-400 transition-transform ${showNetworkLatencyBanner ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                  </svg>
+                </div>
+              </div>
+              {showNetworkLatencyBanner && (
+                <div className="px-4 pb-4 pt-0 text-sm text-cyan-200 space-y-1">
+                  <div>Override status: <strong>{networkLatency.status?.has_override ? 'Active' : 'None'}</strong></div>
+                  {typeof networkLatency.status?.entries === 'number' && (
+                    <div>Override entries: <strong>{networkLatency.status.entries}</strong></div>
+                  )}
+                  {typeof networkLatency.status?.ttl_seconds === 'number' && (
+                    <div>TTL: <strong>{networkLatency.status.ttl_seconds}s</strong></div>
+                  )}
+                  {typeof networkLatency.status?.age_seconds === 'number' && (
+                    <div>Age: <strong>{Math.floor(networkLatency.status.age_seconds)}s</strong></div>
+                  )}
+                  {networkLatency.override && (
+                    <div className="mt-2 text-xs text-cyan-300">
+                      Showing up to 6 override entries:
+                      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2 mt-2">
+                        {Object.entries(networkLatency.override).slice(0,6).map(([k,v]) => (
+                          <div key={k} className="bg-cyan-500/10 border border-cyan-500/20 rounded px-2 py-1">
+                            <span className="font-mono">{k}</span>: <span className="font-semibold">{v} ms</span>
+                          </div>
+                        ))}
+                      </div>
+                      {Object.entries(networkLatency.override).length > 6 && (
+                        <div className="mt-1">… and {Object.entries(networkLatency.override).length - 6} more</div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Validation Cards */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+            {/* Unit Tests Card (Core Optimization Suite) */}
+            <div className="bg-gradient-to-br from-emerald-500/20 to-green-500/20 backdrop-blur-md rounded-xl p-6 border border-emerald-500/30 shadow-xl">
+              <div className="flex items-start justify-between mb-4">
+                <div>
+                  <h3 className="text-xl font-bold text-emerald-300 flex items-center gap-2">
+                    <span className="text-2xl">✅</span>
+                    Unit Test Coverage
+                  </h3>
+                  <p className="text-emerald-200/80 text-sm mt-1">Core optimization validation suite</p>
+                </div>
+                <div className="bg-emerald-500/30 rounded-lg px-3 py-1 text-emerald-200 font-bold text-sm">
+                  14/14 PASSED
+                </div>
+              </div>
+              
+              <div className="space-y-2 mb-4">
+                <div className="flex items-center justify-between text-sm">
+                  <span className="text-emerald-100">CSP Constraint Satisfaction</span>
+                  <span className="text-emerald-300 font-semibold">3/3 ✓</span>
+                </div>
+                <div className="flex items-center justify-between text-sm">
+                  <span className="text-emerald-100">Solution Deduplication</span>
+                  <span className="text-emerald-300 font-semibold">2/2 ✓</span>
+                </div>
+                <div className="flex items-center justify-between text-sm">
+                  <span className="text-emerald-100">Pareto Frontier Optimization</span>
+                  <span className="text-emerald-300 font-semibold">3/3 ✓</span>
+                </div>
+                <div className="flex items-center justify-between text-sm">
+                  <span className="text-emerald-100">Budget-Relative Thresholds</span>
+                  <span className="text-emerald-300 font-semibold">1/1 ✓</span>
+                </div>
+                <div className="flex items-center justify-between text-sm">
+                  <span className="text-emerald-100">CMOv4 Instance Scaling</span>
+                  <span className="text-emerald-300 font-semibold">3/3 ✓</span>
+                </div>
+                <div className="flex items-center justify-between text-sm">
+                  <span className="text-emerald-100">Expert System Rules</span>
+                  <span className="text-emerald-300 font-semibold">2/2 ✓</span>
+                </div>
+              </div>
+              
+              <div className="pt-3 border-t border-emerald-500/30">
+                <p className="text-xs text-emerald-200/70">
+                  All core optimization algorithms validated: constraint satisfaction, deduplication (~50% reduction), 
+                  Pareto non-dominance, budget-adaptive thresholds, and instance count scaling.
+                </p>
+              </div>
+            </div>
+
+            {/* Extended Backend Tests Card */}
+            <div className="bg-gradient-to-br from-emerald-500/15 to-teal-500/20 backdrop-blur-md rounded-xl p-6 border border-emerald-400/30 shadow-xl">
+              <div className="flex items-start justify-between mb-4">
+                <div>
+                  <h3 className="text-xl font-bold text-emerald-200 flex items-center gap-2">
+                    <span className="text-2xl">🧪</span>
+                    Extended Backend Tests
+                  </h3>
+                  <p className="text-emerald-100/80 text-sm mt-1">Pricing, caching, explainability & baselines</p>
+                </div>
+                <div className="bg-emerald-500/20 rounded-lg px-3 py-1 text-emerald-100 font-bold text-xs text-right">
+                  Full backend suite
+                  <br />
+                  <span className="font-normal opacity-80">32 tests · 10 subtests</span>
+                </div>
+              </div>
+
+              <ul className="text-xs text-emerald-100/90 space-y-2 mb-4 list-disc list-inside">
+                <li>
+                  <span className="font-semibold">Pricing validation:</span> live Azure Retail API vs. static tables, 
+                  fallback coverage, and price sanity checks.
+                </li>
+                <li>
+                  <span className="font-semibold">Caching behavior:</span> ServiceDataCache TTL refresh, stale vs. fresh 
+                  pricing, and cache invalidation paths.
+                </li>
+                <li>
+                  <span className="font-semibold">Explainability metrics:</span> explanation accuracy, label thresholds 
+                  (High / Moderate / Needs Review), and consistency across runs.
+                </li>
+                <li>
+                  <span className="font-semibold">Baseline comparisons:</span> CMOv3 vs. CMOv4 cost/latency parity checks 
+                  and sanity checks for hypervolume-based improvements.
+                </li>
+              </ul>
+
+              <div className="pt-3 border-t border-emerald-500/30">
+                <p className="text-xs text-emerald-200/70">
+                  These tests complement the core 14/14 optimization suite and validate the surrounding infrastructure: 
+                  live pricing, caching, explainability metrics, and baseline comparison logic.
+                </p>
+              </div>
+            </div>
+
+            {/* Sensitivity Analysis Card */}
+            <div className="bg-gradient-to-br from-blue-500/20 to-indigo-500/20 backdrop-blur-md rounded-xl p-6 border border-blue-500/30 shadow-xl">
+              <div className="flex items-start justify-between mb-4">
+                <div>
+                  <h3 className="text-xl font-bold text-blue-300 flex items-center gap-2">
+                    <span className="text-2xl">📊</span>
+                    Sensitivity Analysis
+                  </h3>
+                  <p className="text-blue-200/80 text-sm mt-1">Parameter impact validation</p>
+                </div>
+                <div className="bg-blue-500/30 rounded-lg px-3 py-1 text-blue-200 font-bold text-sm">
+                  16 Experiments
+                </div>
+              </div>
+              
+              <div className="space-y-2 mb-4">
+                <div className="flex items-center justify-between text-sm">
+                  <span className="text-blue-100">Budget Sensitivity (5 levels)</span>
+                  <span className="text-blue-300 font-semibold">~4 sols avg</span>
+                </div>
+                <div className="flex items-center justify-between text-sm">
+                  <span className="text-blue-100">Latency Constraints (5 levels)</span>
+                  <span className="text-blue-300 font-semibold">~3 sols avg</span>
+                </div>
+                <div className="flex items-center justify-between text-sm">
+                  <span className="text-blue-100">Provider Diversity (1-3)</span>
+                  <span className="text-blue-300 font-semibold">1 to 34 sols</span>
+                </div>
+                <div className="flex items-center justify-between text-sm">
+                  <span className="text-blue-100">Component Count (5-18)</span>
+                  <span className="text-blue-300 font-semibold">~6 sols avg</span>
+                </div>
+              </div>
+              
+              <div className="pt-3 border-t border-blue-500/30">
+                <p className="text-xs text-blue-200/70">
+                  <strong>Key Finding:</strong> Provider diversity has the largest impact (34× more solutions with 3 providers). 
+                  Tight latency constraints (&lt;8ms) eliminate feasibility. Performance: 5-460ms avg.
+                </p>
+              </div>
+            </div>
+          </div>
+
+          {mode === 'preset' ? (
+            <div className="space-y-4">
+              <div className="bg-gradient-to-r from-indigo-500/20 to-violet-500/20 backdrop-blur-md rounded-xl p-6 border border-indigo-500/30">
+                <label className="block text-sm font-semibold text-blue-200 mb-2">Scenario</label>
+                <select value={selected} onChange={e => setSelected(parseInt(e.target.value))} className="w-full bg-white/10 backdrop-blur-md border border-blue-500/30 rounded-lg px-4 py-3 text-white focus:outline-none focus:border-cyan-400">
+                  {scenarios.map(s => <option key={s.key} value={s.key} className="bg-slate-800">{s.name}</option>)}
+                </select>
+                <div className="text-xs text-blue-300 mt-2">{scenarios[selected]?.description}</div>
+              </div>
+
+              <div className="bg-gradient-to-r from-purple-500/20 to-pink-500/20 backdrop-blur-md rounded-xl p-6 border border-purple-500/30">
+                <h3 className="font-semibold text-purple-200 mb-3">Workload Profile</h3>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-xs text-blue-300 mb-1">Requests / Month</label>
+                    <input type="number" value={requestsPerMonth} onChange={e=>setRequestsPerMonth(e.target.value)} className="w-full bg-white/10 backdrop-blur-md border border-blue-500/30 rounded-lg px-4 py-2 text-white focus:outline-none focus:border-cyan-400" />
+                  </div>
+                  <div>
+                    <label className="block text-xs text-blue-300 mb-1">Cross-AZ (GB)</label>
+                    <input type="number" value={crossAzGb} onChange={e=>setCrossAzGb(e.target.value)} className="w-full bg-white/10 backdrop-blur-md border border-blue-500/30 rounded-lg px-4 py-2 text-white focus:outline-none focus:border-cyan-400" />
+                  </div>
+                  <div>
+                    <label className="block text-xs text-blue-300 mb-1">Internet Egress (GB)</label>
+                    <input type="number" value={internetEgressGb} onChange={e=>setInternetEgressGb(e.target.value)} className="w-full bg-white/10 backdrop-blur-md border border-blue-500/30 rounded-lg px-4 py-2 text-white focus:outline-none focus:border-cyan-400" />
+                  </div>
+                  <div>
+                    <label className="block text-xs text-blue-300 mb-1">EBS (GB)</label>
+                    <input type="number" value={ebsGb} onChange={e=>setEbsGb(e.target.value)} className="w-full bg-white/10 backdrop-blur-md border border-blue-500/30 rounded-lg px-4 py-2 text-white focus:outline-none focus:border-cyan-400" />
+                  </div>
+                  <div>
+                    <label className="block text-xs text-blue-300 mb-1">RDS Backup (GB)</label>
+                    <input type="number" value={rdsBackupGb} onChange={e=>setRdsBackupGb(e.target.value)} className="w-full bg-white/10 backdrop-blur-md border border-blue-500/30 rounded-lg px-4 py-2 text-white focus:outline-none focus:border-cyan-400" />
+                  </div>
+                  <div>
+                    <label className="block text-xs text-blue-300 mb-1">S3 (GB)</label>
+                    <input type="number" value={s3Gb} onChange={e=>setS3Gb(e.target.value)} className="w-full bg-white/10 backdrop-blur-md border border-blue-500/30 rounded-lg px-4 py-2 text-white focus:outline-none focus:border-cyan-400" />
+                  </div>
+                </div>
+              </div>
+
+              <div className="bg-gradient-to-r from-cyan-500/20 to-blue-500/20 backdrop-blur-md rounded-xl p-6 border border-cyan-500/30">
+                <h3 className="font-semibold text-cyan-200 mb-3">Optimization Preferences</h3>
+                <div className="space-y-3">
+                  <div>
+                    <label className="block text-xs text-blue-300 mb-1">Latency Model</label>
+                    <select value={latencyModel} onChange={e=>setLatencyModel(e.target.value)} className="w-full bg-white/10 backdrop-blur-md border border-blue-500/30 rounded-lg px-4 py-2 text-white focus:outline-none focus:border-cyan-400">
+                      <option value="avg_latency" className="bg-slate-800">Classic (Average Latency)</option>
+                      <option value="graph_latency" className="bg-slate-800">Graph-based (Critical Path)</option>
+                    </select>
+                    <p className="text-xs text-blue-300/70 mt-1">Dependency-aware critical path considers inter-region network hops.</p>
+                  </div>
+                  <div>
+                    <label className="block text-xs text-blue-300 mb-1">Preferred Cloud Provider</label>
+                    <select value={preferredProvider} onChange={e=>setPreferredProvider(e.target.value)} className="w-full bg-white/10 backdrop-blur-md border border-blue-500/30 rounded-lg px-4 py-2 text-white focus:outline-none focus:border-cyan-400">
+                      <option value="" className="bg-slate-800">No Preference</option>
+                      <option value="AWS" className="bg-slate-800">AWS</option>
+                      <option value="Azure" className="bg-slate-800">Azure</option>
+                      <option value="GCP" className="bg-slate-800">GCP</option>
+                    </select>
+                    <p className="text-xs text-blue-300/70 mt-1">Bonus points for solutions using this provider</p>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <input type="checkbox" id="prioritizeCost" checked={prioritizeCost} onChange={e=>setPrioritizeCost(e.target.checked)} className="w-4 h-4 rounded border-blue-500/30 bg-white/10" />
+                    <label htmlFor="prioritizeCost" className="text-sm text-blue-200">Prioritize Cost Efficiency</label>
+                  </div>
+                  <p className="text-xs text-blue-300/70 -mt-2 ml-6">Bonus for solutions below ${Math.round(Number(maxBudget) * 0.7)}/month</p>
+                  <div className="flex items-center gap-2">
+                    <input type="checkbox" id="prioritizePerformance" checked={prioritizePerformance} onChange={e=>setPrioritizePerformance(e.target.checked)} className="w-4 h-4 rounded border-blue-500/30 bg-white/10" />
+                    <label htmlFor="prioritizePerformance" className="text-sm text-blue-200">Prioritize Performance</label>
+                  </div>
+                  <p className="text-xs text-blue-300/70 -mt-2 ml-6">Bonus for solutions below {Math.round(Number(maxLatency) * 0.67)}ms latency</p>
+                </div>
+              </div>
+
+              <div className="space-y-4">
+                <button onClick={handleRun} disabled={loading} className="w-full bg-gradient-to-r from-blue-600 to-cyan-600 text-white py-4 rounded-xl font-semibold text-lg hover:from-blue-700 hover:to-cyan-700 transition disabled:opacity-50 shadow-lg">
+                  {loading ? '⏳ Running Benchmark...' : '🚀 Run Benchmark'}
+                </button>
+                
+                {/* Multi-Cloud Preview for Preset */}
+                <div className="bg-gradient-to-r from-yellow-500/10 to-orange-500/10 backdrop-blur-md rounded-xl p-4 border border-yellow-500/20">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <h4 className="text-lg font-semibold text-yellow-300 mb-1 flex items-center gap-2">
+                        ⚠️ Multi-Cloud Considerations
+                      </h4>
+                      <p className="text-yellow-200 text-sm">
+                        CMOv4 scenarios may use multiple providers. Expect additional latency (+8-15ms) and transfer costs (~$50-200/month)
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          ) : (
+            <div className="space-y-4">
+              <div className="bg-gradient-to-r from-violet-500/20 to-purple-500/20 backdrop-blur-md rounded-xl p-6 border border-violet-500/30">
+                <label className="block text-sm font-semibold text-purple-200 mb-2">Architecture Pattern</label>
+                <select value={customArchPattern} onChange={e => setCustomArchPattern(e.target.value)} className="w-full bg-white/10 backdrop-blur-md border border-purple-500/30 rounded-lg px-4 py-2 text-white focus:outline-none focus:border-pink-400 mb-2">
+                  {architecturePatterns.map(p => <option key={p.id} value={p.id} className="bg-slate-800">{p.name}</option>)}
+                </select>
+                <p className="text-xs text-purple-300">Components auto-update when pattern changes ✨</p>
+              </div>
+
+              <div className="bg-gradient-to-r from-green-500/20 to-emerald-500/20 backdrop-blur-md rounded-xl p-6 border border-green-500/30">
+                <h3 className="font-semibold text-green-200 mb-3">Constraints</h3>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-xs text-green-300 mb-1">Max Budget ($/month)</label>
+                    <input type="number" value={maxBudget} onChange={e=>setMaxBudget(e.target.value)} className="w-full bg-white/10 backdrop-blur-md border border-green-500/30 rounded-lg px-4 py-2 text-white focus:outline-none focus:border-emerald-400" min="1000" step="1000" />
+                  </div>
+                  <div>
+                    <label className="block text-xs text-green-300 mb-1">Max Latency (ms)</label>
+                    <input type="number" value={maxLatency} onChange={e=>setMaxLatency(e.target.value)} className="w-full bg-white/10 backdrop-blur-md border border-green-500/30 rounded-lg px-4 py-2 text-white focus:outline-none focus:border-emerald-400" min="10" step="10" />
+                  </div>
+                </div>
+              </div>
+
+              <div className="bg-gradient-to-r from-blue-500/20 to-cyan-500/20 backdrop-blur-md rounded-xl p-6 border border-blue-500/30">
+                <h3 className="font-semibold text-blue-200 mb-3">Select Components</h3>
+                <div className="flex flex-wrap gap-2">
+                  {componentTypes.map(c => (
+                    <label key={c.type} className="text-sm flex items-center gap-2 px-3 py-2 bg-white/10 backdrop-blur-md border border-blue-500/30 rounded-lg hover:bg-white/20 transition cursor-pointer">
+                      <input type="checkbox" checked={customComponents.includes(c.type)} onChange={() => setCustomComponents(prev => prev.includes(c.type) ? prev.filter(x=>x!==c.type) : [...prev, c.type])} className="w-4 h-4" />
+                      <span className="text-blue-100">{c.label}</span>
+                    </label>
+                  ))}
+                </div>
+                <div className="text-xs text-blue-300 mt-2">Selected: {customComponents.length}</div>
+              </div>
+
+              <div className="bg-gradient-to-r from-orange-500/20 to-red-500/20 backdrop-blur-md rounded-xl p-6 border border-orange-500/30">
+                <h3 className="font-semibold text-orange-200 mb-3">Providers</h3>
+                <p className="text-xs text-orange-200/80 mb-2">
+                  Fixed for experiments: all three major cloud providers are always considered.
+                </p>
+                <div className="flex gap-4 opacity-70 cursor-not-allowed">
+                  {['AWS','Azure','GCP'].map(p => (
+                    <label key={p} className="text-sm flex items-center gap-2 px-4 py-2 bg-white/10 backdrop-blur-md border border-orange-500/30 rounded-lg">
+                      <input
+                        type="checkbox"
+                        checked={customProviders.includes(p)}
+                        readOnly
+                        className="w-4 h-4 cursor-not-allowed"
+                      />
+                      <span className="text-orange-100">{p}</span>
+                    </label>
+                  ))}
+                </div>
+              </div>
+
+              <div className="bg-gradient-to-r from-indigo-500/20 to-violet-500/20 backdrop-blur-md rounded-xl p-6 border border-indigo-500/30">
+                <h3 className="font-semibold text-indigo-200 mb-3">CSP Search</h3>
+                <div className="space-y-3">
+                  <div>
+                    <label className="block text-xs text-indigo-300 mb-1">Strategy</label>
+                    <select value={searchStrategy} onChange={e=>setSearchStrategy(e.target.value)} className="w-full bg-white/10 backdrop-blur-md border border-indigo-500/30 rounded-lg px-4 py-2 text-white focus:outline-none focus:border-violet-400">
+                      {searchStrategies.map(s => <option key={s.id} value={s.id} className="bg-slate-800">{s.name}</option>)}
+                    </select>
+                  </div>
+                  <div className="text-xs text-indigo-300/80 bg-indigo-900/20 rounded p-2 border border-indigo-500/20">
+                    💡 CMOv4 uses strategic heuristic sampling (~50 combinations: 2 extremes + 8 balanced + 3 single-provider + 37 random exploration). Sample size parameter is not used.
+                  </div>
+                </div>
+              </div>
+
+              <div className="bg-gradient-to-r from-pink-500/20 to-rose-500/20 backdrop-blur-md rounded-xl p-6 border border-pink-500/30">
+                <h3 className="font-semibold text-pink-200 mb-3">Workload Profile</h3>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-xs text-pink-300 mb-1">Requests / Month</label>
+                    <input type="number" value={requestsPerMonth} onChange={e=>setRequestsPerMonth(e.target.value)} className="w-full bg-white/10 backdrop-blur-md border border-pink-500/30 rounded-lg px-4 py-2 text-white focus:outline-none focus:border-rose-400" />
+                  </div>
+                  <div>
+                    <label className="block text-xs text-pink-300 mb-1">Cross-AZ (GB)</label>
+                    <input type="number" value={crossAzGb} onChange={e=>setCrossAzGb(e.target.value)} className="w-full bg-white/10 backdrop-blur-md border border-pink-500/30 rounded-lg px-4 py-2 text-white focus:outline-none focus:border-rose-400" />
+                  </div>
+                  <div>
+                    <label className="block text-xs text-pink-300 mb-1">Internet Egress (GB)</label>
+                    <input type="number" value={internetEgressGb} onChange={e=>setInternetEgressGb(e.target.value)} className="w-full bg-white/10 backdrop-blur-md border border-pink-500/30 rounded-lg px-4 py-2 text-white focus:outline-none focus:border-rose-400" />
+                  </div>
+                  <div>
+                    <label className="block text-xs text-pink-300 mb-1">EBS (GB)</label>
+                    <input type="number" value={ebsGb} onChange={e=>setEbsGb(e.target.value)} className="w-full bg-white/10 backdrop-blur-md border border-pink-500/30 rounded-lg px-4 py-2 text-white focus:outline-none focus:border-rose-400" />
+                  </div>
+                  <div>
+                    <label className="block text-xs text-pink-300 mb-1">RDS Backup (GB)</label>
+                    <input type="number" value={rdsBackupGb} onChange={e=>setRdsBackupGb(e.target.value)} className="w-full bg-white/10 backdrop-blur-md border border-pink-500/30 rounded-lg px-4 py-2 text-white focus:outline-none focus:border-rose-400" />
+                  </div>
+                  <div>
+                    <label className="block text-xs text-pink-300 mb-1">S3 (GB)</label>
+                    <input type="number" value={s3Gb} onChange={e=>setS3Gb(e.target.value)} className="w-full bg-white/10 backdrop-blur-md border border-pink-500/30 rounded-lg px-4 py-2 text-white focus:outline-none focus:border-rose-400" />
+                  </div>
+                </div>
+              </div>
+
+              <div className="bg-gradient-to-r from-teal-500/20 to-cyan-500/20 backdrop-blur-md rounded-xl p-6 border border-teal-500/30">
+                <h3 className="font-semibold text-teal-200 mb-3">Optimization Preferences</h3>
+                <div className="space-y-3">
+                  <div>
+                    <label className="block text-xs text-teal-300 mb-1">Latency Model</label>
+                    <select value={latencyModel} onChange={e=>setLatencyModel(e.target.value)} className="w-full bg-white/10 backdrop-blur-md border border-teal-500/30 rounded-lg px-4 py-2 text-white focus:outline-none focus:border-cyan-400">
+                      <option value="avg_latency" className="bg-slate-800">Classic (Average Latency)</option>
+                      <option value="graph_latency" className="bg-slate-800">Graph-based (Critical Path)</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-xs text-teal-300 mb-1">Preferred Cloud Provider</label>
+                    <select value={preferredProvider} onChange={e=>setPreferredProvider(e.target.value)} className="w-full bg-white/10 backdrop-blur-md border border-teal-500/30 rounded-lg px-4 py-2 text-white focus:outline-none focus:border-cyan-400">
+                      <option value="" className="bg-slate-800">No Preference</option>
+                      <option value="AWS" className="bg-slate-800">AWS</option>
+                      <option value="Azure" className="bg-slate-800">Azure</option>
+                      <option value="GCP" className="bg-slate-800">GCP</option>
+                    </select>
+                    <p className="text-xs text-teal-300/70 mt-1">Bonus points for solutions using this provider</p>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <input type="checkbox" id="customPrioritizeCost" checked={prioritizeCost} onChange={e=>setPrioritizeCost(e.target.checked)} className="w-4 h-4 rounded border-teal-500/30 bg-white/10" />
+                    <label htmlFor="customPrioritizeCost" className="text-sm text-teal-200">Prioritize Cost Efficiency</label>
+                  </div>
+                  <p className="text-xs text-teal-300/70 -mt-2 ml-6">Bonus for solutions below ${Math.round(Number(maxBudget) * 0.7)}/month</p>
+                  <div className="flex items-center gap-2">
+                    <input type="checkbox" id="customPrioritizePerformance" checked={prioritizePerformance} onChange={e=>setPrioritizePerformance(e.target.checked)} className="w-4 h-4 rounded border-teal-500/30 bg-white/10" />
+                    <label htmlFor="customPrioritizePerformance" className="text-sm text-teal-200">Prioritize Performance</label>
+                  </div>
+                  <p className="text-xs text-teal-300/70 -mt-2 ml-6">Bonus for solutions below {Math.round(Number(maxLatency) * 0.67)}ms latency</p>
+                </div>
+              </div>
+
+              <div className="space-y-4">
+                <button onClick={handleCustomRun} disabled={loading || customComponents.length===0} className="w-full bg-gradient-to-r from-purple-600 to-pink-600 text-white py-4 rounded-xl font-semibold text-lg hover:from-purple-700 hover:to-pink-700 transition disabled:opacity-50 shadow-lg">
+                  {loading ? '⏳ Running Custom Benchmark...' : '🚀 Run Custom Benchmark'}
+                </button>
+                {customComponents.length===0 && <div className="text-sm text-red-400 bg-red-500/20 backdrop-blur-md border border-red-500/30 rounded-lg px-4 py-2 mt-2">⚠️ Select at least one component.</div>}
+                
+                {/* Multi-Cloud Preview for Custom */}
+                <div className="bg-gradient-to-r from-yellow-500/10 to-orange-500/10 backdrop-blur-md rounded-xl p-4 border border-yellow-500/20">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <h4 className="text-lg font-semibold text-yellow-300 mb-1 flex items-center gap-2">
+                        ⚠️ Multi-Cloud Considerations
+                      </h4>
+                      <p className="text-yellow-200 text-sm">
+                        With {customProviders.length} providers selected, expect cross-cloud latency and data transfer costs. 
+                        CMOv4 will find optimal trade-offs.
+                      </p>
+                    </div>
+                    <button 
+                      onClick={async () => {
+                        if (!results || !results.topSolution) {
+                          alert('Please run optimization first to analyze multi-cloud concerns');
+                          return;
+                        }
+                        
+                        try {
+                          const response = await fetch(`${API_BASE}/api/multi-cloud-analysis`, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                              configuration: results.topSolution.configuration
+                            })
+                          });
+                          
+                          if (response.ok) {
+                            const analysis = await response.json();
+                            
+                            // Create a detailed popup with analysis
+                            const popup = window.open('', '_blank', 'width=800,height=600,scrollbars=yes');
+                            popup.document.write(`
+                              <html>
+                                <head>
+                                  <title>Multi-Cloud Analysis Report</title>
+                                  <style>
+                                    body { font-family: Arial, sans-serif; margin: 20px; background: #1a1a2e; color: white; }
+                                    .section { background: #16213e; padding: 20px; margin: 15px 0; border-radius: 8px; border: 1px solid #0f3460; }
+                                    .metric { display: inline-block; margin: 10px; padding: 15px; background: #0f3460; border-radius: 5px; min-width: 150px; }
+                                    .high { border-left: 4px solid #ef4444; }
+                                    .medium { border-left: 4px solid #f59e0b; }
+                                    .low { border-left: 4px solid #10b981; }
+                                    ul { padding-left: 20px; }
+                                    li { margin: 5px 0; }
+                                    h1, h2, h3 { color: #60a5fa; }
+                                  </style>
+                                </head>
+                                <body>
+                                  <h1>🌐 Multi-Cloud Configuration Analysis</h1>
+                                  
+                                  <div class="section">
+                                    <h2>📊 Provider Distribution</h2>
+                                    <p><strong>Total Providers:</strong> ${analysis.provider_analysis.provider_count}</p>
+                                    <p><strong>Multi-Cloud:</strong> ${analysis.provider_analysis.is_multi_cloud ? 'Yes' : 'No'}</p>
+                                    ${Object.entries(analysis.provider_analysis.providers).map(([provider, components]) => 
+                                      `<div class="metric"><strong>${provider}:</strong> ${components.length} services<br><small>${components.join(', ')}</small></div>`
+                                    ).join('')}
+                                  </div>
+                                  
+                                  <div class="section ${analysis.latency_analysis.impact_level.toLowerCase()}">
+                                    <h2>⚡ Latency Impact</h2>
+                                    <div class="metric">
+                                      <strong>Cross-Cloud Penalty:</strong> +${analysis.latency_analysis.cross_cloud_penalty_ms}ms<br>
+                                      <small>Impact Level: ${analysis.latency_analysis.impact_level}</small>
+                                    </div>
+                                  </div>
+                                  
+                                  <div class="section">
+                                    <h2>💰 Cost Analysis</h2>
+                                    <div class="metric">
+                                      <strong>Monthly Transfer:</strong> $${analysis.cost_analysis.monthly_transfer_cost}<br>
+                                      <small>Annual: $${analysis.cost_analysis.annual_transfer_cost}</small>
+                                    </div>
+                                  </div>
+                                  
+                                  <div class="section ${analysis.operational_complexity.complexity_level.toLowerCase()}">
+                                    <h2>⚙️ Operational Complexity</h2>
+                                    <div class="metric">
+                                      <strong>Complexity Score:</strong> ${analysis.operational_complexity.complexity_score}<br>
+                                      <small>Level: ${analysis.operational_complexity.complexity_level}</small>
+                                    </div>
+                                    <p><strong>Factors:</strong></p>
+                                    <ul>
+                                      ${Object.entries(analysis.operational_complexity.factors).map(([factor, value]) => 
+                                        `<li>${factor.replace(/_/g, ' ')}: ${value}</li>`
+                                      ).join('')}
+                                    </ul>
+                                  </div>
+                                  
+                                  <div class="section">
+                                    <h2>💡 Recommendations</h2>
+                                    <ul>
+                                      ${analysis.recommendations.map(rec => `<li>${rec}</li>`).join('')}
+                                    </ul>
+                                  </div>
+                                  
+                                  <div class="section">
+                                    <h2>🛠️ Mitigation Strategies</h2>
+                                    <h3>Latency Reduction:</h3>
+                                    <ul>
+                                      ${analysis.mitigation_strategies.latency.map(strategy => `<li>${strategy}</li>`).join('')}
+                                    </ul>
+                                    <h3>Cost Control:</h3>
+                                    <ul>
+                                      ${analysis.mitigation_strategies.cost.map(strategy => `<li>${strategy}</li>`).join('')}
+                                    </ul>
+                                    <h3>Complexity Management:</h3>
+                                    <ul>
+                                      ${analysis.mitigation_strategies.complexity.map(strategy => `<li>${strategy}</li>`).join('')}
+                                    </ul>
+                                  </div>
+                                </body>
+                              </html>
+                            `);
+                            popup.document.close();
+                          } else {
+                            alert('Failed to generate multi-cloud analysis');
+                          }
+                        } catch (error) {
+                          alert('Error: ' + error.message);
+                        }
+                      }}
+                      className="px-4 py-2 bg-gradient-to-r from-yellow-600 to-orange-600 text-white rounded-lg hover:from-yellow-700 hover:to-orange-700 transition text-sm font-semibold whitespace-nowrap"
+                    >
+                      📊 Analyze Multi-Cloud
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {results && (
+            <div className="mt-8 space-y-6">
+              <div className="flex items-center justify-between">
+                <h2 className="text-xl font-semibold bg-gradient-to-r from-cyan-400 to-blue-500 bg-clip-text text-transparent flex items-center gap-3">
+                  Results
+                  <span className="text-xs px-2 py-1 rounded-full border border-blue-500/40 bg-blue-500/10 text-blue-200">
+                    Latency: {(() => {
+                      const lm = results.latencyModel || 'avg_latency';
+                      return lm === 'graph_latency' ? 'Graph-based' : 'Classic';
+                    })()}
+                  </span>
+                </h2>
+                <button onClick={() => setShowRaw(!showRaw)} className="text-xs px-4 py-2 rounded-lg bg-yellow-500/20 backdrop-blur-md border border-yellow-500/40 text-yellow-300 font-semibold hover:bg-yellow-500/30 transition">
+                  {showRaw ? '🙈 Hide Raw V4' : '👁️ Show Raw V4'}
+                </button>
+              </div>
+              {showRaw && (
+                <div className="bg-yellow-500/10 backdrop-blur-md border border-yellow-500/30 rounded-xl p-4 overflow-auto max-h-96">
+                  <pre className="text-xs text-yellow-200 whitespace-pre-wrap">{JSON.stringify(rawV4, null, 2)}</pre>
+                </div>
+              )}
+
+              {results.error ? (
+                <div className="p-6 bg-red-500/20 backdrop-blur-md border border-red-500/30 text-red-300 rounded-xl">❌ {results.error}</div>
+              ) : results.metrics?.feasible_space_size === 0 ? (
+                <div className="bg-yellow-500/20 backdrop-blur-md border border-yellow-500/30 rounded-xl p-6">
+                  <div className="text-yellow-300 font-semibold mb-2">No feasible solution found</div>
+                  <div className="text-yellow-200 text-sm mb-3">Try relaxing constraints or increasing budget/latency limits.</div>
+                  {(results.suggestions || rawV4?.suggestions) && (results.suggestions || rawV4?.suggestions).length > 0 && (
+                    <div className="bg-orange-500/20 rounded-lg p-4 border border-orange-500/30">
+                      <div className="text-orange-300 font-semibold mb-2">💡 Suggestions:</div>
+                      <ul className="text-sm text-orange-200 space-y-1">
+                        {(results.suggestions || rawV4?.suggestions).map((suggestion, idx) => (
+                          <li key={idx} className="flex items-start gap-2">
+                            <span className="text-orange-400 mt-0.5">•</span>
+                            <span>{suggestion}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <>
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div className="bg-gradient-to-br from-green-500/20 to-emerald-500/20 backdrop-blur-md rounded-xl p-6 border border-green-500/30">
+                      <div className="text-sm text-green-300">Feasible Solutions</div>
+                      <div className="text-3xl font-bold text-green-100 mt-1">{results.metrics?.feasible_space_size ?? '—'}</div>
+                    </div>
+                    <div className="bg-gradient-to-br from-blue-500/20 to-cyan-500/20 backdrop-blur-md rounded-xl p-6 border border-blue-500/30">
+                      <div className="text-sm text-blue-300">Pareto Solutions</div>
+                      <div className="text-3xl font-bold text-blue-100 mt-1">{results.paretoFrontier?.size ?? '—'}</div>
+                    </div>
+                    <div className="bg-gradient-to-br from-purple-500/20 to-pink-500/20 backdrop-blur-md rounded-xl p-6 border border-purple-500/30">
+                      <div className="text-sm text-purple-300">Hypervolume</div>
+                      <div className="text-3xl font-bold text-purple-100 mt-1">{(results.paretoFrontier?.metrics?.hypervolume ?? 0).toFixed(2)}</div>
+                    </div>
+                  </div>
+
+                  {/* Pareto Frontier Visualization */}
+                  {results.paretoFrontier?.solutions?.length > 0 && results.solutions?.length > 0 && (
+                    <div className="bg-gradient-to-br from-indigo-500/20 to-purple-500/20 backdrop-blur-md rounded-xl p-6 border border-indigo-500/30">
+                      <div className="flex items-center justify-between mb-4">
+                        <h3 className="text-lg font-semibold text-indigo-200">📊 Pareto Frontier Analysis</h3>
+                        <div className="text-xs text-indigo-300">
+                          Multi-Objective Optimization: Cost vs Latency
+                        </div>
+                      </div>
+                      
+                      <div id="pareto-scatter-plot" style={{ width:'100%', height:'400px', background: 'rgba(255,255,255,0.05)', borderRadius: '8px' }}></div>
+                      {typeof Plotly !== 'undefined' && setTimeout(()=>{
+                        const paretoSols = results.paretoFrontier.solutions || [];
+                        const allSols = results.solutions || [];
+                        const topSol = results.topSolution;
+                        
+                        // All feasible solutions (gray)
+                        const feasibleTrace = {
+                          x: allSols.map(s => s.cost),
+                          y: allSols.map(s => s.latency),
+                          mode: 'markers',
+                          type: 'scatter',
+                          name: 'Feasible Solutions',
+                          marker: {
+                            size: 6,
+                            color: 'rgba(150, 150, 150, 0.3)',
+                            line: { color: 'rgba(150, 150, 150, 0.5)', width: 0.5 }
+                          },
+                          hovertemplate: '<b>Feasible</b><br>Cost: $%{x:.2f}<br>Latency: %{y:.1f}ms<extra></extra>'
+                        };
+                        
+                        // Pareto frontier (blue line + markers)
+                        const paretoSorted = [...paretoSols].sort((a,b) => a.cost - b.cost);
+                        const paretoTrace = {
+                          x: paretoSorted.map(s => s.cost),
+                          y: paretoSorted.map(s => s.latency),
+                          mode: 'lines+markers',
+                          type: 'scatter',
+                          name: 'Pareto Frontier',
+                          line: { color: 'rgb(59, 130, 246)', width: 2, shape: 'linear' },
+                          marker: {
+                            size: 10,
+                            color: 'rgb(59, 130, 246)',
+                            line: { color: 'white', width: 2 }
+                          },
+                          hovertemplate: '<b>Pareto Solution</b><br>Cost: $%{x:.2f}<br>Latency: %{y:.1f}ms<br>Providers: %{customdata}<extra></extra>',
+                          customdata: paretoSorted.map(s => s.providers)
+                        };
+                        
+                        // Best solution (star marker)
+                        const bestTrace = topSol ? {
+                          x: [topSol.cost],
+                          y: [topSol.latency],
+                          mode: 'markers',
+                          type: 'scatter',
+                          name: 'Best Solution',
+                          marker: {
+                            size: 20,
+                            color: 'rgb(234, 179, 8)',
+                            symbol: 'star',
+                            line: { color: 'white', width: 2 }
+                          },
+                          hovertemplate: '<b>🏆 Best Solution</b><br>Cost: $%{x:.2f}<br>Latency: %{y:.1f}ms<br>Score: ' + topSol.score + '<extra></extra>'
+                        } : null;
+                        
+                        const traces = bestTrace ? [feasibleTrace, paretoTrace, bestTrace] : [feasibleTrace, paretoTrace];
+                        
+                        const layout = {
+                          title: {
+                            text: 'Cost-Latency Trade-off Space',
+                            font: { size: 16, color: 'rgba(255,255,255,0.9)' }
+                          },
+                          xaxis: { 
+                            title: 'Monthly Cost ($)', 
+                            gridcolor: 'rgba(255,255,255,0.1)',
+                            color: 'rgba(255,255,255,0.7)'
+                          },
+                          yaxis: { 
+                            title: 'Average Latency (ms)', 
+                            gridcolor: 'rgba(255,255,255,0.1)',
+                            color: 'rgba(255,255,255,0.7)'
+                          },
+                          paper_bgcolor: 'rgba(0,0,0,0)',
+                          plot_bgcolor: 'rgba(0,0,0,0)',
+                          legend: {
+                            x: 0.02,
+                            y: 0.98,
+                            bgcolor: 'rgba(0,0,0,0.5)',
+                            font: { color: 'white' }
+                          },
+                          hovermode: 'closest',
+                          margin: { l: 60, r: 30, t: 50, b: 60 }
+                        };
+                        
+                        const config = { 
+                          displaylogo: false,
+                          responsive: true,
+                          toImageButtonOptions: {
+                            format: 'png',
+                            filename: 'pareto_frontier_cmov4',
+                            height: 600,
+                            width: 900
+                          }
+                        };
+                        
+                        Plotly.newPlot('pareto-scatter-plot', traces, layout, config);
+                      }, 100)}
+                      
+                      {/* Pareto Metrics */}
+                      {results.paretoFrontier?.metrics && (
+                        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mt-4">
+                          <div className="bg-white/10 backdrop-blur-md rounded-lg p-3 border border-blue-500/20">
+                            <div className="text-xs text-blue-300 mb-1">Hypervolume</div>
+                            <div className="text-lg font-bold text-white">{(results.paretoFrontier.metrics.hypervolume ?? 0).toFixed(2)}</div>
+                          </div>
+                          <div className="bg-white/10 backdrop-blur-md rounded-lg p-3 border border-cyan-500/20">
+                            <div className="text-xs text-cyan-300 mb-1">Spacing</div>
+                            <div className="text-lg font-bold text-white">{(results.paretoFrontier.metrics.spacing ?? 0).toFixed(2)}</div>
+                          </div>
+                          <div className="bg-white/10 backdrop-blur-md rounded-lg p-3 border border-purple-500/20">
+                            <div className="text-xs text-purple-300 mb-1">Coverage Rate</div>
+                            <div className="text-lg font-bold text-white">{(results.paretoFrontier.metrics.coverage_rate ?? 0).toFixed(1)}%</div>
+                          </div>
+                          <div className="bg-white/10 backdrop-blur-md rounded-lg p-3 border border-pink-500/20">
+                            <div className="text-xs text-pink-300 mb-1">Frontier Size</div>
+                            <div className="text-lg font-bold text-white">{results.paretoFrontier.size ?? 0}</div>
+                          </div>
+                        </div>
+                      )}
+                      
+                      {/* Extreme Solutions */}
+                      {results.paretoFrontier?.extremeSolutions && (
+                        <div className="mt-4 grid grid-cols-1 md:grid-cols-3 gap-3">
+                          {results.paretoFrontier.extremeSolutions.minCost && (
+                            <div className="bg-emerald-500/20 backdrop-blur-md rounded-lg p-4 border border-emerald-500/30">
+                              <div className="text-xs font-semibold text-emerald-300 mb-2">💰 Min Cost Solution</div>
+                              <div className="text-sm text-white space-y-1">
+                                <div>Cost: <span className="font-bold">${results.paretoFrontier.extremeSolutions.minCost.cost.toFixed(2)}</span></div>
+                                <div>Latency: <span className="font-bold">{results.paretoFrontier.extremeSolutions.minCost.latency.toFixed(1)}ms</span></div>
+                                <div>Providers: <span className="font-bold">{results.paretoFrontier.extremeSolutions.minCost.providers}</span></div>
+                              </div>
+                            </div>
+                          )}
+                          {results.paretoFrontier.extremeSolutions.minLatency && (
+                            <div className="bg-blue-500/20 backdrop-blur-md rounded-lg p-4 border border-blue-500/30">
+                              <div className="text-xs font-semibold text-blue-300 mb-2">⚡ Min Latency Solution</div>
+                              <div className="text-sm text-white space-y-1">
+                                <div>Cost: <span className="font-bold">${results.paretoFrontier.extremeSolutions.minLatency.cost.toFixed(2)}</span></div>
+                                <div>Latency: <span className="font-bold">{results.paretoFrontier.extremeSolutions.minLatency.latency.toFixed(1)}ms</span></div>
+                                <div>Providers: <span className="font-bold">{results.paretoFrontier.extremeSolutions.minLatency.providers}</span></div>
+                              </div>
+                            </div>
+                          )}
+                          {results.paretoFrontier.extremeSolutions.balanced && (
+                            <div className="bg-purple-500/20 backdrop-blur-md rounded-lg p-4 border border-purple-500/30">
+                              <div className="text-xs font-semibold text-purple-300 mb-2">⚖️ Balanced Solution</div>
+                              <div className="text-sm text-white space-y-1">
+                                <div>Cost: <span className="font-bold">${results.paretoFrontier.extremeSolutions.balanced.cost.toFixed(2)}</span></div>
+                                <div>Latency: <span className="font-bold">{results.paretoFrontier.extremeSolutions.balanced.latency.toFixed(1)}ms</span></div>
+                                <div>Providers: <span className="font-bold">{results.paretoFrontier.extremeSolutions.balanced.providers}</span></div>
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {/* PDF Report Download Button */}
+                  {results.topSolution && (
+                    <div className="bg-gradient-to-r from-blue-500/20 to-cyan-500/20 backdrop-blur-md rounded-xl p-6 border border-blue-500/30">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <h3 className="text-lg font-semibold text-blue-200 mb-2">📄 Detailed Solution Report</h3>
+                          <p className="text-sm text-blue-300">Generate a comprehensive PDF report with technical and financial analysis</p>
+                        </div>
+                        <button 
+                          onClick={() => downloadPDFReport(results)}
+                          className="bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-700 hover:to-cyan-700 text-white px-6 py-3 rounded-lg font-semibold shadow-lg hover:shadow-xl transition-all duration-200 flex items-center gap-2"
+                        >
+                          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                          </svg>
+                          Download PDF Report
+                        </button>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Multi-Cloud Analysis Section - CMOv4 */}
+                  {results.topSolution && results.topSolution.providers > 1 && (
+                    <div className="bg-gradient-to-r from-yellow-500/20 to-orange-500/20 backdrop-blur-md rounded-xl p-6 border border-yellow-500/30">
+                      <h3 className="text-xl font-bold text-white mb-4 flex items-center gap-2">
+                        ⚠️ Multi-Cloud Configuration Analysis
+                      </h3>
+                      <p className="text-yellow-200 text-sm mb-4">
+                        Your solution uses {results.topSolution.providers} cloud providers. Here's what you need to know:
+                      </p>
+                      
+                      <div className="grid md:grid-cols-3 gap-4 mb-6">
+                        <div className="bg-red-500/20 rounded-lg p-4 border border-red-500/40">
+                          <div className="text-red-300 text-sm mb-2 flex items-center gap-2">
+                            <span>🌐</span> Cross-Cloud Latency
+                          </div>
+                          <div className="text-2xl font-bold text-white">+{(8 + (results.topSolution.providers - 2) * 2).toFixed(1)}ms</div>
+                          <div className="text-red-300 text-xs mt-1">Estimated penalty</div>
+                          <div className="text-red-200 text-xs mt-2">
+                            {results.topSolution.providers > 2 ? '🔴 High Impact' : '🟡 Medium Impact'}
+                          </div>
+                        </div>
+                        
+                        <div className="bg-orange-500/20 rounded-lg p-4 border border-orange-500/40">
+                          <div className="text-orange-300 text-sm mb-2 flex items-center gap-2">
+                            <span>💸</span> Data Transfer Cost
+                          </div>
+                          <div className="text-2xl font-bold text-white">${(results.topSolution.providers * 50).toFixed(2)}</div>
+                          <div className="text-orange-300 text-xs mt-1">Per month (est.)</div>
+                          <div className="text-orange-200 text-xs mt-2">
+                            Annual: ${(results.topSolution.providers * 50 * 12).toFixed(2)}
+                          </div>
+                        </div>
+                        
+                        <div className="bg-purple-500/20 rounded-lg p-4 border border-purple-500/40">
+                          <div className="text-purple-300 text-sm mb-2 flex items-center gap-2">
+                            <span>⚙️</span> Operational Complexity
+                          </div>
+                          <div className="text-2xl font-bold text-white">{results.topSolution.providers > 2 ? 'High' : 'Medium'}</div>
+                          <div className="text-purple-300 text-xs mt-1">{results.topSolution.providers} providers</div>
+                          <div className="text-purple-200 text-xs mt-2">
+                            {results.topSolution.providers} consoles to manage
+                          </div>
+                        </div>
+                      </div>
+                      
+                      {/* Solutions and Recommendations */}
+                      <div className="bg-white/10 rounded-lg p-4 border border-yellow-500/30">
+                        <h4 className="text-lg font-semibold text-white mb-3 flex items-center gap-2">
+                          💡 How to Address These Concerns
+                        </h4>
+                        
+                        <div className="grid md:grid-cols-3 gap-4">
+                          <div>
+                            <h5 className="text-yellow-300 font-semibold mb-2 text-sm">🚀 Reduce Latency</h5>
+                            <ul className="text-yellow-200 text-xs space-y-1">
+                              <li>• Co-locate in same regions</li>
+                              <li>• Use CDN for static content</li>
+                              <li>• Implement local caching</li>
+                              <li>• Set up VPN/peering</li>
+                            </ul>
+                          </div>
+                          
+                          <div>
+                            <h5 className="text-orange-300 font-semibold mb-2 text-sm">💰 Control Costs</h5>
+                            <ul className="text-orange-200 text-xs space-y-1">
+                              <li>• Compress data transfers</li>
+                              <li>• Batch API calls</li>
+                              <li>• Use message queues</li>
+                              <li>• Monitor transfer costs</li>
+                            </ul>
+                          </div>
+                          
+                          <div>
+                            <h5 className="text-purple-300 font-semibold mb-2 text-sm">🛠️ Simplify Operations</h5>
+                            <ul className="text-purple-200 text-xs space-y-1">
+                              <li>• Use Terraform for IaC</li>
+                              <li>• Consistent monitoring</li>
+                              <li>• Standardize policies</li>
+                              <li>• Single-pane tools</li>
+                            </ul>
+                          </div>
+                        </div>
+                      </div>
+                      
+                      {/* Quick Actions */}
+                      <div className="mt-4 flex flex-wrap gap-2">
+                        <button 
+                          onClick={async () => {
+                            try {
+                              const response = await fetch(`${API_BASE}/api/terraform`, {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({
+                                  configuration: results.topSolution.configuration,
+                                  cost: results.topSolution.cost,
+                                  latency: results.topSolution.latency,
+                                  providers: results.topSolution.providers,
+                                  providerDistribution: results.topSolution.providerDistribution
+                                })
+                              });
+                              
+                              if (response.ok) {
+                                const data = await response.json();
+                                const blob = new Blob([data.terraform_config], { type: 'text/plain' });
+                                const url = URL.createObjectURL(blob);
+                                const a = document.createElement('a');
+                                a.href = url;
+                                a.download = 'cmov4-multi-cloud.tf';
+                                a.click();
+                                URL.revokeObjectURL(url);
+                              }
+                            } catch (error) {
+                              alert('Error: ' + error.message);
+                            }
+                          }}
+                          className="px-3 py-2 bg-blue-600 text-white rounded text-sm hover:bg-blue-700 transition flex items-center gap-2"
+                        >
+                          🏗️ Download Terraform
+                        </button>
+                        
+                        <button 
+                          onClick={async () => {
+                            try {
+                              const response = await fetch(`${API_BASE}/api/multi-cloud-analysis`, {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({
+                                  configuration: results.topSolution.configuration
+                                })
+                              });
+                              
+                              if (response.ok) {
+                                const analysis = await response.json();
+                                
+                                // Create detailed analysis popup
+                                const popup = window.open('', '_blank', 'width=800,height=600,scrollbars=yes');
+                                popup.document.write(`
+                                  <html>
+                                    <head>
+                                      <title>CMOv4 Multi-Cloud Analysis</title>
+                                      <style>
+                                        body { font-family: Arial, sans-serif; margin: 20px; background: #1a1a2e; color: white; }
+                                        .section { background: #16213e; padding: 20px; margin: 15px 0; border-radius: 8px; border: 1px solid #0f3460; }
+                                        .metric { display: inline-block; margin: 10px; padding: 15px; background: #0f3460; border-radius: 5px; min-width: 150px; }
+                                        .high { border-left: 4px solid #ef4444; }
+                                        .medium { border-left: 4px solid #f59e0b; }
+                                        .low { border-left: 4px solid #10b981; }
+                                        ul { padding-left: 20px; }
+                                        li { margin: 5px 0; }
+                                        h1, h2, h3 { color: #60a5fa; }
+                                      </style>
+                                    </head>
+                                    <body>
+                                      <h1>🌐 CMOv4 Multi-Cloud Analysis Report</h1>
+                                      
+                                      <div class="section">
+                                        <h2>📊 Provider Distribution</h2>
+                                        <p><strong>Total Providers:</strong> ${analysis.provider_analysis.provider_count}</p>
+                                        <p><strong>Multi-Cloud:</strong> ${analysis.provider_analysis.is_multi_cloud ? 'Yes' : 'No'}</p>
+                                        ${Object.entries(analysis.provider_analysis.providers).map(([provider, components]) => 
+                                          `<div class="metric"><strong>${provider}:</strong> ${components.length} services<br><small>${components.join(', ')}</small></div>`
+                                        ).join('')}
+                                      </div>
+                                      
+                                      <div class="section ${analysis.latency_analysis.impact_level.toLowerCase()}">
+                                        <h2>⚡ Latency Impact</h2>
+                                        <div class="metric">
+                                          <strong>Cross-Cloud Penalty:</strong> +${analysis.latency_analysis.cross_cloud_penalty_ms}ms<br>
+                                          <small>Impact Level: ${analysis.latency_analysis.impact_level}</small>
+                                        </div>
+                                      </div>
+                                      
+                                      <div class="section">
+                                        <h2>💰 Cost Analysis</h2>
+                                        <div class="metric">
+                                          <strong>Monthly Transfer:</strong> $${analysis.cost_analysis.monthly_transfer_cost}<br>
+                                          <small>Annual: $${analysis.cost_analysis.annual_transfer_cost}</small>
+                                        </div>
+                                      </div>
+                                      
+                                      <div class="section ${analysis.operational_complexity.complexity_level.toLowerCase()}">
+                                        <h2>⚙️ Operational Complexity</h2>
+                                        <div class="metric">
+                                          <strong>Complexity Score:</strong> ${analysis.operational_complexity.complexity_score}<br>
+                                          <small>Level: ${analysis.operational_complexity.complexity_level}</small>
+                                        </div>
+                                      </div>
+                                      
+                                      <div class="section">
+                                        <h2>💡 Recommendations</h2>
+                                        <ul>
+                                          ${analysis.recommendations.map(rec => `<li>${rec}</li>`).join('')}
+                                        </ul>
+                                      </div>
+                                      
+                                      <div class="section">
+                                        <h2>🛠️ Mitigation Strategies</h2>
+                                        <h3>Latency Reduction:</h3>
+                                        <ul>
+                                          ${analysis.mitigation_strategies.latency.map(strategy => `<li>${strategy}</li>`).join('')}
+                                        </ul>
+                                        <h3>Cost Control:</h3>
+                                        <ul>
+                                          ${analysis.mitigation_strategies.cost.map(strategy => `<li>${strategy}</li>`).join('')}
+                                        </ul>
+                                        <h3>Complexity Management:</h3>
+                                        <ul>
+                                          ${analysis.mitigation_strategies.complexity.map(strategy => `<li>${strategy}</li>`).join('')}
+                                        </ul>
+                                      </div>
+                                    </body>
+                                  </html>
+                                `);
+                                popup.document.close();
+                              } else {
+                                alert('Failed to generate analysis');
+                              }
+                            } catch (error) {
+                              alert('Error: ' + error.message);
+                            }
+                          }}
+                          className="px-3 py-2 bg-green-600 text-white rounded text-sm hover:bg-green-700 transition flex items-center gap-2"
+                        >
+                          📊 Detailed Analysis
+                        </button>
+                        
+                        <button 
+                          onClick={() => {
+                            const tips = [
+                              '🌍 Co-locate services in same regions (us-east-1 ↔ East US ↔ us-east1)',
+                              '🚀 Use CDN to cache static content and reduce cross-cloud requests',
+                              '📦 Compress data transfers to save 70% on bandwidth costs',
+                              '🔄 Implement message queues for async cross-cloud communication',
+                              '📊 Set up monitoring alerts for data transfer costs',
+                              '🛠️ Use Terraform for unified infrastructure management',
+                              '🔐 Standardize security policies across all providers'
+                            ];
+                            alert(tips.join('\n\n'));
+                          }}
+                          className="px-3 py-2 bg-purple-600 text-white rounded text-sm hover:bg-purple-700 transition flex items-center gap-2"
+                        >
+                          💡 Quick Tips
+                        </button>
+                      </div>
+                      
+                      {/* Academic Note */}
+                      <div className="mt-4 bg-blue-900/20 rounded-lg p-3 border border-blue-500/30">
+                        <div className="text-blue-300 font-semibold mb-1 text-sm">📚 Research Contribution</div>
+                        <p className="text-blue-200 text-xs">
+                          CMOv4 demonstrates how Pareto optimization can automatically identify multi-cloud trade-offs 
+                          while providing practical deployment guidance. The system programmatically addresses 
+                          latency penalties, data transfer costs, and operational complexity.
+                        </p>
+                      </div>
+                    </div>
+                  )}
+
+                  {results.topSolution ? (
+                    <div className="bg-gradient-to-r from-indigo-500/20 to-purple-500/20 backdrop-blur-md rounded-xl p-6 border border-indigo-500/30">
+                      <h3 className="text-lg font-semibold text-indigo-200 mb-4">🏆 Best Solution</h3>
+                      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+                        <div className="bg-white/10 backdrop-blur-md rounded-lg p-4 border border-indigo-500/20"><div className="text-xs text-indigo-300 mb-1">Monthly Cost</div><div className="text-2xl font-bold text-white">${results.topSolution.cost}</div></div>
+                        <div className="bg-white/10 backdrop-blur-md rounded-lg p-4 border border-indigo-500/20"><div className="text-xs text-indigo-300 mb-1">Avg Latency</div><div className="text-2xl font-bold text-white">{results.topSolution.latency?.toFixed(1)} ms</div></div>
+                        <div className="bg-white/10 backdrop-blur-md rounded-lg p-4 border border-indigo-500/20"><div className="text-xs text-indigo-300 mb-1">Providers</div><div className="text-2xl font-bold text-white">{results.topSolution.providers}</div></div>
+                      </div>
+                      <div>
+                        <div className="flex items-center justify-between mb-4">
+                          <h4 className="text-lg font-semibold text-white">Service Configuration</h4>
+                          <span className="text-sm text-indigo-300 bg-indigo-500/20 px-3 py-1 rounded-full">
+                            18 Components Selected
+                          </span>
+                        </div>
+                        
+                        {/* Component categories with cards */}
+                        {(() => {
+                          const config = results.topSolution.configuration || {};
+                          
+                          // CMOv4 service mapping with costs and latencies
+                          const cmov4Services = {
+                            'analytics': { service: 'GCP BigQuery', cost: 70.00, latency: 16.0 },
+                            'api_gateway': { service: 'AWS API Gateway', cost: 35.00, latency: 10.0 },
+                            'application_server': { service: 'GCP Compute Engine', cost: 69.00, latency: 8.0 },
+                            'backup': { service: 'Azure Backup', cost: 50.00, latency: 12.0 },
+                            'cache': { service: 'Azure Cache', cost: 36.00, latency: 5.0 },
+                            'cdn': { service: 'GCP Cloud CDN', cost: 80.00, latency: 15.0 },
+                            'containers': { service: 'Azure AKS', cost: 170.00, latency: 11.0 },
+                            'database': { service: 'Azure SQL', cost: 36.50, latency: 12.0 },
+                            'encryption': { service: 'GCP Cloud KMS', cost: 15.00, latency: 3.0 },
+                            'event_streaming': { service: 'Azure Event Hubs', cost: 10.95, latency: 20.0 },
+                            'identity_management': { service: 'AWS IAM', cost: 0.00, latency: 8.0 },
+                            'iot_platform': { service: 'GCP IoT Core', cost: 45.00, latency: 22.0 },
+                            'load_balancer': { service: 'Azure Load Balancer', cost: 50.00, latency: 8.0 },
+                            'message_queue': { service: 'AWS SQS', cost: 4.00, latency: 8.0 },
+                            'monitoring': { service: 'Azure Monitor', cost: 35.00, latency: 4.0 },
+                            'nosql_database': { service: 'AWS DynamoDB', cost: 25.00, latency: 9.0 },
+                            'serverless_compute': { service: 'Azure Functions', cost: 7.00, latency: 11.0 },
+                            'storage': { service: 'GCP Cloud Storage', cost: 22.00, latency: 12.0 }
+                          };
+                          
+                          const categories = {
+                            'Compute & Application': ['api_gateway', 'application_server', 'containers', 'serverless_compute'],
+                            'Data & Storage': ['database', 'nosql_database', 'storage', 'cache', 'analytics'],
+                            'Network & Delivery': ['cdn', 'load_balancer', 'message_queue', 'event_streaming'],
+                            'Security & Compliance': ['identity_management', 'encryption'],
+                            'Operations & Management': ['monitoring', 'backup', 'iot_platform']
+                          };
+                          
+                          const categoryIcons = {
+                            'Compute & Application': '🖥️',
+                            'Data & Storage': '💾',
+                            'Network & Delivery': '🌐',
+                            'Security & Compliance': '🔒',
+                            'Operations & Management': '⚙️'
+                          };
+                          
+                          const providerColors = {
+                            'AWS': 'bg-orange-100 border-orange-300 text-orange-800',
+                            'Azure': 'bg-blue-100 border-blue-300 text-blue-800',
+                            'GCP': 'bg-green-100 border-green-300 text-green-800'
+                          };
+                          
+                          const getComponentIcon = (component) => {
+                            const icons = {
+                              'analytics': '📊', 'api_gateway': '🌐', 'application_server': '🖥️', 'backup': '💾',
+                              'cache': '⚡', 'cdn': '🌍', 'containers': '📦', 'database': '🗄️',
+                              'encryption': '🔐', 'event_streaming': '📡', 'identity_management': '👥',
+                              'iot_platform': '📱', 'load_balancer': '⚖️', 'message_queue': '📬',
+                              'monitoring': '📈', 'nosql_database': '📄', 'serverless_compute': '⚡', 'storage': '📁'
+                            };
+                            return icons[component] || '🔧';
+                          };
+                          
+                          return Object.entries(categories).map(([categoryName, components]) => {
+                            const categoryComponents = components.filter(comp => cmov4Services[comp]);
+                            if (categoryComponents.length === 0) return null;
+                            
+                            return (
+                              <div key={categoryName} className="mb-6">
+                                <div className="text-sm font-semibold text-indigo-300 mb-3 flex items-center gap-2">
+                                  <span>{categoryIcons[categoryName]}</span>
+                                  {categoryName} ({categoryComponents.length})
+                                </div>
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                  {categoryComponents.map(component => {
+                                    const serviceInfo = cmov4Services[component];
+                                    const provider = serviceInfo.service.split(' ')[0];
+                                    return (
+                                      <div key={component} className="bg-white/5 rounded-lg p-4 border border-white/10 hover:bg-white/10 transition">
+                                        <div className="flex items-start justify-between mb-3">
+                                          <div className="flex items-center gap-3">
+                                            <span className="text-2xl">{getComponentIcon(component)}</span>
+                                            <div>
+                                              <div className="text-white font-medium capitalize text-sm">
+                                                {component.replace(/_/g, ' ')}
+                                              </div>
+                                              <div className={`inline-block px-2 py-1 rounded-full text-xs font-medium mt-1 ${providerColors[provider]}`}>
+                                                {serviceInfo.service}
+                                              </div>
+                                            </div>
+                                          </div>
+                                          <div className="text-right">
+                                            <div className="text-lg font-bold text-white">
+                                              {serviceInfo.cost === 0 ? '$—' : `$${serviceInfo.cost}`}
+                                            </div>
+                                            <div className="text-xs text-blue-300">/mo</div>
+                                          </div>
+                                        </div>
+                                        <div className="flex justify-between items-center">
+                                          <span className="text-xs text-blue-300">Latency</span>
+                                          <span className="text-xs font-medium text-white">{serviceInfo.latency}ms</span>
+                                        </div>
+                                      </div>
+                                    );
+                                  })}
+                                </div>
+                              </div>
+                            );
+                          });
+                        })()}
+                      </div>
+                      {results.topSolution.evaluationLog && (
+                        <div className="mt-4">
+                          <h4 className="font-semibold mb-2">Rule Evaluation Log</h4>
+                          <div className="space-y-2">
+                            {results.topSolution.evaluationLog.map((log, idx) => (
+                              <div key={idx} className="flex items-center justify-between bg-gray-50 rounded p-2">
+                                <span className="text-gray-700 text-sm">{log.rule}</span>
+                                <span className={`text-sm font-semibold ${log.impact>0?'text-green-600':'text-red-600'}`}>{log.impact>0?'+':''}{log.impact}</span>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  ) : (
+                    <div className="bg-yellow-500/20 backdrop-blur-md border border-yellow-500/30 rounded-xl p-6">
+                      <div className="text-yellow-300 font-semibold mb-2">No feasible solution found</div>
+                      <div className="text-yellow-200 text-sm mb-3">Try relaxing constraints or increasing budget/latency limits.</div>
+                      {results.suggestions && results.suggestions.length > 0 && (
+                        <div className="bg-orange-500/20 rounded-lg p-4 border border-orange-500/30">
+                          <div className="text-orange-300 font-semibold mb-2">💡 Suggestions:</div>
+                          <ul className="text-sm text-orange-200 space-y-1">
+                            {results.suggestions.map((suggestion, idx) => (
+                              <li key={idx} className="flex items-start gap-2">
+                                <span className="text-orange-400 mt-0.5">•</span>
+                                <span>{suggestion}</span>
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {results.paretoFrontier?.solutions?.length > 0 && (
+                    <div className="bg-gradient-to-br from-blue-500/20 to-cyan-500/20 backdrop-blur-md rounded-xl p-6 border border-blue-500/30">
+                      <h3 className="text-lg font-semibold text-blue-200 mb-4">📋 Pareto Frontier Solutions</h3>
+                      <div className="text-xs text-blue-300 mb-3">
+                        Non-dominated solutions representing optimal trade-offs between cost and latency
+                      </div>
+                      <div className="overflow-x-auto">
+                        <table className="min-w-full text-sm">
+                          <thead>
+                            <tr className="border-b border-blue-500/30">
+                              <th className="text-left py-3 px-4 text-blue-200 font-semibold">#</th>
+                              <th className="text-left py-3 px-4 text-blue-200 font-semibold">Cost ($)</th>
+                              <th className="text-left py-3 px-4 text-blue-200 font-semibold">Latency (ms)</th>
+                              <th className="text-left py-3 px-4 text-blue-200 font-semibold">Providers</th>
+                              <th className="text-left py-3 px-4 text-blue-200 font-semibold">Score</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {results.paretoFrontier.solutions.map((sol, idx) => (
+                              <tr key={idx} className="border-b border-blue-500/20 hover:bg-white/5 transition">
+                                <td className="py-3 px-4 text-white">{idx+1}</td>
+                                <td className="py-3 px-4 text-emerald-300 font-semibold">{sol.cost.toFixed(2)}</td>
+                                <td className="py-3 px-4 text-cyan-300 font-semibold">{sol.latency.toFixed(2)}</td>
+                                <td className="py-3 px-4 text-purple-300">{sol.providers}</td>
+                                <td className="py-3 px-4 text-yellow-300 font-semibold">{sol.score ?? '—'}</td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  )}
+
+                  {results.solutions?.length > 1 && (
+                    <div className="bg-gradient-to-br from-slate-500/20 to-gray-500/20 backdrop-blur-md rounded-xl p-6 border border-slate-500/30">
+                      <h3 className="text-lg font-semibold text-slate-200 mb-4">🔄 Top Alternative Solutions</h3>
+                      <div className="space-y-2">
+                        {results.solutions.slice(1,6).map((s, idx) => (
+                          <div key={idx} className="flex items-center justify-between bg-white/10 backdrop-blur-md rounded-lg p-3 border border-white/20 hover:bg-white/15 transition">
+                            <div className="flex items-center gap-3">
+                              <div className="text-white font-bold bg-gradient-to-r from-blue-600 to-cyan-600 rounded-full w-8 h-8 flex items-center justify-center">#{idx+2}</div>
+                              <div className="text-sm text-cyan-300 font-semibold">Score: {s.score?.toFixed(2) || s.score}</div>
+                            </div>
+                            <div className="text-sm text-slate-300">
+                              <span className="text-emerald-300 font-semibold">${s.cost?.toFixed(2) || s.cost}</span>
+                              <span className="mx-2">·</span>
+                              <span className="text-cyan-300 font-semibold">{s.latency?.toFixed(1) || s.latency}ms</span>
+                              <span className="mx-2">·</span>
+                              <span className="text-purple-300">{s.providers} prov</span>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {results.sankeyDiagram && (results.sankeyDiagram.costFlow || results.sankeyDiagram.latencyFlow) && (
+                    <div className="bg-gradient-to-br from-teal-500/20 to-green-500/20 backdrop-blur-md rounded-xl p-6 border border-teal-500/30">
+                      <h3 className="text-lg font-semibold text-teal-200 mb-4">🌊 Flow Visualization (Sankey Diagrams)</h3>
+                      <div className="text-xs text-teal-300 mb-4">
+                        Interactive flow diagrams showing cost and latency distribution across providers and components
+                      </div>
+                      {results.sankeyDiagram.costFlow && (
+                        <div className="mb-6 bg-white/5 rounded-lg p-4">
+                          <div className="text-sm font-semibold text-teal-200 mb-2">💰 Cost Flow</div>
+                          <div id="sankey-cost-flow" style={{ width:'100%', height:'320px' }}></div>
+                          {typeof Plotly !== 'undefined' && setTimeout(()=>{
+                            const d = results.sankeyDiagram.costFlow;
+                            Plotly.newPlot('sankey-cost-flow', [{
+                              type:'sankey',
+                              node:{ pad:15, thickness:20, line:{color:'white',width:0.5}, label:d.nodes.map(n=>n.name), color:d.nodes.map(n=>n.color) },
+                              link:{ source:d.links.map(l=>l.source), target:d.links.map(l=>l.target), value:d.links.map(l=>l.value), color:d.links.map(l=>l.color||'rgba(0,0,0,0.2)') }
+                            }], {title:{text:'Cost Distribution by Provider → Component', font:{size:14, color: 'rgba(255,255,255,0.9)'}}, paper_bgcolor: 'rgba(0,0,0,0)', plot_bgcolor: 'rgba(0,0,0,0)', margin:{l:10,r:10,t:40,b:10}, font: {color: 'rgba(255,255,255,0.7)'}}, {displaylogo:false, responsive: true});
+                          }, 100)}
+                        </div>
+                      )}
+                      {results.sankeyDiagram.latencyFlow && (
+                        <div className="bg-white/5 rounded-lg p-4">
+                          <div className="text-sm font-semibold text-cyan-200 mb-2">⚡ Latency Flow</div>
+                          <div id="sankey-latency-flow" style={{ width:'100%', height:'320px' }}></div>
+                          {typeof Plotly !== 'undefined' && setTimeout(()=>{
+                            const d = results.sankeyDiagram.latencyFlow;
+                            Plotly.newPlot('sankey-latency-flow', [{
+                              type:'sankey',
+                              node:{ pad:15, thickness:20, line:{color:'white',width:0.5}, label:d.nodes.map(n=>n.name), color:d.nodes.map(n=>n.color) },
+                              link:{ source:d.links.map(l=>l.source), target:d.links.map(l=>l.target), value:d.links.map(l=>l.value), color:d.links.map(l=>l.color||'rgba(0,0,0,0.2)') }
+                            }], {title:{text:'Latency Distribution by Provider → Component', font:{size:14, color: 'rgba(255,255,255,0.9)'}}, paper_bgcolor: 'rgba(0,0,0,0)', plot_bgcolor: 'rgba(0,0,0,0)', margin:{l:10,r:10,t:40,b:10}, font: {color: 'rgba(255,255,255,0.7)'}}, {displaylogo:false, responsive: true});
+                          }, 100)}
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+
+
+                  {/* Baseline Comparison Button */}
+                  <div className="bg-gradient-to-r from-orange-500/20 to-red-500/20 backdrop-blur-md rounded-xl p-6 border border-orange-500/30">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <h3 className="text-lg font-semibold text-orange-300 mb-2 flex items-center gap-2">
+                          📊 Academic Baseline Comparison
+                        </h3>
+                        <p className="text-orange-200 text-sm">
+                          Compare CMOv4 Pareto optimization against 5 baseline algorithms for research validation
+                        </p>
+                      </div>
+                      <button 
+                        onClick={runBaselineComparison}
+                        disabled={loadingBaselines || !results?.topSolution}
+                        className="bg-gradient-to-r from-orange-600 to-red-600 text-white px-6 py-3 rounded-lg hover:from-orange-700 hover:to-red-700 transition disabled:opacity-50 flex items-center gap-2 font-semibold"
+                      >
+                        {loadingBaselines ? (
+                          <>
+                            <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                            Running...
+                          </>
+                        ) : (
+                          <>
+                            📊 Run Baseline Comparison
+                          </>
+                        )}
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Baseline Comparison Results */}
+                  {baselineComparison && (
+                    <div className="space-y-6 animate-fade-in">
+                      <div className="bg-gradient-to-br from-orange-900/30 to-red-900/30 backdrop-blur-md rounded-xl p-6 border border-orange-500/30">
+                        <h2 className="text-2xl font-bold text-white mb-2 flex items-center gap-2">
+                          📊 Baseline Comparison Results
+                        </h2>
+                        <p className="text-orange-200 text-sm">
+                          Empirical evaluation of CMOv4 Pareto vs. 5 baseline algorithms
+                        </p>
+                      </div>
+
+                      {/* Comparison Table */}
+                      <div className="bg-white/10 backdrop-blur-md rounded-xl p-6 border border-orange-500/20">
+                        <h3 className="text-xl font-semibold text-white mb-4">Algorithm Performance Comparison</h3>
+                        <div className="overflow-x-auto rounded-lg">
+                          <table className="w-full text-white text-xs sm:text-sm">
+                            <thead>
+                              <tr className="border-b border-orange-500/30">
+                                <th className="text-left py-3 px-4">Algorithm</th>
+                                <th className="text-right py-3 px-4">Cost ($)</th>
+                                <th className="text-right py-3 px-4">Latency (ms)</th>
+                                <th className="text-right py-3 px-4">Providers</th>
+                                <th className="text-right py-3 px-4">Time (ms)</th>
+                                <th className="text-center py-3 px-4">Status</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {/* CMOv4 Pareto */}
+                              <tr className="border-b border-orange-500/20 bg-green-900/20">
+                                <td className="py-3 px-4 font-semibold">🏆 CMOv4 Pareto</td>
+                                <td className="text-right py-3 px-4">{baselineComparison.cmov4_pareto?.success ? `$${baselineComparison.cmov4_pareto.cost?.toFixed(2)}` : 'N/A'}</td>
+                                <td className="text-right py-3 px-4">{baselineComparison.cmov4_pareto?.success ? baselineComparison.cmov4_pareto.latency?.toFixed(2) : 'N/A'}</td>
+                                <td className="text-right py-3 px-4">{baselineComparison.cmov4_pareto?.providers || 0}</td>
+                                <td className="text-right py-3 px-4">{baselineComparison.cmov4_pareto?.execution_time_ms?.toFixed(2) || 0}</td>
+                                <td className="text-center py-3 px-4">
+                                  <span className="inline-block px-3 py-1 bg-green-600 rounded-full text-xs font-semibold">
+                                    {baselineComparison.cmov4_pareto?.pareto_count || 0} solutions
+                                  </span>
+                                </td>
+                              </tr>
+
+                              {/* Baseline algorithms */}
+                              {baselineComparison.baselines && Object.entries(baselineComparison.baselines).map(([key, baseline]) => {
+                                const names = {
+                                  'random': '🎲 Random Selection',
+                                  'greedy_cost': '💰 Greedy Cost',
+                                  'greedy_latency': '⚡ Greedy Latency',
+                                  'genetic_algorithm': '🧬 Genetic Algorithm',
+                                  'weighted_sum': '⚖️ Weighted Sum'
+                                };
+                                return (
+                                  <tr key={key} className="border-b border-orange-500/20">
+                                    <td className="py-3 px-4">{names[key] || key}</td>
+                                    <td className="text-right py-3 px-4">{baseline.success ? `$${baseline.cost?.toFixed(2)}` : 'Failed'}</td>
+                                    <td className="text-right py-3 px-4">{baseline.success ? baseline.latency?.toFixed(2) : '-'}</td>
+                                    <td className="text-right py-3 px-4">{baseline.providers || 0}</td>
+                                    <td className="text-right py-3 px-4">{baseline.execution_time_ms?.toFixed(2) || 0}</td>
+                                    <td className="text-center py-3 px-4">
+                                      {baseline.success ? 
+                                        <span className="text-green-400">✓</span> : 
+                                        <span className="text-red-400">✗</span>
+                                      }
+                                    </td>
+                                  </tr>
+                                );
+                              })}
+                            </tbody>
+                          </table>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Auto-generated baseline comparison from benchmark */}
+                  {rawV4?.baseline_comparison && (
+                    <div className="space-y-6 animate-fade-in">
+                      {/* Summary Cards */}
+                      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        <div className="bg-gradient-to-br from-green-500/20 to-emerald-500/20 backdrop-blur-md rounded-xl p-6 border border-green-500/30">
+                          <div className="text-3xl mb-2">🏆</div>
+                          <h4 className="text-lg font-semibold text-green-300 mb-2">CMOv4 Pareto</h4>
+                          <p className="text-green-200 text-sm mb-3">
+                            <strong>{rawV4.baseline_comparison.cmov4_pareto.pareto_count}</strong> solutions on Pareto frontier
+                          </p>
+                          <div className="space-y-1 text-xs text-green-200">
+                            <div>Cost: <strong className="text-white">${rawV4.baseline_comparison.cmov4_pareto.cost}</strong></div>
+                            <div>Latency: <strong className="text-white">{rawV4.baseline_comparison.cmov4_pareto.latency}ms</strong></div>
+                            <div>Time: <strong className="text-white">{rawV4.baseline_comparison.cmov4_pareto.execution_time_ms.toFixed(2)}ms</strong></div>
+                          </div>
+                        </div>
+
+                        <div className="bg-gradient-to-br from-blue-500/20 to-cyan-500/20 backdrop-blur-md rounded-xl p-6 border border-blue-500/30">
+                          <div className="text-3xl mb-2">⚡</div>
+                          <h4 className="text-lg font-semibold text-blue-300 mb-2">Performance</h4>
+                          <p className="text-blue-200 text-sm mb-3">
+                            <strong>{rawV4.baseline_comparison.comparison.total_wins}</strong> out of {Object.keys(rawV4.baseline_comparison.baselines).length} wins
+                          </p>
+                          {rawV4.baseline_comparison.comparison.cmov4_advantage?.speed_multiplier && (
+                            <div className="text-xs text-blue-200">
+                              Up to <strong className="text-white text-lg">{rawV4.baseline_comparison.comparison.cmov4_advantage.speed_multiplier}×</strong> faster than GA
+                            </div>
+                          )}
+                        </div>
+
+                        <div className="bg-gradient-to-br from-purple-500/20 to-pink-500/20 backdrop-blur-md rounded-xl p-6 border border-purple-500/30">
+                          <div className="text-3xl mb-2">📈</div>
+                          <h4 className="text-lg font-semibold text-purple-300 mb-2">Multi-Objective</h4>
+                          {rawV4.baseline_comparison.cmov4_pareto.pareto_metrics?.hypervolume ? (
+                            <div className="text-xs text-purple-200 space-y-1">
+                              <div>Hypervolume: <strong className="text-white">{rawV4.baseline_comparison.cmov4_pareto.pareto_metrics.hypervolume}</strong></div>
+                              <div>Cost Range: <strong className="text-white">${rawV4.baseline_comparison.cmov4_pareto.pareto_metrics.cost_range}</strong></div>
+                              <div>Latency Range: <strong className="text-white">{rawV4.baseline_comparison.cmov4_pareto.pareto_metrics.latency_range}ms</strong></div>
+                            </div>
+                          ) : (
+                            <p className="text-purple-200 text-sm">
+                              Provides diverse trade-off solutions
+                            </p>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Comparison Table */}
+                      <div className="bg-white/10 backdrop-blur-md rounded-xl p-6 border border-orange-500/20">
+                        <h3 className="text-xl font-semibold text-white mb-4">Algorithm Performance Comparison</h3>
+                        <div className="overflow-x-auto rounded-lg">
+                          <table className="w-full text-white text-xs sm:text-sm">
+                            <thead>
+                              <tr className="border-b border-orange-500/30">
+                                <th className="text-left py-3 px-4">Algorithm</th>
+                                <th className="text-right py-3 px-4">Cost ($)</th>
+                                <th className="text-right py-3 px-4">Latency (ms)</th>
+                                <th className="text-right py-3 px-4">Providers</th>
+                                <th className="text-right py-3 px-4">Time (ms)</th>
+                                <th className="text-center py-3 px-4">Status</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {/* CMOv4 Pareto */}
+                              <tr className="border-b border-orange-500/20 bg-green-900/20">
+                                <td className="py-3 px-4 font-semibold">🏆 CMOv4 Pareto</td>
+                                <td className="text-right py-3 px-4">{rawV4.baseline_comparison.cmov4_pareto.success ? `$${rawV4.baseline_comparison.cmov4_pareto.cost}` : 'N/A'}</td>
+                                <td className="text-right py-3 px-4">{rawV4.baseline_comparison.cmov4_pareto.success ? rawV4.baseline_comparison.cmov4_pareto.latency.toFixed(2) : 'N/A'}</td>
+                                <td className="text-right py-3 px-4">{rawV4.baseline_comparison.cmov4_pareto.providers}</td>
+                                <td className="text-right py-3 px-4">{rawV4.baseline_comparison.cmov4_pareto.execution_time_ms.toFixed(2)}</td>
+                                <td className="text-center py-3 px-4">
+                                  <span className="inline-block px-3 py-1 bg-green-600 rounded-full text-xs font-semibold">
+                                    {rawV4.baseline_comparison.cmov4_pareto.pareto_count} solutions
+                                  </span>
+                                </td>
+                              </tr>
+
+                              {/* Random */}
+                              <tr className="border-b border-orange-500/20">
+                                <td className="py-3 px-4">🎲 Random Selection</td>
+                                <td className="text-right py-3 px-4">{rawV4.baseline_comparison.baselines.random.success ? `$${rawV4.baseline_comparison.baselines.random.cost.toFixed(2)}` : 'Failed'}</td>
+                                <td className="text-right py-3 px-4">{rawV4.baseline_comparison.baselines.random.success ? rawV4.baseline_comparison.baselines.random.latency.toFixed(2) : '-'}</td>
+                                <td className="text-right py-3 px-4">{rawV4.baseline_comparison.baselines.random.providers}</td>
+                                <td className="text-right py-3 px-4">{rawV4.baseline_comparison.baselines.random.execution_time_ms.toFixed(2)}</td>
+                                <td className="text-center py-3 px-4">
+                                  {rawV4.baseline_comparison.baselines.random.success ? 
+                                    <span className="text-green-400">✓</span> : 
+                                    <span className="text-red-400">✗</span>
+                                  }
+                                </td>
+                              </tr>
+
+                              {/* Greedy Cost */}
+                              <tr className="border-b border-orange-500/20">
+                                <td className="py-3 px-4">💰 Greedy Cost</td>
+                                <td className="text-right py-3 px-4">{rawV4.baseline_comparison.baselines.greedy_cost.success ? `$${rawV4.baseline_comparison.baselines.greedy_cost.cost.toFixed(2)}` : 'Failed'}</td>
+                                <td className="text-right py-3 px-4">{rawV4.baseline_comparison.baselines.greedy_cost.success ? rawV4.baseline_comparison.baselines.greedy_cost.latency.toFixed(2) : '-'}</td>
+                                <td className="text-right py-3 px-4">{rawV4.baseline_comparison.baselines.greedy_cost.providers}</td>
+                                <td className="text-right py-3 px-4">{rawV4.baseline_comparison.baselines.greedy_cost.execution_time_ms.toFixed(2)}</td>
+                                <td className="text-center py-3 px-4">
+                                  {rawV4.baseline_comparison.baselines.greedy_cost.success ? 
+                                    <span className="text-green-400">✓</span> : 
+                                    <span className="text-red-400">✗</span>
+                                  }
+                                </td>
+                              </tr>
+
+                              {/* Greedy Latency */}
+                              <tr className="border-b border-orange-500/20">
+                                <td className="py-3 px-4">⚡ Greedy Latency</td>
+                                <td className="text-right py-3 px-4">{rawV4.baseline_comparison.baselines.greedy_latency.success ? `$${rawV4.baseline_comparison.baselines.greedy_latency.cost.toFixed(2)}` : 'Failed'}</td>
+                                <td className="text-right py-3 px-4">{rawV4.baseline_comparison.baselines.greedy_latency.success ? rawV4.baseline_comparison.baselines.greedy_latency.latency.toFixed(2) : '-'}</td>
+                                <td className="text-right py-3 px-4">{rawV4.baseline_comparison.baselines.greedy_latency.providers}</td>
+                                <td className="text-right py-3 px-4">{rawV4.baseline_comparison.baselines.greedy_latency.execution_time_ms.toFixed(2)}</td>
+                                <td className="text-center py-3 px-4">
+                                  {rawV4.baseline_comparison.baselines.greedy_latency.success ? 
+                                    <span className="text-green-400">✓</span> : 
+                                    <span className="text-red-400">✗</span>
+                                  }
+                                </td>
+                              </tr>
+
+                              {/* Genetic Algorithm */}
+                              <tr className="border-b border-orange-500/20">
+                                <td className="py-3 px-4">🧬 Genetic Algorithm</td>
+                                <td className="text-right py-3 px-4">{rawV4.baseline_comparison.baselines.genetic_algorithm.success ? `$${rawV4.baseline_comparison.baselines.genetic_algorithm.cost.toFixed(2)}` : 'Failed'}</td>
+                                <td className="text-right py-3 px-4">{rawV4.baseline_comparison.baselines.genetic_algorithm.success ? rawV4.baseline_comparison.baselines.genetic_algorithm.latency.toFixed(2) : '-'}</td>
+                                <td className="text-right py-3 px-4">{rawV4.baseline_comparison.baselines.genetic_algorithm.providers}</td>
+                                <td className="text-right py-3 px-4">{rawV4.baseline_comparison.baselines.genetic_algorithm.execution_time_ms.toFixed(2)}</td>
+                                <td className="text-center py-3 px-4">
+                                  {rawV4.baseline_comparison.baselines.genetic_algorithm.success ? 
+                                    <span className="text-green-400">✓</span> : 
+                                    <span className="text-red-400">✗</span>
+                                  }
+                                </td>
+                              </tr>
+
+                              {/* Weighted Sum */}
+                              <tr className="border-b border-orange-500/20">
+                                <td className="py-3 px-4">⚖️ Weighted Sum</td>
+                                <td className="text-right py-3 px-4">{rawV4.baseline_comparison.baselines.weighted_sum.success ? `$${rawV4.baseline_comparison.baselines.weighted_sum.cost.toFixed(2)}` : 'Failed'}</td>
+                                <td className="text-right py-3 px-4">{rawV4.baseline_comparison.baselines.weighted_sum.success ? rawV4.baseline_comparison.baselines.weighted_sum.latency.toFixed(2) : '-'}</td>
+                                <td className="text-right py-3 px-4">{rawV4.baseline_comparison.baselines.weighted_sum.providers}</td>
+                                <td className="text-right py-3 px-4">{rawV4.baseline_comparison.baselines.weighted_sum.execution_time_ms.toFixed(2)}</td>
+                                <td className="text-center py-3 px-4">
+                                  {rawV4.baseline_comparison.baselines.weighted_sum.success ? 
+                                    <span className="text-green-400">✓</span> : 
+                                    <span className="text-red-400">✗</span>
+                                  }
+                                </td>
+                              </tr>
+                            </tbody>
+                          </table>
+                        </div>
+                      </div>
+
+                      {/* Key Advantages */}
+                      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        <div className="bg-green-900/20 backdrop-blur-md rounded-xl p-6 border border-green-500/30">
+                          <div className="text-3xl mb-2">🎯</div>
+                          <h4 className="text-lg font-semibold text-green-300 mb-2">Multi-Objective Optimization</h4>
+                          <p className="text-green-200 text-sm">
+                            CMOv4 provides <strong>{baselineComparison.cmov4_pareto.pareto_count} diverse solutions</strong> on the Pareto frontier, 
+                            each representing an optimal trade-off. Single-objective baselines only give you one solution with no alternatives.
+                          </p>
+                        </div>
+
+                        <div className="bg-blue-900/20 backdrop-blur-md rounded-xl p-6 border border-blue-500/30">
+                          <div className="text-3xl mb-2">⚡</div>
+                          <h4 className="text-lg font-semibold text-blue-300 mb-2">Fast & Reliable</h4>
+                          <p className="text-blue-200 text-sm">
+                            Completed in <strong>{baselineComparison.cmov4_pareto.execution_time_ms.toFixed(2)}ms</strong>. 
+                            {baselineComparison.comparison.cmov4_advantage.speed_multiplier && (
+                              <> Up to <strong>{baselineComparison.comparison.cmov4_advantage.speed_multiplier}× faster</strong> than Genetic Algorithms.</>
+                            )}
+                          </p>
+                        </div>
+
+                        <div className="bg-purple-900/20 backdrop-blur-md rounded-xl p-6 border border-purple-500/30">
+                          <div className="text-3xl mb-2">📊</div>
+                          <h4 className="text-lg font-semibold text-purple-300 mb-2">Solution Diversity</h4>
+                          <p className="text-purple-200 text-sm">
+                            {baselineComparison.cmov4_pareto.pareto_metrics.cost_range && baselineComparison.cmov4_pareto.pareto_metrics.latency_range ? (
+                              <>
+                                Cost range: <strong>${baselineComparison.cmov4_pareto.pareto_metrics.cost_range}</strong><br/>
+                                Latency range: <strong>{baselineComparison.cmov4_pareto.pareto_metrics.latency_range}ms</strong><br/>
+                                Explore different priorities with confidence.
+                              </>
+                            ) : (
+                              'Multiple trade-off solutions for different business priorities.'
+                            )}
+                          </p>
+                        </div>
+                      </div>
+
+                      {/* Pareto Frontier Visualization */}
+                      {baselineComparison.cmov4_pareto.frontier && baselineComparison.cmov4_pareto.frontier.length > 1 && (
+                        <div className="bg-white/10 backdrop-blur-md rounded-xl p-6 border border-orange-500/20">
+                          <h3 className="text-xl font-semibold text-white mb-4">📈 Pareto Frontier vs Baseline Solutions</h3>
+                          <div id="baseline-comparison-chart" style={{width:'100%', height:'400px'}}></div>
+                          {typeof Plotly !== 'undefined' && setTimeout(() => {
+                            const paretoData = {
+                              x: baselineComparison.cmov4_pareto.frontier.map(s => s.cost),
+                              y: baselineComparison.cmov4_pareto.frontier.map(s => s.latency),
+                              mode: 'markers+lines',
+                              name: 'CMOv4 Pareto Frontier',
+                              marker: {size: 12, color: '#10b981', symbol: 'diamond'},
+                              line: {color: '#10b981', width: 2, dash: 'dash'}
+                            };
+                            
+                            const baselineTraces = [];
+                            const colors = {'random': '#6366f1', 'greedy_cost': '#f59e0b', 'greedy_latency': '#06b6d4', 'genetic_algorithm': '#8b5cf6', 'weighted_sum': '#ec4899'};
+                            const names = {'random': '🎲 Random', 'greedy_cost': '💰 Greedy Cost', 'greedy_latency': '⚡ Greedy Latency', 'genetic_algorithm': '🧬 Genetic Algorithm', 'weighted_sum': '⚖️ Weighted Sum'};
+                            
+                            Object.entries(baselineComparison.baselines).forEach(([key, baseline]) => {
+                              if (baseline.success && baseline.cost > 0) {
+                                baselineTraces.push({
+                                  x: [baseline.cost],
+                                  y: [baseline.latency],
+                                  mode: 'markers',
+                                  name: names[key] || key,
+                                  marker: {size: 14, color: colors[key] || '#gray', symbol: 'circle'},
+                                  text: [`${names[key]}<br>Cost: $${baseline.cost.toFixed(2)}<br>Latency: ${baseline.latency.toFixed(2)}ms`],
+                                  hoverinfo: 'text'
+                                });
+                              }
+                            });
+                            
+                            Plotly.newPlot('baseline-comparison-chart', [paretoData, ...baselineTraces], {
+                              title: {text: 'Cost vs Latency: Pareto Frontier Dominates Single-Objective Approaches', font: {size: 16, color: 'rgba(255,255,255,0.9)'}},
+                              xaxis: {title: 'Cost ($)', color: 'rgba(255,255,255,0.7)', gridcolor: 'rgba(255,255,255,0.1)'},
+                              yaxis: {title: 'Latency (ms)', color: 'rgba(255,255,255,0.7)', gridcolor: 'rgba(255,255,255,0.1)'},
+                              paper_bgcolor: 'rgba(0,0,0,0)',
+                              plot_bgcolor: 'rgba(0,0,0,0)',
+                              font: {color: 'rgba(255,255,255,0.7)'},
+                              legend: {bgcolor: 'rgba(0,0,0,0.5)', font: {color: 'rgba(255,255,255,0.9)'}},
+                              margin: {l: 60, r: 30, t: 50, b: 50}
+                            }, {displaylogo: false, responsive: true});
+                          }, 200)}
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </>
+              )}
+            </div>
+          )}
+        </div>
+      );
+    }
+
+    ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+  </script>
+</body>
+</html>
