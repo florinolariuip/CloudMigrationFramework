@@ -1481,11 +1481,17 @@ practical: \cmofour produced multi-point Pareto sets, and maintained low runtime
 while offering explanation artefacts suitable for technical and governance-facing
 reviews.
 
-To support external validation, the implementation is available as an online
-demonstrator (deployment URL provided in the final artefact package). The
-interface also uses Sankey diagrams to visualise cost and latency flows across
-components and providers, helping users trace how local configuration choices
-propagate to system-level outcomes.
+To support external validation, the full implementation---including all
+experiment scripts, result artefacts, and the Netflix scenario---is available
+at:
+\begin{center}
+\url{https://github.com/florinolariuip/CloudMigrationFramework/tree/CMO_Netflix/cmo_journal_code}
+\end{center}
+The repository is currently set to private to preserve double-blind review
+integrity; the authors will grant access to any reviewer upon request.
+The interface also uses Sankey diagrams to visualise cost and latency flows
+across components and providers, helping users trace how local configuration
+choices propagate to system-level outcomes.
 
 The distinctive value of our approach is the explicit unification of four
 capabilities that are usually treated separately: exact constraint-based
