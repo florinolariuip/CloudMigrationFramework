@@ -1,0 +1,7 @@
+mcda_score,raw_reliability,raw_security,raw_vendor_risk,raw_scalability,norm_cost,norm_latency,algorithm,cost,latency,providers,scenario
+0.6899,1.0,1.0,0.3333,0.6583,0.0558,0.9669,CMOv4,487.88,21.11,3,18-comp
+0.7645,1.0,1.0,0.5,0.6583,0.0,0.5525,GA,427.74,16.94,2,18-comp
+0.7022,1.0,1.0,0.3333,0.6583,0.0146,0.9669,GreedyCost,443.53,21.11,3,18-comp
+0.6327,1.0,1.0,0.5,0.6583,0.6346,0.2597,GreedyLatency,1112.25,14.0,2,18-comp
+0.5478,1.0,1.0,0.3333,0.6583,0.6029,0.8564,WeightedSum,1078.05,20.0,3,18-comp
+0.6566,1.0,1.0,0.3333,0.6583,0.1853,0.9392,Random,627.65,20.83,3,18-comp

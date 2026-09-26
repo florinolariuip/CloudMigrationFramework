@@ -233,7 +233,7 @@ if suggestions:
 # -----------------------------------------------------------------------
 # Save results
 # -----------------------------------------------------------------------
-out_path = "/sessions/compassionate-intelligent-sagan/mnt/outputs/netflix_cmov4_results.json"
+out_path = "experiments/results/netflix_cmov4_results.json"
 with open(out_path, "w") as f:
     json.dump({
         "scenario":        "Netflix Multi-Cloud Migration (13-component, CMOv4)",

@@ -1,0 +1,60 @@
+{
+  "scenario": "Netflix Multi-Cloud Migration (13-component, CMOv4)",
+  "latency_model": "graph_latency (critical path)",
+  "constraints": {
+    "maxBudget": 5000,
+    "maxLatency": 100,
+    "maxProviders": 3,
+    "performanceMetric": "graph_latency",
+    "preferences": {
+      "preferredProvider": null,
+      "prioritizeCost": false,
+      "prioritizePerformance": false
+    }
+  },
+  "total_runtime_ms": 36642.3,
+  "feasible_count": null,
+  "pareto_size": 0,
+  "pareto_metrics": {},
+  "top_solution": {
+    "configuration": {
+      "api_gateway": "GCP API Gateway",
+      "event_streaming": "Azure Event Hubs",
+      "cdn": "Azure CDN",
+      "storage": "GCP Cloud Storage",
+      "cache": "GCP Memorystore",
+      "nosql_database": "AWS DynamoDB",
+      "monitoring": "GCP Cloud Monitoring",
+      "identity_management": "GCP IAM",
+      "containers": "Azure AKS",
+      "application_server": "Azure VM",
+      "database": "Azure SQL",
+      "load_balancer": "AWS ALB",
+      "analytics": "GCP BigQuery"
+    },
+    "cost": 421.09,
+    "latency": 10.615384615384615,
+    "providers": 3,
+    "providerDistribution": {
+      "GCP": 6,
+      "Azure": 5,
+      "AWS": 2
+    },
+    "score": 90.4814076923077,
+    "raw_score": null,
+    "evaluationLog": null,
+    "constraintProof": null,
+    "ruleTrace": null,
+    "decisionPath": null,
+    "reliability": null,
+    "norm_cost": null,
+    "norm_latency": null,
+    "norm_reliability": null,
+    "security_score": null,
+    "vendor_lockin_risk": null,
+    "scalability_score": null,
+    "norm_security": null,
+    "norm_vendor_risk": null
+  },
+  "pareto_frontier": []
+}

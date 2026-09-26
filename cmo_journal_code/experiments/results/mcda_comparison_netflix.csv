@@ -1,0 +1,10 @@
+mcda_score,raw_reliability,raw_security,raw_vendor_risk,raw_scalability,norm_cost,norm_latency,algorithm,cost,latency,providers,scenario
+0.6855,1.0,1.0,0.3333,0.65,0.0887,0.9392,CMOv3,374.54,21.08,3,Netflix-13comp
+0.7176,1.0,1.0,0.3333,0.65,0.0,0.9122,GA_s0,299.89,20.77,3,Netflix-13comp
+0.7526,1.0,1.0,0.5,0.65,0.0295,0.5676,GA_s1,324.7,16.85,2,Netflix-13comp
+0.7526,1.0,1.0,0.5,0.65,0.0295,0.5676,GA_s2,324.7,16.85,2,Netflix-13comp
+0.7176,1.0,1.0,0.3333,0.65,0.0,0.9122,GA_s3,299.89,20.77,3,Netflix-13comp
+0.7533,1.0,1.0,0.5,0.65,0.1488,0.3851,GA_s4,425.12,14.77,2,Netflix-13comp
+0.6977,1.0,1.0,0.3333,0.65,0.0483,0.9392,GreedyCost,340.49,21.08,3,Netflix-13comp
+0.6377,1.0,1.0,0.5,0.65,0.5792,0.3176,GreedyLatency,787.25,14.0,2,Netflix-13comp
+0.5662,1.0,1.0,0.3333,0.65,0.5497,0.8446,WeightedSum,762.45,20.0,3,Netflix-13comp

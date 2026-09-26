@@ -1,0 +1,421 @@
+{
+  "per_profile_scores": [
+    {
+      "profile": "Balanced (default)",
+      "weights": [
+        0.3,
+        0.2,
+        0.2,
+        0.15,
+        0.1,
+        0.05
+      ],
+      "algorithm": "CMOv4",
+      "mcda_score": 0.6899
+    },
+    {
+      "profile": "Balanced (default)",
+      "weights": [
+        0.3,
+        0.2,
+        0.2,
+        0.15,
+        0.1,
+        0.05
+      ],
+      "algorithm": "GA",
+      "mcda_score": 0.7645
+    },
+    {
+      "profile": "Balanced (default)",
+      "weights": [
+        0.3,
+        0.2,
+        0.2,
+        0.15,
+        0.1,
+        0.05
+      ],
+      "algorithm": "GreedyCost",
+      "mcda_score": 0.7022
+    },
+    {
+      "profile": "Balanced (default)",
+      "weights": [
+        0.3,
+        0.2,
+        0.2,
+        0.15,
+        0.1,
+        0.05
+      ],
+      "algorithm": "GreedyLatency",
+      "mcda_score": 0.6327
+    },
+    {
+      "profile": "Balanced (default)",
+      "weights": [
+        0.3,
+        0.2,
+        0.2,
+        0.15,
+        0.1,
+        0.05
+      ],
+      "algorithm": "WeightedSum",
+      "mcda_score": 0.5478
+    },
+    {
+      "profile": "Balanced (default)",
+      "weights": [
+        0.3,
+        0.2,
+        0.2,
+        0.15,
+        0.1,
+        0.05
+      ],
+      "algorithm": "Random",
+      "mcda_score": 0.6566
+    },
+    {
+      "profile": "Cost-focused",
+      "weights": [
+        0.55,
+        0.15,
+        0.1,
+        0.1,
+        0.05,
+        0.05
+      ],
+      "algorithm": "CMOv4",
+      "mcda_score": 0.7493
+    },
+    {
+      "profile": "Cost-focused",
+      "weights": [
+        0.55,
+        0.15,
+        0.1,
+        0.1,
+        0.05,
+        0.05
+      ],
+      "algorithm": "GA",
+      "mcda_score": 0.8296
+    },
+    {
+      "profile": "Cost-focused",
+      "weights": [
+        0.55,
+        0.15,
+        0.1,
+        0.1,
+        0.05,
+        0.05
+      ],
+      "algorithm": "GreedyCost",
+      "mcda_score": 0.7719
+    },
+    {
+      "profile": "Cost-focused",
+      "weights": [
+        0.55,
+        0.15,
+        0.1,
+        0.1,
+        0.05,
+        0.05
+      ],
+      "algorithm": "GreedyLatency",
+      "mcda_score": 0.5245
+    },
+    {
+      "profile": "Cost-focused",
+      "weights": [
+        0.55,
+        0.15,
+        0.1,
+        0.1,
+        0.05,
+        0.05
+      ],
+      "algorithm": "WeightedSum",
+      "mcda_score": 0.4649
+    },
+    {
+      "profile": "Cost-focused",
+      "weights": [
+        0.55,
+        0.15,
+        0.1,
+        0.1,
+        0.05,
+        0.05
+      ],
+      "algorithm": "Random",
+      "mcda_score": 0.6822
+    },
+    {
+      "profile": "Performance-critical",
+      "weights": [
+        0.15,
+        0.55,
+        0.1,
+        0.1,
+        0.05,
+        0.05
+      ],
+      "algorithm": "CMOv4",
+      "mcda_score": 0.3849
+    },
+    {
+      "profile": "Performance-critical",
+      "weights": [
+        0.15,
+        0.55,
+        0.1,
+        0.1,
+        0.05,
+        0.05
+      ],
+      "algorithm": "GA",
+      "mcda_score": 0.6086
+    },
+    {
+      "profile": "Performance-critical",
+      "weights": [
+        0.15,
+        0.55,
+        0.1,
+        0.1,
+        0.05,
+        0.05
+      ],
+      "algorithm": "GreedyCost",
+      "mcda_score": 0.391
+    },
+    {
+      "profile": "Performance-critical",
+      "weights": [
+        0.15,
+        0.55,
+        0.1,
+        0.1,
+        0.05,
+        0.05
+      ],
+      "algorithm": "GreedyLatency",
+      "mcda_score": 0.6745
+    },
+    {
+      "profile": "Performance-critical",
+      "weights": [
+        0.15,
+        0.55,
+        0.1,
+        0.1,
+        0.05,
+        0.05
+      ],
+      "algorithm": "WeightedSum",
+      "mcda_score": 0.3636
+    },
+    {
+      "profile": "Performance-critical",
+      "weights": [
+        0.15,
+        0.55,
+        0.1,
+        0.1,
+        0.05,
+        0.05
+      ],
+      "algorithm": "Random",
+      "mcda_score": 0.3806
+    },
+    {
+      "profile": "Security-first",
+      "weights": [
+        0.1,
+        0.1,
+        0.15,
+        0.45,
+        0.15,
+        0.05
+      ],
+      "algorithm": "CMOv4",
+      "mcda_score": 0.6477
+    },
+    {
+      "profile": "Security-first",
+      "weights": [
+        0.1,
+        0.1,
+        0.15,
+        0.45,
+        0.15,
+        0.05
+      ],
+      "algorithm": "GA",
+      "mcda_score": 0.6572
+    },
+    {
+      "profile": "Security-first",
+      "weights": [
+        0.1,
+        0.1,
+        0.15,
+        0.45,
+        0.15,
+        0.05
+      ],
+      "algorithm": "GreedyCost",
+      "mcda_score": 0.6519
+    },
+    {
+      "profile": "Security-first",
+      "weights": [
+        0.1,
+        0.1,
+        0.15,
+        0.45,
+        0.15,
+        0.05
+      ],
+      "algorithm": "GreedyLatency",
+      "mcda_score": 0.6231
+    },
+    {
+      "profile": "Security-first",
+      "weights": [
+        0.1,
+        0.1,
+        0.15,
+        0.45,
+        0.15,
+        0.05
+      ],
+      "algorithm": "WeightedSum",
+      "mcda_score": 0.6041
+    },
+    {
+      "profile": "Security-first",
+      "weights": [
+        0.1,
+        0.1,
+        0.15,
+        0.45,
+        0.15,
+        0.05
+      ],
+      "algorithm": "Random",
+      "mcda_score": 0.6375
+    },
+    {
+      "profile": "Vendor-risk-averse",
+      "weights": [
+        0.15,
+        0.1,
+        0.1,
+        0.1,
+        0.5,
+        0.05
+      ],
+      "algorithm": "CMOv4",
+      "mcda_score": 0.82
+    },
+    {
+      "profile": "Vendor-risk-averse",
+      "weights": [
+        0.15,
+        0.1,
+        0.1,
+        0.1,
+        0.5,
+        0.05
+      ],
+      "algorithm": "GA",
+      "mcda_score": 0.7447
+    },
+    {
+      "profile": "Vendor-risk-averse",
+      "weights": [
+        0.15,
+        0.1,
+        0.1,
+        0.1,
+        0.5,
+        0.05
+      ],
+      "algorithm": "GreedyCost",
+      "mcda_score": 0.8261
+    },
+    {
+      "profile": "Vendor-risk-averse",
+      "weights": [
+        0.15,
+        0.1,
+        0.1,
+        0.1,
+        0.5,
+        0.05
+      ],
+      "algorithm": "GreedyLatency",
+      "mcda_score": 0.6788
+    },
+    {
+      "profile": "Vendor-risk-averse",
+      "weights": [
+        0.15,
+        0.1,
+        0.1,
+        0.1,
+        0.5,
+        0.05
+      ],
+      "algorithm": "WeightedSum",
+      "mcda_score": 0.7489
+    },
+    {
+      "profile": "Vendor-risk-averse",
+      "weights": [
+        0.15,
+        0.1,
+        0.1,
+        0.1,
+        0.5,
+        0.05
+      ],
+      "algorithm": "Random",
+      "mcda_score": 0.8033
+    }
+  ],
+  "top_method_by_profile": [
+    {
+      "profile": "Balanced (default)",
+      "top_method": "GA",
+      "top_score": 0.7645
+    },
+    {
+      "profile": "Cost-focused",
+      "top_method": "GA",
+      "top_score": 0.8296
+    },
+    {
+      "profile": "Performance-critical",
+      "top_method": "GreedyLatency",
+      "top_score": 0.6745
+    },
+    {
+      "profile": "Security-first",
+      "top_method": "GA",
+      "top_score": 0.6572
+    },
+    {
+      "profile": "Vendor-risk-averse",
+      "top_method": "GreedyCost",
+      "top_score": 0.8261
+    }
+  ]
+}

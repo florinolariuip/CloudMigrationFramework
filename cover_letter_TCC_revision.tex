@@ -1,0 +1,132 @@
+\documentclass[12pt,a4paper]{letter}
+
+\usepackage[T1]{fontenc}
+\usepackage[utf8]{inputenc}
+\usepackage{lmodern}
+\usepackage{geometry}
+\usepackage{url}
+\usepackage{microtype}
+
+\geometry{
+  top=2.5cm, bottom=2.5cm,
+  left=2.8cm, right=2.8cm
+}
+
+\pagestyle{empty}
+
+\address{
+  Florin Olariu and Lenu\c{t}a Alboaie \\
+  Department of Computer Science \\
+  Alexandru Ioan Cuza University \\
+  Ia\c{s}i, Romania \\
+  \texttt{florin.olariu@info.uaic.ro; lenuta.alboaie@info.uaic.ro}
+}
+
+\date{September 2026}
+
+\begin{document}
+
+\begin{letter}{
+  Prof. Song Guo, Editor-in-Chief \\
+  \textit{IEEE Transactions on Cloud Computing} \\
+  IEEE Computer Society
+}
+
+\opening{Dear Prof. Guo,}
+
+Please find enclosed our revised manuscript, TCC-2026-04-0292,
+
+\begin{center}
+  \textbf{Transparent Multi-Cloud Migration Planning:\\
+  A CSP--Expert--Pareto Decision Pipeline}
+\end{center}
+
+\noindent
+by Florin Olariu and Lenu\c{t}a Alboaie, resubmitted in response to the
+Major Revision decision. We thank the two reviewers for their careful and
+constructive comments, which have materially improved the paper. A detailed,
+point-by-point response to every comment is provided in the accompanying
+``Response to Reviewers'' document; below we summarize the main changes.
+
+\bigskip
+\textbf{Summary of the revision.}
+\begin{itemize}
+  \item \textbf{No overstated optimizer claims.} Following Reviewer 1
+        (Comment 1) and Reviewer 2, we no longer imply that CMO is a
+        stronger optimizer than the baselines on individual metrics. We
+        report plainly that a tuned Genetic Algorithm can match or exceed
+        CMO on raw cost and latency, and reposition CMO's contribution
+        around interpretability, auditability, and multi-criteria decision
+        support rather than raw optimization performance.
+  \item \textbf{Fair, like-for-like comparison.} Following Reviewer 1
+        (Comment 2) and Reviewer 2, all baselines are now also scored with
+        the same six-dimensional MCDA scheme used to rank CMO's solutions
+        (cost, latency, reliability, security, vendor risk, scalability),
+        so every comparison in the paper states explicitly which objective
+        is being compared.
+  \item \textbf{Honest scope on interpretability claims.} Following
+        Reviewer 1 (Comment 3), we no longer imply that auditability and
+        vendor-lock-in mitigation have been validated with users. The
+        Response to Reviewers explains why a task-based user study is out
+        of scope for this submission and lists it as concrete future work;
+        the manuscript itself makes no unsupported claim in this regard.
+  \item \textbf{Baseline configuration details.} Following Reviewer 1
+        (Comment 4), we removed an unexecuted, placeholder NSGA-II/MOEA-D
+        comparison that had been included in error, and we now document
+        the Genetic Algorithm's encoding, population size, and operator
+        settings in full so the remaining evolutionary baseline is
+        reproducible.
+  \item \textbf{Streamlined presentation.} Following Reviewer 1
+        (Comment 5), the two internal configurations formerly labelled
+        CMOv3 and CMOv4 are now presented explicitly as two configurations
+        of a single pipeline (differing only in how latency is modelled),
+        not as sequential software releases, to keep the focus on the
+        research contribution rather than on version history.
+  \item \textbf{Condensed abstract.} Following Reviewer 1 (Comment 6), the
+        abstract has been shortened by nearly half and no longer lists
+        specific run counts, timings, or component counts, focusing
+        instead on motivation, design, and the main qualitative findings.
+  \item \textbf{Clarified feasibility vs.\ completeness.} Following
+        Reviewer 2, we now state explicitly that the constraint layer
+        guarantees the feasibility of every returned solution, and we
+        clarify the conditions under which the reported Pareto set is, or
+        is not, claimed to be complete.
+  \item \textbf{Weight sensitivity.} Following Reviewer 2, we added a new
+        analysis (Section IV-D) showing how the final MCDA ranking responds
+        to changes in the stakeholder weight profile, together with the
+        rationale for the default weights used elsewhere in the paper.
+  \item \textbf{Modest framing of the Netflix case study.} Following
+        Reviewer 2, the Netflix-inspired scenario is now presented as an
+        illustrative, publicly reproducible example grounded in public
+        documentation and pricing, not as validation against real
+        production constraints.
+\end{itemize}
+
+\bigskip
+\textbf{Reproducibility.}
+The implementation, experiment scripts, and result artefacts referenced in
+the manuscript are maintained in a repository that is now publicly
+available, as cited in the bibliography.
+
+\bigskip
+\textbf{Declarations.}
+We confirm that the revised manuscript is original, has not been published
+previously, and is not under consideration by any other journal or
+conference. All authors have approved the submitted version, and there are
+no conflicts of interest to declare.
+
+\bigskip
+We thank you and the reviewers again for the thorough evaluation, and we
+believe the revised manuscript addresses all of the points raised. Please
+let us know if any further information or clarification is required.
+
+\closing{Yours sincerely,}
+
+\vspace{0.5cm}
+Florin Olariu \quad (Corresponding Author) \\
+Lenu\c{t}a Alboaie \quad (Corresponding Author) \\[4pt]
+Department of Computer Science, Alexandru Ioan Cuza University, Ia\c{s}i, Romania \\[2pt]
+\texttt{florin.olariu@info.uaic.ro; lenuta.alboaie@info.uaic.ro}
+
+\end{letter}
+\end{document}

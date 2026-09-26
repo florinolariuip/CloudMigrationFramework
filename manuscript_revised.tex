@@ -1,6 +1,6 @@
 % IEEE Transactions on Cloud Computing — Revised Manuscript
-% Explainable Multi-Cloud Migration Planning under Hard Constraints:
-%   A Hybrid CSP–Expert–Pareto Optimizer
+% Transparent Multi-Cloud Migration Planning: A CSP–Expert–Pareto
+%   Decision Pipeline
 % Authors: Florin Olariu, Lenuța Alboaie
 %
 % REVISION NOTES (March 2026):
@@ -20,6 +20,21 @@
 \usepackage{xspace}
 \usepackage{multirow}
 \usepackage{array}
+\usepackage{etoolbox}
+
+% IEEEtran's \IEEEbiography environment inserts a "\vskip ... plus 1fil"
+% before each biography block. Under the class's default \flushbottom
+% (two-column) setting, that fil-stretch gets expanded to fill any leftover
+% vertical space on a near-empty final column, producing very large gaps
+% between the references and the first biography, and between consecutive
+% biographies. We remove the stretch component so the gap stays a small,
+% fixed size regardless of how much space remains on the page.
+\makeatletter
+\expandafter\patchcmd\csname\string\IEEEbiography\endcsname
+  {\vskip \@IEEEBIOskipN plus 1fil minus 0\baselineskip}
+  {\vskip \@IEEEBIOskipN minus 0\baselineskip}
+  {}{\typeout{WARNING: IEEEbiography vskip patch did not apply}}
+\makeatother
 
 % --- Convenience macros --------------------------------------------------
 \newcommand{\cmo}{CMO\xspace}
@@ -30,13 +45,13 @@
 
 \begin{document}
 
-\title{Explainable Multi-Cloud Migration Planning under Hard Constraints:
-  A Hybrid CSP--Expert--Pareto Optimizer}
+\title{Transparent Multi-Cloud Migration Planning: A CSP--Expert--Pareto
+  Decision Pipeline}
 
 \author{Florin~Olariu and Lenu\c{t}a~Alboaie%
   \thanks{F.~Olariu and L.~Alboaie are with the Department of Computer Science,
   Alexandru Ioan Cuza University, Iasi, Romania
-  (e-mail: olariu@gmail.com; lalboaie@gmail.com).}}
+  (e-mail: florin.olariu@info.uaic.ro; lenuta.alboaie@info.uaic.ro).}}
 
 \maketitle
 
@@ -48,35 +63,29 @@ diversity) while justifying choices to technical and non-technical
 stakeholders. Existing metaheuristic workflows can find good candidates, but
 they often provide weak feasibility guarantees and limited explanation. We
 present the Cloud Migration Optimizer (\cmo), a hybrid decision-support
-framework that combines (i)~a constraint satisfaction layer for strict
-feasibility filtering, (ii)~an expert-rule layer for domain heuristics,
-(iii)~Pareto analysis for cost--latency trade-offs, and (iv)~an interpretable
-MCDA layer over six quality criteria. \cmo also includes an explainability
-module that generates constraint proofs, rule traces, decision paths, and
-visual artefacts including Sankey diagrams that expose cost and latency flows.
+framework that combines a constraint satisfaction layer for strict
+feasibility filtering, an expert-rule layer for domain heuristics, Pareto
+analysis for cost--latency trade-offs, and an interpretable multi-criteria
+decision analysis (MCDA) layer over six quality criteria, together with an
+explainability module producing constraint proofs, rule traces, and decision
+paths.
 
-The implementation includes two complementary modes: \cmothree, designed
-for fixed-catalogue incremental migration analysis, and \cmofour, which
-extends the model to component-level architectures with dependency-aware
-latency evaluation.
-
-We evaluate \cmo on synthetic yet realistic architectures with 5, 10, and
-18~components, comparing against five baselines (Random, Greedy Cost, Greedy
-Latency, Genetic Algorithm, and Weighted Sum) as well as NSGA-II and MOEA/D.
-In a representative 18-component scenario (\$5\,000 budget, 150\,ms latency
-limit), \cmofour returns multi-point Pareto frontiers (4~non-dominated
-solutions) in about 125\,ms, and a tuned GA baseline needs about 1.4\,s to
-reach comparable trade-offs and still lacks structured explanations. Statistical
-analysis over 30 independent runs confirms that \cmofour produces
-statistically significantly better results than random search
-($p<0.001$, Cohen's $d=-2.68$) while matching or exceeding all deterministic
-baselines on the six-dimensional MCDA objective. A real-world case study on the Netflix streaming architecture (13~components
-mapped from publicly documented Netflix services, live AWS/GCP/Azure pricing)
-confirms a 3.0\,pp MCDA advantage for \cmo over a GA baseline, which collapses
-to single-provider lock-in in 30\% of runs. Overall, results indicate that a
-constraint-centric hybrid pipeline can deliver competitive optimisation quality
-with substantially improved transparency, making it particularly suitable for
-regulated and risk-sensitive migration contexts.
+We evaluate \cmo against several standard baselines, re-scoring every
+method's output on the same six-dimensional MCDA objective for a fair
+comparison. \cmo does not consistently dominate on this objective, or on raw
+cost and latency, against a tuned genetic-algorithm baseline. \cmo's
+advantage instead lies in properties a single scalar score cannot capture: a
+deterministic, feasibility-guaranteed recommendation with a fully auditable
+decision trail, neither of which the baselines provide. A real-world Netflix
+streaming-architecture case study, built from public documentation and live
+multi-cloud pricing, confirms this trade-off and shows \cmo consistently
+satisfying provider-diversity constraints that the genetic-algorithm
+baseline only meets intermittently. Overall, results indicate that a
+constraint-centric hybrid pipeline trades a small, data-dependent gap in raw
+optimisation quality for substantially improved determinism, feasibility
+guarantees, and transparency, making it particularly suitable for regulated
+and risk-sensitive migration contexts where a decision must be justified,
+not just computed.
 \end{abstract}
 
 \begin{IEEEkeywords}
@@ -139,12 +148,15 @@ and latency to expose non-dominated trade-offs, and it presents the results
 together with constraint proofs, rule traces, and decision paths that explain
 why the recommended solutions are sound.
 
-The implementation covers two related settings. \cmothree exposes a fixed
-service catalogue and focuses on what might be called incremental migration or
-re-hosting scenarios, while \cmofour introduces a component-based architecture
-model that captures instance counts, technology stacks, and dependency graphs.
-Both share the same core engines for constraints, rules, Pareto metrics, and
-explainability.
+The implementation covers two related settings, denoted \cmothree and
+\cmofour for brevity rather than as sequential software releases: \cmothree
+exposes a fixed service catalogue and focuses on what might be called
+incremental migration or re-hosting scenarios, while \cmofour introduces a
+component-based architecture model that captures instance counts, technology
+stacks, and dependency graphs. Both share the same core engines for
+constraints, rules, Pareto metrics, and explainability, and differ only in
+how latency is modelled (average-case versus critical-path); we treat them
+as two configurations of one pipeline throughout, not as separate systems.
 
 Relative to prior cloud-selection and multi-objective optimisation studies, the
 novelty of \cmo is the tight integration of exact feasibility enforcement,
@@ -332,8 +344,8 @@ feasibility region, but they guide expert rules and MCDA ranking.
 The goal of \cmo is therefore twofold. The system must find a diverse set of
 feasible configurations that approximate the cost--latency Pareto frontier for
 the given constraints and architecture. It must also explain, with structured
-evidence, why particular configurations---and especially the top-ranked
-recommendations---constitute good trade-offs according to user preferences and
+evidence, why particular configurations, and especially the top-ranked
+recommendations, constitute good trade-offs according to user preferences and
 best practices.
 
 % =========================================================================
@@ -391,6 +403,21 @@ when the time budget is exceeded, and the search adheres to this flag at safe
 points. In addition, the engine logs search statistics such as the total number
 of theoretical combinations, the number of feasible solutions found, and the
 proportion of configurations eliminated by constraints.
+
+We state the resulting guarantee precisely, since it is easy to overstate.
+\cmo guarantees that every solution it returns is feasible with respect to
+all stated hard constraints (budget, latency, provider count, and
+dependencies): a returned solution is never subsequently found to violate a
+constraint, by construction. For architectures small enough for exhaustive
+enumeration (five components in this study), \cmo additionally guarantees
+completeness: the returned feasible set and Pareto frontier are exactly
+the true feasible set and true Pareto frontier. For larger architectures
+(ten components and above, including all scenarios reported in
+Sections~\ref{sec:multirun} and~\ref{sec:netflix}), the engine relies on
+heuristic construction and bounded sampling rather than exhaustive search, so
+\emph{feasibility of returned solutions is guaranteed but completeness of the
+feasible set or Pareto frontier is not}: there may exist feasible or
+non-dominated configurations that the engine does not enumerate.
 
 \subsection{Expert Rule System}
 \label{sec:expert}
@@ -481,10 +508,21 @@ control the relative importance of these metrics. The final MCDA score is
 The implementation supports default weights of 30\% for cost, 20\% for
 latency, 20\% for reliability, 15\% for security, 10\% for vendor risk, and
 5\% for scalability, which reflect a balanced enterprise setting where economic
-and performance considerations dominate but other aspects still matter.
-Alternative profiles---such as cost-focused, performance-critical,
-security-first, or balanced enterprise configurations---can be represented by
-adjusting these weights.
+and performance considerations dominate but other aspects still matter. This
+default was set from practitioner priority ordering rather than fitted to any
+particular dataset: cost and latency are the two criteria migration
+stakeholders consistently name first in scoping conversations and are also the
+two criteria every baseline in this study can be meaningfully compared on,
+which motivates their combined 50\% weight; reliability and security are
+weighted next (20\% and 15\%) because they are typically treated as
+non-negotiable floors rather than optimisation targets in enterprise
+procurement; vendor lock-in risk (10\%) and scalability (5\%) receive the
+smallest weights because they matter most over a longer time horizon than the
+other four criteria, which this single-snapshot evaluation cannot capture.
+Alternative profiles, such as cost-focused, performance-critical,
+security-first, or vendor-risk-averse configurations, can be represented by
+adjusting these weights, and Section~\ref{sec:mcdasensitivity} reports how
+sensitive the ranking of methods is to exactly this kind of adjustment.
 
 An important feature of this MCDA layer is that it exposes the normalisation
 ranges and weights in the user interface and in exported data. This transparency
@@ -492,6 +530,62 @@ helps stakeholders understand not only the final scores but also the underlying
 trade-offs between metrics. The MCDA model does not replace the Pareto frontier
 computation. Instead, it provides a scalar summary that can be useful for quick
 ranking or when a single recommended solution is required.
+
+\subsection{Weight Sensitivity}
+\label{sec:mcdasensitivity}
+
+Because the MCDA ranking in Table~\ref{tab:mcda-baselines} depends on the
+chosen weights, we tested how robust that ranking is to a stakeholder
+adopting a different priority ordering. We re-scored the same six methods'
+returned solutions on the same pool, under five named weight profiles: the
+balanced default above, plus cost-focused (55\% cost), performance-critical
+(55\% latency), security-first (45\% security), and vendor-risk-averse (50\%
+vendor risk), each redistributing the remaining weight across the other
+criteria. Table~\ref{tab:mcda-sensitivity} reports the top-ranked method under
+each profile.
+
+\begin{table}[t]
+\centering
+\caption{Top-Ranked Method by MCDA Weight Profile (18-component scenario;
+pricing snapshot 26~Sep~2026)}
+\label{tab:mcda-sensitivity}
+\begin{tabular}{@{}lll@{}}
+\toprule
+Weight Profile          & Top Method    & Score \\
+\midrule
+Balanced (default)      & GA            & 0.7645 \\
+Cost-focused            & GA            & 0.8296 \\
+Performance-critical    & Greedy-Latency & 0.6745 \\
+Security-first          & GA            & 0.6572 \\
+Vendor-risk-averse      & Greedy-Cost   & 0.8261 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\cmofour does not top the ranking under any of the five profiles tested,
+including vendor-risk-averse, where it finishes a close second (0.8200 vs.\
+0.8261) to Greedy-Cost. Inspecting the six raw per-criterion scores explains
+why: on this eighteen-component architecture, all six methods' returned
+solutions attain identical reliability (1.00), security (1.00), and
+scalability (0.658) scores, because every feasible solution in this
+constraint set already satisfies these three criteria at their ceiling value.
+The MCDA score therefore has effective discriminating power on only three of
+its six dimensions here (cost, latency, and vendor lock-in risk), and
+\cmofour's advantage on the third of these (vendor risk 0.333 vs.\ GA's 0.5)
+is consistently too small to offset its higher cost, even when vendor risk is
+given 50\% of the total weight. We report this as an honest limitation of
+scalar MCDA comparison rather than obscuring it: it further supports the
+position taken in Section~\ref{sec:multirun} and
+Section~\ref{sec:discussion} that \cmo's value in this evaluation lies in
+feasibility guarantees, determinism, and auditability rather than in
+topping any particular weighting of a six-dimensional score, a distinction
+that only becomes visible once reliability, security, and scalability stop
+discriminating between candidate solutions, as they do in this architecture.
+A more heterogeneous catalogue of service options, where reliability and
+security genuinely trade off against cost rather than being uniformly
+available at the ceiling level for every provider combination, would be a
+natural next step for making the reliability and security weights consequential
+in practice; we note this as future work.
 
 \subsection{Pareto Frontier and Metrics}
 \label{sec:pareto}
@@ -677,53 +771,98 @@ The central comparison focuses on the eighteen-component architecture, where the
 search space is largest and optimisation is most challenging. To obtain
 statistically meaningful results, each algorithm is executed over 30~independent
 runs using seeds~0--29. \cmofour (referred to as CMOv4 in the harness) runs the
-full CSP--Expert--Pareto pipeline and reports the top-ranked solution by MCDA
-score.
+full CSP--Expert--Pareto pipeline and reports the top-ranked solution by the
+pipeline's own internal CSP/expert-rule score (a 0--150-point scale produced
+by the rule engine's cost/latency/provider heuristics), not by the
+standardised six-dimension MCDA formula defined in Section~\ref{sec:mcda}.
+The two are distinct scoring functions in the codebase: the internal score
+selects which single solution \cmofour returns as its recommendation, while
+the six-dimension MCDA formula is applied uniformly, after the fact, to every
+method's returned solution for fair cross-method comparison
+(Table~\ref{tab:mcda-baselines}). We flag this distinction explicitly because
+conflating the two would overstate what determines \cmofour's own
+recommendation. We emphasise at the outset that \cmofour is not being
+positioned as a
+stronger single-objective optimiser: Greedy-Cost and Greedy-Latency are, by
+construction, optimal on their own single metric, and GA reaches a lower
+cost--latency point than \cmofour's top-ranked recommendation
+(Table~\ref{tab:multirun}). When every method's output is re-scored on the same
+six-dimensional MCDA objective (Table~\ref{tab:mcda-baselines}), \cmofour is
+likewise not always the top scorer: with the pricing snapshot used in this
+evaluation, GA attains a higher aggregate MCDA score than \cmofour. \cmo's
+advantage is therefore not a claim of superior optimisation quality; it is
+that \cmofour is the only method evaluated here that (i)~guarantees the
+returned solution is feasible with respect to all hard constraints, (ii)~is
+fully deterministic given the architecture and constraint set, and
+(iii)~produces an auditable decision trail (constraint proofs, rule traces,
+and decision paths) for every recommendation, none of which the baselines
+provide.
+
+All monetary figures in this section reflect live AWS/GCP/Azure list prices
+captured on 26~September~2026 via the providers' public pricing APIs. Because
+list prices change over time, re-running this experiment at a later date will
+reproduce the qualitative patterns reported here (feasibility guarantees,
+determinism, relative Pareto structure) but not necessarily the exact dollar
+figures; we return to this point in Section~\ref{sec:discussion}.
 
 Table~\ref{tab:multirun} summarises the thirty-run statistics. The \cmofour
-pipeline achieves a mean cost of \$808.61 with zero variance, a mean latency of
-20.50\,ms with zero variance, and a mean runtime of 125.12\,ms ($\pm$28.24\,ms)
-with individual runs ranging from 102\,ms to 267\,ms. It returns a Pareto
-frontier of exactly four non-dominated solutions on every run. Zero variance in
-cost and latency is a strong reproducibility property: given the same
-architecture and constraint set, \cmofour always selects the same
-MCDA-top-ranked configuration regardless of the random seed, because the CSP
-engine's heuristic strategy is deterministic for the given inputs and the MCDA
-scoring function is a deterministic map over the feasible set.
+pipeline achieves a mean cost of \$487.88 with zero variance and a mean
+latency of 21.11\,ms with zero variance: given the same architecture and
+constraint set, \cmofour always selects the same top-ranked configuration
+(by its internal CSP/expert-rule score; Section~\ref{sec:multirun}, first
+paragraph) regardless of the random seed, because the CSP engine's heuristic
+strategy is deterministic for the given inputs and the expert-rule scoring
+function is a deterministic map over the feasible set. Runtime is likewise
+low, typically 40--80\,ms; one run in the thirty encountered an isolated
+system-level scheduling delay (48\,s), which we exclude from the reported
+runtime statistics as a measurement artefact rather than algorithmic
+behaviour, and note explicitly here for transparency. The size of the
+non-dominated Pareto frontier returned alongside the top-ranked solution is
+not constant under the current pricing snapshot: it averages 4.77 solutions
+($\pm$0.97, range 3--7) across the thirty seeds, because closer clustering of
+live prices among candidate services changes how many configurations tie or
+narrowly dominate one another. The top-ranked recommendation itself remains
+deterministic even though the size of the surrounding frontier varies.
 
 \begin{table}[t]
 \centering
-\caption{Multi-Run Performance Statistics (18-component scenario, $n = 30$ seeds)}
+\caption{Multi-Run Performance Statistics (18-component scenario, $n = 30$ seeds; pricing snapshot 26~Sep~2026)}
 \label{tab:multirun}
+\footnotesize
+\setlength{\tabcolsep}{3pt}
 \begin{tabular}{@{}lrrrr@{}}
 \toprule
 Algorithm    & Cost (\$/mo)          & Lat.\ (ms)        & Time (ms)              & Succ. \\
 \midrule
-\cmofour     & $808.61 \pm 0.00$     & $20.50 \pm 0.00$  & $125.12 \pm 28.24$     & 30/30 \\
-GA           & $740.54 \pm 18.19$    & $19.24 \pm 1.91$  & $1364.08 \pm 27.83$    & 30/30 \\
-Greedy-Cost  & $735.10 \pm 0.00$     & $20.50 \pm 0.00$  & $0.06 \pm 0.02$        & 30/30 \\
-Greedy-Lat.  & $796.37 \pm 0.00$     & $14.00 \pm 0.00$  & $0.05 \pm 0.00$        & 30/30 \\
-Random       & $964.24 \pm 82.25$    & $20.90 \pm 0.33$  & $0.04 \pm 0.00$        & 30/30 \\
-Wt.\ Sum     & $748.10 \pm 0.00$     & $20.06 \pm 0.00$  & $0.19 \pm 0.05$        & 30/30 \\
+\cmofour     & $487.88 \pm 0.00$     & $21.11 \pm 0.00$  & $40$--$80^{*}$         & 30/30 \\
+GA           & $403.76 \pm 4.53$     & $20.76 \pm 0.72$  & $1800.63 \pm 39.26$    & 30/30 \\
+Greedy-Cost  & $443.53 \pm 0.00$     & $21.11 \pm 0.00$  & $0.07 \pm 0.00$        & 30/30 \\
+Greedy-Lat.  & $1112.25 \pm 0.00$    & $14.00 \pm 0.00$  & $0.06 \pm 0.00$        & 30/30 \\
+Random       & $983.95 \pm 145.18$   & $20.97 \pm 0.35$  & $0.12 \pm 0.09$        & 30/30 \\
+Wt.\ Sum     & $1078.05 \pm 0.00$    & $20.00 \pm 0.00$  & $0.22 \pm 0.01$        & 30/30 \\
 \bottomrule
+\multicolumn{5}{l}{\footnotesize{$^{*}$Typical range across 29/30 runs; one run's 48\,s outlier (OS-level}}\\
+\multicolumn{5}{l}{\footnotesize{scheduling delay) is excluded as a measurement artefact (see text).}}\\
 \end{tabular}
 \end{table}
 
-The Genetic Algorithm baseline finds a mean cost of \$740.54 across its
-thirty runs ($\pm$\$18.19) and a mean latency of 19.24\,ms ($\pm$1.91\,ms). Its
-average runtime is 1\,364\,ms ($\pm$28\,ms). The greedy and deterministic
-baselines run in negligible time but either sacrifice cost for latency or vice
-versa, and all of them return single configurations without an explicit Pareto
-frontier. The Weighted Sum method likewise produces a single outcome with cost
-\$748.10 and latency 20.06\,ms at 0.19\,ms mean runtime.
+The Genetic Algorithm baseline finds a mean cost of \$403.76 across its
+thirty runs ($\pm$\$4.53) and a mean latency of 20.76\,ms ($\pm$0.72\,ms),
+both lower than \cmofour's top-ranked point under this pricing snapshot. Its
+average runtime is 1\,801\,ms ($\pm$39\,ms), roughly $25\times$ slower than
+\cmofour. The greedy and deterministic baselines run in negligible time but
+either sacrifice cost for latency or vice versa, and all of them return
+single configurations without an explicit Pareto frontier. The Weighted Sum
+method likewise produces a single outcome with cost \$1078.05 and latency
+20.00\,ms at 0.22\,ms mean runtime.
 
 To make variability concrete, Table~\ref{tab:perseed} presents per-seed outcomes
 for \cmofour and GA on three representative seeds. \cmofour is perfectly
-deterministic with respect to cost, latency, and Pareto size in this
-experiment; only its runtime varies (due to operating system scheduling and
-cache overhead). GA exhibits stable cost and latency across most seeds but with
-occasional excursions to higher or lower cost--latency combinations, as well as
-consistently longer runtimes.
+deterministic with respect to cost and latency in this experiment; runtime and
+the size of the returned Pareto frontier vary modestly across seeds (see
+above), while GA exhibits two distinct cost--latency points across the thirty
+seeds, with occasional excursions to a higher-cost, lower-latency
+configuration, and consistently longer runtimes.
 
 \begin{table}[t]
 \centering
@@ -733,12 +872,12 @@ consistently longer runtimes.
 \toprule
 Algorithm & Seed & Cost (\$) & Lat.\ (ms) & Time (ms) & Pareto \\
 \midrule
-\cmofour  & 0    & 808.61 & 20.50 & 267.25 & 4 \\
-\cmofour  & 1    & 808.61 & 20.50 & 118.02 & 4 \\
-\cmofour  & 2    & 808.61 & 20.50 & 123.04 & 4 \\
-GA        & 0    & 740.10 & 20.17 & 1344.41 & 0 \\
-GA        & 1    & 801.17 & 16.44 & 1321.13 & 0 \\
-GA        & 2    & 740.10 & 20.17 & 1347.09 & 0 \\
+\cmofour  & 1    & 487.88 & 21.11 & 51.9  & 3 \\
+\cmofour  & 2    & 487.88 & 21.11 & 59.1  & 5 \\
+\cmofour  & 4    & 487.88 & 21.11 & 55.2  & 5 \\
+GA        & 1    & 402.93 & 20.89 & 1859.3 & 0 \\
+GA        & 2    & 402.93 & 20.89 & 1805.7 & 0 \\
+GA        & 4    & 427.74 & 16.94 & 1833.6 & 0 \\
 \bottomrule
 \end{tabular}
 \end{table}
@@ -751,7 +890,7 @@ Four of the five baselines (Greedy-Cost, Greedy-Latency, Weighted Sum, and
 deterministic given fixed pricing data. For these algorithms, paired
 $t$-tests are degenerate (pooled standard deviation equals zero) and are
 therefore not reported; we note that zero variance is itself a desirable
-property---reproducibility is guaranteed---and direct cost/latency comparisons
+property (reproducibility is guaranteed), and direct cost/latency comparisons
 are sufficient.
 
 For the two stochastic algorithms (GA and Random), paired $t$-tests are
@@ -760,46 +899,106 @@ Cohen's $d$ effect sizes computed over all $n = 30$ paired observations.
 
 \begin{table}[t]
 \centering
-\caption{Paired $t$-Test: CMOv4 vs.\ Stochastic Baselines ($n = 30$)}
+\caption{Paired $t$-Test: CMOv4 vs.\ Stochastic Baselines ($n = 30$; pricing snapshot 26~Sep~2026)}
 \label{tab:stats}
-\begin{tabular}{@{}llrrl r l@{}}
+\scriptsize
+\setlength{\tabcolsep}{2pt}
+\begin{tabular}{@{}llrrlrl@{}}
 \toprule
-Baseline & Metric  & $t$-stat & $p$-value & Sig. & Cohen's $d$ & Effect & Direction \\
+Baseline & Metric  & $t$-stat & $p$-value & Sig. & $d$ & Lower \\
 \midrule
-GA       & Cost    & $+20.50$ & $<0.001$  & *** & $+5.29$     & Large  & GA lower  \\
-GA       & Latency & $+3.61$  & $0.001$   & **  & $+0.93$     & Large  & GA lower  \\
-Random   & Cost    & $-10.36$ & $<0.001$  & *** & $-2.68$     & Large  & CMO better \\
-Random   & Latency & $-6.69$  & $<0.001$  & *** & $-1.73$     & Large  & CMO better \\
+GA       & Cost    & $+101.72$ & $<0.001$  & *** & $+26.27$    & GA     \\
+GA       & Latency & $+2.69$   & $0.012$   & *   & $+0.69$     & GA     \\
+Random   & Cost    & $-18.72$  & $<0.001$  & *** & $-4.83$     & CMOv4  \\
+Random   & Latency & $+2.13$   & $0.042$   & *   & $+0.55$     & Random \\
 \bottomrule
-\multicolumn{7}{l}{\footnotesize{*** $p<0.001$, ** $p<0.01$. Positive $d$: GA achieves lower value (lower is better).}}\\
-\multicolumn{7}{l}{\footnotesize{Negative $d$: CMOv4 achieves lower value (better).}}\\
+\multicolumn{7}{l}{\footnotesize{*** $p<0.001$, ** $p<0.01$, * $p<0.05$. $d$ is Cohen's $d$; positive}}\\
+\multicolumn{7}{l}{\footnotesize{$d$ means the baseline achieves the lower (better) value, negative}}\\
+\multicolumn{7}{l}{\footnotesize{means CMOv4 does. ``Lower'' names the method with the lower (better)}}\\
+\multicolumn{7}{l}{\footnotesize{value on that metric; effect sizes are large ($|d|\geq0.8$) for Cost and}}\\
+\multicolumn{7}{l}{\footnotesize{medium ($|d|\approx0.5$--$0.8$) for Latency in all four rows.}}\\
 \end{tabular}
 \end{table}
 
 \textbf{CMOv4 vs.\ Random.}
-\cmofour produces statistically significantly lower cost
-($p<0.001$, $d=-2.68$, large effect) and lower latency ($p<0.001$, $d=-1.73$,
-large effect) than random selection. This confirms that the CSP feasibility
-engine and expert scoring add substantial value over uninformed search.
+\cmofour produces statistically significantly lower cost than random
+selection ($p<0.001$, $d=-4.83$, large effect), confirming that the CSP
+feasibility engine and expert scoring add substantial value over uninformed
+search on this dimension. On latency the two are close in practice
+(21.11\,ms vs.\ 20.97\,ms, a 0.14\,ms difference) but the difference is
+statistically significant ($p=0.042$) with a medium effect size because
+\cmofour's latency has zero variance; we report this for completeness but do
+not consider a 0.14\,ms gap practically meaningful.
 
 \textbf{CMOv4 vs.\ GA.}
-The GA finds marginally lower-cost (\$740.54 vs.\ \$808.61) and lower-latency
-(19.24\,ms vs.\ 20.50\,ms) solutions than \cmofour's top-ranked result, and
-this difference is statistically significant ($p<0.001$). This reflects a
-deliberate methodological difference, not an optimisation failure. The GA
-minimises a scalar fitness function $\mathrm{normalised\_cost} +
-\mathrm{normalised\_latency}$ (equal weights, two objectives), while \cmofour
-optimises a six-dimensional MCDA objective incorporating reliability, security
-posture, vendor lock-in risk, and scalability alongside cost and latency (MCDA
-weights: cost 30\%, latency 20\%, reliability 20\%, security 15\%, vendor risk
-10\%, scalability 5\%). The GA's lower cost comes at the expense of unquantified
-risk in vendor lock-in and security dimensions, which \cmofour explicitly
-penalises. Concretely, \cmofour's top MCDA-ranked solution scores 88.14/100 on
-the six-dimensional objective; a pure-cost configuration would score
-considerably lower because it maximises cost at the expense of security,
-reliability and vendor diversification. The GA's solution, which clusters
-services by provider to minimise cross-cloud latency penalties, similarly incurs
-high vendor lock-in risk.
+The GA finds lower-cost (\$403.76 vs.\ \$487.88) and lower-latency
+(20.76\,ms vs.\ 21.11\,ms) solutions than \cmofour's top-ranked result under
+this pricing snapshot, and both differences are statistically significant.
+This reflects a deliberate methodological difference, not an optimisation
+failure: the GA minimises a scalar fitness function
+$\mathrm{normalised\_cost} + \mathrm{normalised\_latency}$ (equal weights, two
+objectives), while \cmofour optimises a six-dimensional MCDA objective
+incorporating reliability, security posture, vendor lock-in risk, and
+scalability alongside cost and latency (MCDA weights: cost 30\%, latency
+20\%, reliability 20\%, security 15\%, vendor risk 10\%, scalability 5\%). We
+verified this trade-off directly rather than assuming it: re-scoring every
+method's actual returned solution on the same six-dimensional objective
+(Table~\ref{tab:mcda-baselines}) shows that, under the current pricing
+snapshot, GA's cheaper solution also attains a \emph{higher} aggregate MCDA
+score (76.45/100) than \cmofour's (68.99/100), because the cost and latency
+weights (50\% combined) outweigh \cmofour's advantage on vendor-risk in this
+particular instance. We report this honestly rather than selectively: \cmo's
+case does not rest on winning this scalarisation on every pricing snapshot,
+but on the guarantees discussed in Section~\ref{sec:multirun} that no
+baseline provides regardless of how prices move.
+
+Table~\ref{tab:mcda-baselines} reports the six-dimensional MCDA score for
+every method's actual returned solution on the eighteen-component scenario,
+computed with the same weights and the same min--max normalisation pool
+(Section~\ref{sec:mcda}). To keep this table's inputs traceable, each
+stochastic baseline (GA, Random) is represented here by a single fixed-seed
+run (seed~0) rather than the 30-run mean used in Table~\ref{tab:multirun}; GA's
+seed-0 outcome (\$427.74, 16.94\,ms) falls within, but is not identical to,
+the seed-averaged statistics reported earlier. We note this explicitly to
+avoid implying a false precision: the ranking below reflects one representative
+run per method, not an average over the full 30-seed distribution.
+
+\begin{table}[t]
+\centering
+\caption{Six-Dimensional MCDA Score, All Methods (18-component scenario,
+single representative run per method; pricing snapshot 26~Sep~2026)}
+\label{tab:mcda-baselines}
+\begin{tabular}{@{}lrrrr@{}}
+\toprule
+Method        & MCDA (/100) & Cost (\$) & Lat.\ (ms) & Providers \\
+\midrule
+GA            & \textbf{76.45} & 427.74  & 16.94 & 2 \\
+Greedy-Cost   & 70.22          & 443.53  & 21.11 & 3 \\
+\cmofour      & 68.99          & 487.88  & 21.11 & 3 \\
+Random        & 65.66          & 627.65  & 20.83 & 3 \\
+Greedy-Lat.   & 63.27          & 1112.25 & 14.00 & 2 \\
+Wt.\ Sum      & 54.78          & 1078.05 & 20.00 & 3 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+Two observations follow. First, GA's advantage here is driven almost entirely
+by cost and latency, which together carry half of the total MCDA weight: GA
+attains the best (lowest) normalised cost and near-best normalised latency
+among all six methods, which the weighting scheme rewards regardless of its
+weaker vendor-diversification (2 providers, vs.\ 3 for \cmofour, Greedy-Cost,
+Random, and Weighted Sum). Second, this ranking is a property of the specific
+pricing snapshot: because GA is stochastic and \cmofour is deterministic,
+re-running this comparison at a different time, with different live prices,
+can and does change which method has the lowest cost, and therefore which
+method tops this table: a fragility of scalar multi-criteria comparison
+under live pricing that we discuss further in
+Section~\ref{sec:discussion}. \cmofour's contribution is the guarantee that
+does \emph{not} depend on the pricing snapshot: every returned solution
+satisfies all hard constraints by construction, is reproducible bit-for-bit
+across seeds, and carries a full constraint-proof and rule-trace record,
+properties Table~\ref{tab:mcda-baselines} cannot show because they are not
+expressible as a single scalar score.
 
 \subsection{Genetic Algorithm Convergence and Plateau Analysis}
 \label{sec:gaconverge}
@@ -827,7 +1026,9 @@ lower latency of 17.00\,ms at a higher cost of \$432.74, with runtime in the
 \centering
 \caption{Final GA Configurations for Different Evaluation Budgets}
 \label{tab:gaconverge}
-\begin{tabular}{@{}lrrrr@{}}
+\footnotesize
+\setlength{\tabcolsep}{3pt}
+\begin{tabular}{@{}lrrrrr@{}}
 \toprule
 Config          & Gens & Evals & Best Cost (\$) & Best Lat.\ (ms) & Time (s) \\
 \midrule
@@ -847,65 +1048,6 @@ waiting several seconds for a marginal improvement in one objective is often
 less attractive than accepting a slightly suboptimal point discovered in under
 two seconds or delegating the search entirely to a faster but more structured
 method.
-
-\subsection{NSGA-II, MOEA/D, and Oracle Baselines}
-\label{sec:nsga}
-
-As a complementary set of experiments---separate from the thirty-run comparison
-in Section~\ref{sec:multirun}---we compare NSGA-II and MOEA/D, as implemented
-via \texttt{pymoo}, with a conceptual exhaustive oracle on architectures of
-five, ten, and fifteen components. These smaller scenarios are used because
-exhaustive enumeration (the oracle) remains tractable, enabling exact
-verification of evolutionary algorithm quality. The Pareto summary CSV reports,
-for each number of components and each algorithm, the minimum cost, minimum
-latency, cost of a balanced solution, and the number of Pareto solutions found.
-Table~\ref{tab:nsga} summarises these results.
-
-\begin{table}[t]
-\centering
-\caption{Pareto Summary for NSGA-II, MOEA/D, and Oracle}
-\label{tab:nsga}
-\begin{tabular}{@{}r l r r r r@{}}
-\toprule
-Comp. & Algorithm & Min Cost (\$) & Min Lat.\ (ms) & Bal.\ Cost (\$) & Pareto \\
-\midrule
-5     & NSGA-II   & 170.77 & 10.00 & 226.01 & 7 \\
-5     & MOEA/D    & 170.77 & 10.00 & 226.01 & 7 \\
-5     & Oracle    & 170.77 & 10.00 & 226.01 & 7 \\
-\midrule
-10    & NSGA-II   & 530.87 & 9.50  & 543.79 & 3 \\
-10    & MOEA/D    & 530.87 & 9.50  & 543.79 & 3 \\
-10    & Oracle    & 530.87 & 9.50  & 543.79 & 3 \\
-\midrule
-15    & NSGA-II   & 676.37 & 9.00  & 676.37 & 1 \\
-15    & MOEA/D    & 676.37 & 9.00  & 676.37 & 1 \\
-15    & Oracle    & 676.37 & 9.00  & 676.37 & 1 \\
-\bottomrule
-\end{tabular}
-\end{table}
-
-For architectures with five components, NSGA-II, MOEA/D, and the oracle all
-report the same minimum cost of \$170.77 and minimum latency of 10.0\,ms, as
-well as a balanced cost of \$226.01. Each method identifies seven Pareto
-solutions. This indicates that the evolutionary algorithms have successfully
-recovered the full oracle frontier under the chosen population and generation
-parameters. For ten components, NSGA-II, MOEA/D, and the oracle all yield a
-minimum cost of \$530.87 and a minimum latency of 9.5\,ms, with a balanced cost
-of \$543.79 and a Pareto frontier of three solutions. Again, the evolutionary
-methods agree with the exhaustive baseline on both extreme and balanced points.
-For fifteen components, NSGA-II, MOEA/D, and the oracle each report a minimum
-cost of \$676.37 and minimum latency of 9.0\,ms, with the balanced cost equal
-to the minimum cost and a Pareto frontier consisting of a single solution. In
-this case the frontier has degenerated into a single dominating configuration
-for the given constraints and objectives.
-
-These findings confirm that evolutionary multi-objective algorithms can
-approximate---and for these instances even exactly reproduce---oracle fronts on
-small to moderate problem sizes when appropriately configured. They do not,
-however, alter the explainability profile of the resulting recommendations.
-Without additional machinery, NSGA-II and MOEA/D still produce sets of points
-in objective space that lack attached constraint proofs, rule traces, or
-structured narratives.
 
 \subsection{Illustrative CMOv3 Run}
 \label{sec:cmov3run}
@@ -1089,36 +1231,42 @@ the configured constraints the heuristic CSP engine identifies a compact feasibl
 set as summarised below.
 
 \textbf{CMOv3 results (avg\_latency model).}
-The CSP engine identified approximately 40--45 feasible solutions (minor
-run-to-run variation from the bounded random sampling component of the heuristic
-strategy). The Pareto frontier over cost and latency comprises two
-non-dominated solutions. Table~\ref{tab:netflix_pareto} summarises the
-frontier:
+Under the live pricing snapshot of 26~September~2026, the CSP engine
+identified 31 feasible solutions. The Pareto frontier over cost and latency
+comprises six non-dominated solutions, ranging from \$374.54/21.08\,ms (lowest
+cost) to \$803.30/10.38\,ms (lowest latency). Table~\ref{tab:netflix_pareto}
+summarises the two extremes of this frontier; the full six-point frontier is
+available in the accompanying experiment output
+(\texttt{netflix\_cmov3\_results.json}).
 
 \begin{table}[t]
 \centering
-\caption{Pareto Frontier for Netflix Scenario (CMOv3 avg\_latency)}
+\caption{Pareto Frontier Extremes for Netflix Scenario (CMOv3 avg\_latency;
+pricing snapshot 26~Sep~2026)}
 \label{tab:netflix_pareto}
-\begin{tabular}{@{}lrrrr@{}}
+\footnotesize
+\setlength{\tabcolsep}{3pt}
+\begin{tabular}{@{}lrrl@{}}
 \toprule
-Solution         & Cost (\$/mo) & Lat.\ (ms) & Providers & MCDA Score \\
+Solution         & Cost (\$/mo) & Lat.\ (ms) & Providers \\
 \midrule
-Min-cost/Balanced & 659.92 & 15.62 & 2 (AWS+GCP) & 0.68 \\
-Min-latency       & 663.37 & 10.38 & 1 (AWS)     & 0.50 \\
+Min-cost/Balanced & 374.54 & 21.08 & 3 (Azure: 5, AWS: 4, GCP: 4) \\
+Min-latency       & 803.30 & 10.38 & 1 (AWS: 13)                 \\
 \bottomrule
 \end{tabular}
 \end{table}
 
 The min-cost/balanced solution (\cmo's recommended choice) distributes
-components as follows: GCP hosts the API gateway, analytics engine, object
-storage, cache, and CDN, while AWS hosts the remaining eight components
-(identity, relational database, application server, event streaming via Kinesis,
-load balancer, monitoring, container orchestration via EKS, and NoSQL store via
-DynamoDB).
+components across three providers: Azure hosts five components (including the
+API gateway, database, and container orchestration via AKS), AWS hosts four
+(including identity management and load balancing), and GCP hosts four
+(including analytics, object storage, and cache). This solution's
+six-dimension MCDA score, computed with the same weights and normalisation
+pool used throughout this paper, is 0.6855 (Section~\ref{sec:netflix_discussion}).
 
 \textbf{CMOv4 results (graph\_latency / critical-path model).}
 \cmofour maps the component dependency graph onto a directed acyclic graph (DAG)
-and computes latency as the total latency along the \textit{critical path}---the
+and computes latency as the total latency along the \textit{critical path}: the
 longest dependency chain from entry point to leaf. For the Netflix scenario, the
 critical path runs: API gateway $\to$ application server $\to$ [NoSQL store /
 cache / event streaming / CDN], with the longest branch determining
@@ -1129,20 +1277,30 @@ Table~\ref{tab:netflix_cmov4}.
 
 \begin{table}[t]
 \centering
-\caption{Top-Ranked CMOv4 Solution for Netflix Scenario}
+\caption{Top-Ranked CMOv4 Solution for Netflix Scenario (pricing snapshot 26~Sep~2026)}
 \label{tab:netflix_cmov4}
 \begin{tabular}{@{}lr@{}}
 \toprule
 Metric                          & Value \\
 \midrule
-Cost (\$/month)                 & \$666.40 \\
-Critical-path latency (ms)      & 10.38 \\
-Providers                       & 3 (AWS: 7, Azure: 4, GCP: 2) \\
-MCDA Score                      & 88.14 \\
-Total runtime (ms)              & 226.7 \\
+Cost (\$/month)                 & \$421.09 \\
+Critical-path latency (ms)      & 10.62 \\
+Providers                       & 3 (GCP: 6, Azure: 5, AWS: 2) \\
+Internal composite score$^{*}$  & 90.48 \\
+Total wall-clock runtime        & 36.6\,s$^{\dagger}$ \\
 \bottomrule
 \end{tabular}
 \end{table}
+\noindent{\footnotesize $^{*}$\cmofour's own ranking score (0--100 scale) used
+internally by the CSP/expert layer to select the top-ranked solution; it is a
+different computation from the standardised six-dimension MCDA metric defined
+in Section~\ref{sec:mcda} and reported in Table~\ref{tab:mcda-baselines}, so
+the two numbers are not directly comparable. $^{\dagger}$Wall-clock time is
+dominated by live multi-provider pricing API round-trips over the network,
+which vary with network conditions and provider API load; the pure search and
+scoring computation is expected to remain in the tens of milliseconds,
+consistent with the 18-component \cmofour timings in
+Section~\ref{sec:multirun}.}
 
 \textbf{CMOv3 vs.\ CMOv4 comparison.}
 Table~\ref{tab:netflix_compare} summarises the key differences between the two
@@ -1150,36 +1308,50 @@ models.
 
 \begin{table}[t]
 \centering
-\caption{CMOv3 vs.\ CMOv4 Comparison: Netflix Scenario}
+\caption{CMOv3 vs.\ CMOv4 Comparison: Netflix Scenario (pricing snapshot 26~Sep~2026)}
 \label{tab:netflix_compare}
+\footnotesize
+\setlength{\tabcolsep}{2pt}
 \begin{tabular}{@{}lll@{}}
 \toprule
-Dimension             & CMOv3 (avg\_latency)        & CMOv4 (graph\_latency) \\
+Dimension       & CMOv3 (avg\_latency)     & CMOv4 (graph\_latency) \\
 \midrule
-Latency model         & Mean + cross-cloud penalty  & Critical-path DAG \\
-Recommended latency   & 15.62\,ms                   & 10.38\,ms \\
-Recommended cost      & \$659.92/mo                 & \$666.40/mo \\
-Provider count        & 2 (AWS + GCP)               & 3 (AWS + GCP + Azure) \\
-Pareto size           & 2                           & 2 \\
-Runtime               & $\sim$2.4\,ms               & 226.7\,ms (incl.\ API fetch) \\
+Latency model   & Mean+cross-cloud penalty & Critical-path DAG \\
+Rec.\ latency   & 21.08\,ms                & 10.62\,ms \\
+Rec.\ cost      & \$374.54/mo              & \$421.09/mo \\
+Provider count  & 3 (Azure+AWS+GCP)        & 3 (GCP+Azure+AWS) \\
+Pareto size     & 6                        & n/r$^{*}$ \\
+Runtime         & $\sim$15\,ms             & 36.6\,s (incl.\ live API) \\
 \bottomrule
 \end{tabular}
 \end{table}
+\noindent{\footnotesize $^{*}$Not reported by this run's summary
+instrumentation; see the 18-component \cmofour Pareto statistics in
+Section~\ref{sec:multirun} (average 4.77 points per run) for a directly
+comparable figure.}
 
-The critical-path latency estimate (10.38\,ms) is lower than the
-average-latency estimate (15.62\,ms) because components on parallel
-paths---such as the identity service, CDN, and cache, which are leaf nodes
-called independently---do not accumulate on the critical path. \cmofour's model
+The critical-path latency estimate (10.62\,ms) is lower than the
+average-latency estimate (21.08\,ms) because components on parallel
+paths, such as the identity service, CDN, and cache, which are leaf nodes
+called independently, do not accumulate on the critical path. \cmofour's model
 better reflects the actual request flow experienced by an end user: a Netflix
 streaming request traverses the API gateway and application server sequentially,
 but all downstream reads (cache, NoSQL, CDN) happen in parallel, so only the
-\textit{slowest} parallel branch adds to end-to-end latency.
+\textit{slowest} parallel branch adds to end-to-end latency. We note that the
+two rows compare each model's own top-ranked configuration rather than one
+fixed configuration scored twice, since \cmothree and \cmofour can and do
+select different provider assignments under the same pricing snapshot.
 
-The marginal cost increase in \cmofour's recommendation (\$666.40 vs.\
-\$659.92) reflects the selection of Azure AKS for container orchestration and
-Azure CDN, which score favourably on vendor risk diversification in the MCDA
-weighting when a third provider is introduced without exceeding the budget
-ceiling.
+Under this pricing snapshot, both models' recommended solutions use three
+providers, so the cost difference between them (\$421.09 vs.\ \$374.54) is not
+driven by provider count but by which specific services each model's scoring
+function favours: \cmofour's critical-path objective rewards service choices
+that shorten the dependency chain (here, more components placed on GCP and
+Azure), while \cmothree's average-latency objective is comparatively neutral
+between the parallel branches and instead favours the cheapest per-component
+combination. We do not attribute the difference to a single service-level
+cause, since a full per-component price attribution was outside the scope of
+this comparison.
 
 \subsection{Explainability Artefacts}
 \label{sec:netflix_explain}
@@ -1188,27 +1360,34 @@ ceiling.
 balanced solution.
 
 \textbf{Constraint proof.}
-Three hard constraints are verified: \textit{Budget:} total monthly cost
-\$659.92 $\le$ \$5\,000 limit (margin: \$4\,340.08)---PASS. \textit{Latency:}
-end-to-end latency 15.62\,ms $\le$ 100\,ms limit---PASS. \textit{Provider
-diversity:} 2 distinct providers (AWS, GCP) $\le$ maximum of 3---PASS.
+Three hard constraints are verified for the min-cost/balanced solution:
+\textit{Budget:} total monthly cost \$374.54 $\le$ \$5\,000 limit (margin:
+\$4\,625.46): PASS. \textit{Latency:} end-to-end latency 21.08\,ms $\le$
+100\,ms limit: PASS. \textit{Provider diversity:} 3 distinct providers
+(Azure, AWS, GCP) $\le$ maximum of 3: PASS.
 
 \textbf{Rule trace.}
-The expert rule engine fired 6~rules for the balanced solution. Key examples:
-(i)~a \textit{Low Cost Solution} rule rewarded the configuration for falling
-under 80\% of the budget ceiling; (ii)~a \textit{Very Low Cost Solution} rule
-added an additional reward for cost falling below 60\% of the budget;
-(iii)~a \textit{Multi-Cloud Strategy} rule rewarded the dual-provider deployment
-for balancing risk mitigation with operational simplicity; (iv)~a
-\textit{Balanced Provider Distribution} rule confirmed that no single provider
-hosts more than a fixed fraction of total components, mitigating vendor lock-in
-exposure.
+The expert rule engine evaluates the same category of rules for every
+returned solution, illustrated here qualitatively rather than by an exact
+per-run count (which varies with the specific configuration and pricing
+snapshot): cost-tier rules reward configurations that fall under successive
+budget-utilisation thresholds; a \textit{Multi-Cloud Strategy} rule rewards
+deployments that spread components across more than one provider for risk
+mitigation; and a \textit{Balanced Provider Distribution} rule checks that no
+single provider hosts a disproportionate share of components, flagging
+vendor-lock-in exposure when it does. For the current min-cost/balanced
+solution (Azure: 5, AWS: 4, GCP: 4 components), the distribution is close to
+even and the lock-in-risk rule does not fire a penalty.
 
 \textbf{Pipeline timing.}
-For \cmothree, the full pipeline completed in approximately 2.4\,ms (CSP:
-1.5\,ms, expert rules: 0.8\,ms, Pareto: 0.1\,ms), well within interactive
-thresholds. \cmofour's end-to-end runtime of 226.7\,ms includes live pricing API
-fetches; the pure computation time remains sub-10\,ms.
+For \cmothree, the full pipeline completed in approximately 15.0\,ms (CSP:
+9.0\,ms, expert rules: 3.1\,ms, Pareto: 2.9\,ms), well within interactive
+thresholds. \cmofour's end-to-end wall-clock runtime of 36.6\,s for this run
+was dominated by live pricing API round-trips (Table~\ref{tab:netflix_cmov4}
+footnote); we do not have an isolated compute-only timing for this specific
+run, but the 18-component \cmofour timings in Section~\ref{sec:multirun}
+(typically 40--80\,ms of pure computation) indicate the search and scoring
+logic itself is not the source of this runtime.
 
 \subsection{Discussion of Netflix Results}
 \label{sec:netflix_discussion}
@@ -1217,62 +1396,97 @@ The Netflix case study surfaces several insights beyond what the synthetic
 experiments demonstrate.
 
 \textbf{Multi-cloud is Pareto-competitive with single-cloud.}
-The all-AWS configuration (Netflix's current deployment) achieves minimum
-latency at \$663.37/month (CMOv3) but is not strictly Pareto-optimal: the
-hybrid AWS+GCP configuration achieves lower cost (\$659.92) at higher but still
-excellent latency (15.62\,ms vs.\ 10.38\,ms). In practice, a difference of
-5\,ms in average latency is imperceptible to end users for non-real-time
-workloads, yet the cost saving and vendor lock-in reduction are genuine. \cmo
-surfaces this trade-off explicitly and quantifiably.
+Under this pricing snapshot, the all-AWS configuration (Netflix's current
+deployment, and also \cmothree's min-latency Pareto point) achieves the lowest
+latency at \$803.30/month but is not strictly Pareto-optimal: the hybrid
+3-provider configuration achieves less than half the cost (\$374.54) at
+higher but still low latency (21.08\,ms vs.\ 10.38\,ms). Whether an
+approximately 10.7\,ms latency difference is acceptable depends on the
+workload's real-time requirements; for non-real-time reads it is plausibly
+imperceptible to end users, while the more-than-\$400/month cost saving and
+vendor-diversification benefit are unambiguous. \cmo surfaces this trade-off
+explicitly and quantifiably rather than resolving it unilaterally.
 
 \textbf{Dependency-aware latency modelling produces more actionable results.}
-\cmofour's critical-path analysis reduces the estimated end-to-end latency from
-15.62\,ms (CMOv3 average model) to 10.38\,ms for the recommended configuration.
-This is not an optimistic artefact but a structurally accurate reflection:
-Netflix's architecture parallelises downstream I/O reads, so the true bottleneck
-is the critical path, not the sum of all component latencies.
+\cmofour's critical-path analysis estimates a substantially lower end-to-end
+latency (10.62\,ms) for its own top-ranked configuration than \cmothree's
+average-latency model estimates for its own top-ranked configuration
+(21.08\,ms). Because the two models can select different provider
+assignments, this is not a like-for-like reduction on one fixed
+configuration, but it illustrates the same structural point: Netflix's
+architecture parallelises downstream I/O reads, so the true bottleneck for an
+end-user request is the critical path, not the sum of all component
+latencies, and \cmofour's model is designed to reflect that.
 
-\textbf{GCP is competitive on network-edge and analytics components.}
-Both \cmothree and \cmofour consistently select GCP for object storage
-(\$20/month vs.\ AWS S3's \$23/month) and cache (GCP Memorystore \$35.77/month
-vs.\ AWS ElastiCache \$49.64/month). This is driven by GCP's pricing structure,
-which is more favourable for these workload types at the modelled scale. AWS
-retains compute, orchestration, streaming, and database components where its
-pricing or ecosystem advantages are stronger.
+\textbf{Provider selection is driven by the live pricing snapshot, not a fixed
+architectural rule.} Across both models' recommended solutions, all three
+providers are represented at each pricing snapshot we have examined, but
+which specific components land on which provider shifts with the prices
+themselves (Table~\ref{tab:netflix_pareto}, Table~\ref{tab:netflix_cmov4}).
+We therefore do not report fixed per-service cost comparisons (e.g., a claim
+that a specific GCP service is durably cheaper than its AWS equivalent) as a
+general finding, since we observed in this same revision cycle that such
+comparisons can invert between pricing snapshots taken weeks apart. AWS,
+GCP, and Azure each win on different components depending on the day's
+prices; \cmo's contribution is to re-solve the assignment consistently
+whenever prices change, not to encode a static preference for one provider's
+services.
 
 \textbf{The vendor lock-in framing is directly actionable.}
 Netflix's current all-AWS deployment receives a vendor lock-in penalty in the
 MCDA scoring that contributes to its lower overall score relative to hybrid
 configurations. The rule trace explains precisely which components drive this
-penalty (DynamoDB, EKS, Kinesis---all with high AWS-specific lock-in risk
+penalty (DynamoDB, EKS, Kinesis, all with high AWS-specific lock-in risk
 scores) and suggests which components could be migrated first to reduce exposure
 with minimal operational disruption.
 
 \textbf{GA baseline comparison on the Netflix scenario.}
 To place the \cmo results in context, we ran the GA baseline (identical
 configuration to the 18-component experiments: 50~individuals,
-100~generations) on the Netflix 13-component scenario for 10~independent seeds.
-The GA achieved a mean cost of \$649.37 $\pm$ \$25.99 (range
-\$631.50--\$714.57) and a mean latency of 14.10 $\pm$ 2.46\,ms, at a mean
-runtime of 940.9\,ms---roughly 400$\times$ slower than \cmothree and
-$4\times$ slower than \cmofour. Critically, 30\% of GA runs (seeds 3, 8, 9)
-converged to a single-provider (all-AWS) configuration, achieving low latency
-(10.38\,ms) but maximum vendor lock-in risk (VR $= 1.0$) and consequently a
-lower MCDA score. The MCDA score across the five GA seeds that found
-multi-provider solutions averaged 0.7437 $\pm$ 0.0814, compared with
-\cmothree's deterministic MCDA of 0.7659 (+3.0\,pp advantage) despite
-\cmothree's slightly higher cost (\$659.92). This demonstrates that the
-CSP-enforced multi-provider constraint provides more reliable vendor-risk
-management than the stochastic GA, and the higher MCDA reflects genuine
-multi-dimensional quality rather than cost minimisation alone.
+100~generations) on the Netflix 13-component scenario for 10~independent
+seeds, using the same live pricing snapshot (26~September~2026) as the other
+experiments in this revision. The GA achieved a mean cost of \$334.86
+$\pm$\$46.47 (range \$299.89--\$425.12) and a mean latency of 18.00
+$\pm$2.38\,ms, at a mean runtime of approximately 1.4\,s across nine of the
+ten seeds (one seed encountered an isolated system-level scheduling delay,
+excluded from this statistic as in Section~\ref{sec:multirun}),
+substantially slower than \cmothree's approximately 15\,ms pipeline runtime
+(Section~\ref{sec:netflix_explain}). Provider
+diversity varied across seeds: 6 of 10 runs used 2 providers (vendor risk
+0.5) and 4 of 10 used 3 providers (vendor risk 0.333, matching \cmothree's
+constant choice); no run in this batch collapsed to a single provider. Scored
+on the same six-dimensional MCDA objective, GA's mean score across the ten
+seeds is 0.7387 ($\pm$0.0173), compared with \cmothree's deterministic MCDA
+of 0.6855; under this pricing snapshot, GA's aggregate score is
+\emph{higher} than \cmothree's by 5.3~percentage points, driven by GA's lower
+cost. We report this plainly rather than selectively, consistent with
+Section~\ref{sec:mcdasensitivity}: \cmothree's contribution on this scenario
+is not a higher MCDA score but a consistently enforced 3-provider
+architecture on every run, regardless of which prices happen to be cheapest
+on a given day, together with a full constraint-proof and rule-trace record
+that GA does not produce.
 
 \textbf{Limitations.}
 The absolute cost and latency values in this case study are indicative rather
-than definitive. Real Netflix infrastructure involves reserved instance pricing,
-custom network arrangements, and Open Connect hardware that cannot be captured
-by public list prices. The relative patterns---which provider combinations are
-Pareto-optimal, which components drive lock-in risk, which rules fire---are the
-meaningful signal, and these are grounded in publicly documented architectural
+than definitive, and are more volatile than the relative architectural
+patterns discussed above: because both \cmo and the GA baseline price
+configurations against live AWS/GCP/Azure list prices, re-running this
+comparison on a different date can and does change the specific dollar
+figures and can change which method attains the higher MCDA score, as our
+own revision history illustrates (an earlier pricing snapshot in this same
+codebase showed the opposite ranking). Real Netflix infrastructure also
+involves reserved instance pricing, custom network arrangements, and Open
+Connect hardware that cannot be captured by public list prices. We therefore
+present this case study as an illustrative, reproducible scenario, useful
+for showing how \cmo's constraint proofs, rule traces, and deterministic
+provider-diversity guarantee apply to a real, publicly documented
+architecture, rather than as validation of any specific cost, latency, or
+MCDA-margin figure against Netflix's actual production deployment. The
+relative patterns that do not depend on the pricing snapshot (which
+provider combinations are feasible under the stated constraints, which
+components drive lock-in risk, which rules fire, and that \cmo's recommendation
+is reproducible while GA's is not) are the meaningful signal, and these
+are grounded in publicly documented architectural
 facts~\cite{aws_netflix,netflix_techblog,netflix_zuul,netflix_atlas,netflix_titus,netflix_openconnect}
 and live provider pricing APIs~\cite{aws_pricing,azure_prices,gcp_pricing}.
 
@@ -1281,27 +1495,31 @@ and live provider pricing APIs~\cite{aws_pricing,azure_prices,gcp_pricing}.
 \label{sec:discussion}
 
 The experiments show that \cmo's hybrid CSP--Expert--Pareto pipeline can provide
-high-quality recommendations for multi-cloud deployment planning with strong
-constraint guarantees and low runtime. In the eighteen-component scenario,
-\cmofour consistently found the same cost--latency combination across all 30~runs,
-indicating that its feasible search and expert scoring logic are stable under the
-fixed architecture and constraints. Its runtime remained within approximately
-102\,ms to 267\,ms, which is well within interactive thresholds for decision
-support.
+constraint-compliant recommendations for multi-cloud deployment planning with
+strong feasibility guarantees and low runtime. In the eighteen-component
+scenario, \cmofour deterministically found the same cost--latency combination
+across all 30~runs ($\sigma=0$; Table~\ref{tab:multirun}), indicating that its
+feasible search and expert scoring logic are exactly stable under the fixed
+architecture and constraints. Excluding a single run that encountered an
+isolated system-level scheduling delay (Section~\ref{sec:multirun}), its
+runtime remained within approximately 40\,ms to 80\,ms, which is well within
+interactive thresholds for decision support.
 
-In \cmofour, the best solution on the evaluated architecture uses three
-providers, with a monthly cost of \$808.61 and an average latency of 20.50\,ms.
-The multi-cloud analysis estimates a cross-cloud latency penalty of
-approximately 10\,ms and monthly cross-provider data-transfer costs of about
-\$150 for a 100\,GB workload, corresponding to roughly \$1\,800 per year in
-additional spend. Operational complexity is rated as high, with three separate
-provider consoles to manage. These figures illustrate that Pareto-optimality in
-cost and latency alone does not resolve multi-cloud operational concerns, which
-must be addressed either via additional objectives (such as risk or complexity)
-or through rule-based penalties and practitioner judgement.
+In \cmofour, the recommended solution on the evaluated architecture uses three
+providers, with a monthly cost of \$487.88 and a latency of 21.11\,ms (Table
+\ref{tab:multirun}). The multi-cloud analysis estimates a cross-cloud latency
+penalty of approximately 10\,ms and monthly cross-provider data-transfer costs
+of about \$150 for a 100\,GB workload, corresponding to roughly \$1\,800 per
+year in additional spend. Operational complexity is rated as high, with three
+separate provider consoles to manage. These figures illustrate that
+Pareto-optimality in cost and latency alone does not resolve multi-cloud
+operational concerns, which must be addressed either via additional
+objectives (such as risk or complexity) or through rule-based penalties and
+practitioner judgement.
 
 From a pure cost--latency standpoint, the GA baseline did achieve a better
-point: roughly \$740.54 and 19.24\,ms compared with \$808.61 and 20.50\,ms.
+point on average: mean \$403.76 ($\pm$\$4.53) and 20.76\,ms ($\pm$0.72)
+compared with \cmofour's \$487.88 and 21.11\,ms (Table~\ref{tab:multirun}).
 This raises a natural question. Why prefer the CSP--Expert--Pareto approach when
 GA can find a cheaper configuration with similar latency? The answer lies in
 several factors that matter for enterprise decision making.
@@ -1315,20 +1533,31 @@ deterministic performance within a narrow runtime band and can be restarted
 quickly for different constraint combinations.
 
 Second, \textbf{diversity of solutions is valuable}. \cmofour produces an
-explicit Pareto frontier with four non-dominated configurations, while GA, as
-configured in the experiments, yields a single elite solution. An architect
-might prefer a slightly more expensive solution that uses fewer providers, or one
-that favours a strategic provider partnership, or one that leaves more budget
-headroom for future growth. Having four options on the frontier allows such
-nuanced choices informed by organisational context.
+explicit Pareto frontier averaging 4--5 non-dominated configurations (Section
+\ref{sec:multirun}), while GA, as configured in the experiments, yields a
+single elite solution. An architect might prefer a slightly more expensive
+solution that uses fewer providers, or one that favours a strategic provider
+partnership, or one that leaves more budget headroom for future growth.
+Having several options on the frontier allows such nuanced choices informed
+by organisational context.
 
-Third, \textbf{explainability and auditability are increasingly important}.
-\cmo's constraint proofs, rule traces, and decision paths provide a rich
-evidence trail. They can be embedded into PDF reports and used in governance
-processes. They also make it easier to validate that rule thresholds and weights
-align with internal policies or risk appetites. In contrast, GA's best solution
-is, from a user's perspective, simply the outcome of a black box, unless
-additional effort is invested in post-hoc explanation.
+Third, \textbf{explainability and auditability are increasingly important},
+and we quantify this coverage rather than asserting it qualitatively:
+\cmo attaches a constraint proof and a rule trace to 100\% of the solutions
+it returns, across every experiment reported in this paper (Sections
+\ref{sec:multirun} and~\ref{sec:netflix}); none of the five baselines compared
+against (Random, Greedy-Cost, Greedy-Latency, GA, and Weighted Sum) attach any
+comparable artefact to their output. These artefacts can be embedded into PDF reports
+and used in governance processes, and they make it possible to check that
+rule thresholds and weights align with internal policies or risk appetites
+without re-deriving the recommendation from scratch. In contrast, GA's best
+solution is, from a user's perspective, simply the outcome of a black box,
+unless additional effort is invested in post-hoc explanation. We have not
+conducted a task-based user study measuring whether practitioners actually
+make better or faster decisions with these artefacts than without them; this
+is a genuine gap in the present evaluation, and we list it explicitly as
+future work in Section~\ref{sec:threats} rather than implying it has been
+tested.
 
 Fourth, the \textbf{hybrid approach more naturally integrates symbolic business
 knowledge}. Many best practices in multi-cloud architecture are qualitative and
@@ -1340,28 +1569,26 @@ influence the optimiser directly. GA and other metaheuristics can approximate
 these practices indirectly through fitness functions, but the mapping is less
 direct and harder to maintain.
 
-The NSGA-II and MOEA/D experiments, meanwhile, show that evolutionary
-multi-objective algorithms have their place. They provide a way to validate the
-frontier found by the CSP--Expert--Pareto pipeline on small instances and to
-explore alternative formulations of objectives on moderately sized problems.
-They also demonstrate that, under generous evaluation budgets, stochastic search
-can approximate or match oracle frontiers. Yet they do not, in their standard
-forms, offer the level of built-in explainability that \cmo targets.
-
-The Netflix case study further validates the framework on a real-world scenario
-with 13~components drawn from publicly documented Netflix
+The Netflix case study further illustrates the framework on a real-world
+scenario with 13~components drawn from publicly documented Netflix
 services~\cite{aws_netflix,netflix_zuul,netflix_atlas,netflix_titus,netflix_openconnect}
 and live cloud pricing. \cmo identified hybrid configurations that are
 Pareto-competitive with Netflix's current all-AWS deployment, surfaced the
 vendor lock-in penalties for AWS-specific services (Kinesis, DynamoDB, EKS),
 and completed the full pipeline in under 230\,ms including pricing API calls.
-A GA baseline on the same scenario took ${\sim}$941\,ms ($400{\times}$ slower
-than \cmothree) and in 30\% of runs collapsed to an all-AWS solution with
-maximum vendor lock-in risk; \cmothree's deterministic MCDA score (0.7659)
-exceeded the average GA MCDA (0.7437) by 3.0~percentage points. This
-demonstrates that the framework generalises beyond synthetic benchmarks and
-provides more reliable multi-dimensional quality than stochastic baselines on
-real-world architecture scenarios.
+A GA baseline on the same scenario took ${\sim}$1.4\,s, substantially slower
+than \cmothree, and its provider diversity varied across seeds (2 or 3
+providers, never collapsing to a single provider in this run). Under the
+pricing snapshot used in this evaluation, GA's mean MCDA score across the ten
+seeds (0.7387) was in fact \emph{higher} than \cmothree's deterministic score
+(0.6855); we report this honestly (Section~\ref{sec:mcdasensitivity},
+Section~\ref{sec:discussion}) rather than selectively, since it is consistent
+with the synthetic eighteen-component results. What generalises from
+synthetic benchmarks to this real-world scenario is not a claim that \cmo
+attains a higher aggregate score, but that it deterministically satisfies the
+provider-diversity constraint and produces a fully auditable decision trail
+on every run, on a real, publicly documented architecture and not only on
+synthetic ones.
 
 % =========================================================================
 \section{Threats to Validity and Limitations}
@@ -1376,19 +1603,26 @@ and organisation-specific constraints that are not captured here. Nonetheless,
 the core structure of components, providers, dependencies, and cost and latency
 objectives is representative of many cloud migration scenarios.
 
-A second threat concerns pricing and latency data. The experiments use a mixture
-of live Azure retail prices and documented AWS and GCP prices, anchored at
-particular points in time. Real-world prices change, sometimes significantly,
-over months and years. Network latencies also vary with traffic patterns,
-routing changes, and infrastructure evolution. As a result, absolute cost and
-latency numbers in the experiments should not be taken as permanent truths. The
-relative patterns observed---for example, the speed difference between
-CSP-based optimisation and GA, or the trade-off structures across
-architectures---are less sensitive to such changes.
+A second threat concerns pricing and latency data, and we can report this one
+from direct experience rather than as a hypothetical concern. The experiments
+use a mixture of live Azure retail prices and documented AWS and GCP prices,
+anchored at a specific point in time (26~September~2026, this revision's
+snapshot). During the preparation of this revision we re-ran the full
+experimental suite against a newer pricing snapshot than the one used for the
+initially submitted manuscript, and several relative comparisons changed
+along with the absolute figures: most notably, which method attains the
+higher aggregate MCDA score on the eighteen-component and Netflix scenarios
+(Section~\ref{sec:mcdasensitivity}) reversed direction between the two
+snapshots. This is a genuine threat to the stability of any single-snapshot
+scalar comparison, not only to absolute dollar figures, and it is one reason
+we now report \cmo's contribution primarily in terms of feasibility
+guarantees, determinism, and auditability (Sections~\ref{sec:multirun}
+and~\ref{sec:discussion}), which do not depend on which prices happen to be
+cheapest on a given day. Network latencies also vary with traffic patterns,
+routing changes, and infrastructure evolution, compounding this effect.
 
 Third, the search strategies within the CSP engine and the hyperparameters of
-GA, NSGA-II, and MOEA/D were chosen pragmatically rather than systematically
-optimised. Different choices could improve or degrade performance. For instance,
+GA were chosen pragmatically rather than systematically optimised. Different choices could improve or degrade performance. For instance,
 GA might find even better cost--latency combinations with alternative crossover
 schemes or adaptive mutation rates, at the expense of additional complexity and
 tuning effort. Conversely, CSP heuristics could be adjusted to explore more
@@ -1396,14 +1630,31 @@ diverse regions of the space without sacrificing runtime guarantees. The
 experiments do not exhaustively explore these configuration spaces.
 
 Fourth, the MCDA weights and expert rule thresholds were selected to match a
-plausible balanced enterprise scenario. Organisations that strongly prioritise
-security or compliance might wish to increase the corresponding weights or adjust
-rules to reflect stricter standards. The current implementation allows for such
-tuning, but the experiments do not include a systematic sensitivity analysis over
-these parameters. Changes in weights can alter the ranking of configurations
-even when their cost and latency remain unchanged.
+plausible balanced enterprise scenario, and Section~\ref{sec:mcdasensitivity}
+now reports a weight-sensitivity analysis across five named profiles.
+Organisations that strongly prioritise security or compliance can adjust the
+corresponding weights or rule thresholds directly. That analysis also
+surfaced a more specific limitation worth stating here: on the architectures
+studied, three of the six MCDA criteria (reliability, security, scalability)
+do not discriminate between methods at all, because every feasible solution
+attains the same value on them. This is a property of the current service
+catalogue's metric model rather than of the MCDA formulation itself, and it
+means the sensitivity results in Section~\ref{sec:mcdasensitivity} should be
+read as characterising the cost/latency/vendor-risk trade-off specifically,
+not the full six-dimensional space. A catalogue in which reliability and
+security genuinely vary across provider choices would be needed to assess
+sensitivity on those dimensions.
 
-Fifth, while the \cmo codebase and experiment harness aim for reproducibility,
+Fifth, we have not conducted a task-based user study to test whether the
+explainability artefacts (constraint proofs, rule traces, decision paths)
+actually improve practitioners' decisions, trust, or speed relative to an
+unexplained recommendation. Section~\ref{sec:discussion} quantifies artefact
+\emph{coverage} (100\% of \cmo's outputs, 0\% of the baselines'), which is a
+verifiable property of the software, but coverage is not the same claim as
+demonstrated usefulness to a human decision-maker; the latter remains future
+work.
+
+Sixth, while the \cmo codebase and experiment harness aim for reproducibility,
 the present paper relies on a specific set of CSV outputs. Re-running
 experiments with newer versions of cloud pricing APIs, different random seeds, or
 updated rule configurations might yield slightly different numbers. The
@@ -1444,19 +1695,28 @@ interpretability in one workflow. By integrating CSP filtering, expert rules,
 Pareto analysis, and MCDA ranking, the framework supports both technically sound
 and communicable migration decisions.
 
-Across synthetic architectures up to 18~components, \cmofour produced
-competitive cost--latency outcomes with low runtime and returned multi-point
-Pareto frontiers that offer actionable alternatives rather than a single opaque
-recommendation. Compared with GA/NSGA-II/MOEA/D baselines, \cmo maintained
-strong feasibility discipline and provided richer explanatory evidence
-(constraint proofs, rule traces, and decision-path artefacts), which is
-important in regulated and risk-sensitive environments. Statistical analysis
-over 30~independent runs confirmed that \cmofour is statistically significantly
-superior to random search ($p<0.001$, large effect size) and produces
-deterministic, reproducible results. The real-world Netflix case study with
-13~components and live cloud pricing further validated the approach, demonstrating
-that \cmo identifies hybrid multi-cloud configurations that are Pareto-competitive
-with current single-provider deployments.
+Across synthetic architectures up to 18~components, \cmofour returned solutions
+with sub-second runtime and multi-point Pareto frontiers (averaging 4--5 points
+per run) that offer actionable alternatives rather than a single opaque
+recommendation. We do not claim that \cmofour dominates GA on cost, latency,
+or aggregate MCDA score under the pricing snapshot used in this
+revision (Section~\ref{sec:multirun}); indeed the GA baseline attains a higher
+mean MCDA score in several of the weight profiles tested
+(Section~\ref{sec:mcdasensitivity}). What \cmo maintains relative to these
+baselines is strict feasibility discipline: every returned solution
+provably satisfies the stated budget, latency, and provider-count
+constraints, together with richer explanatory evidence (constraint proofs,
+rule traces, and decision-path artefacts) that the stochastic baselines do not
+produce. Statistical analysis over 30~independent runs confirmed that
+\cmofour's cost and runtime are deterministic and exactly reproducible across
+seeds ($\sigma=0$), whereas all stochastic baselines exhibit run-to-run
+variance (Table~\ref{tab:stats}); this determinism, not superior optimisation
+quality, is the property we emphasise for governance and audit use cases. The
+real-world Netflix case study with 13~components and live cloud pricing
+further illustrates the approach on an operational scenario, showing that
+\cmo identifies hybrid multi-cloud configurations that are Pareto-competitive
+with current single-provider deployments; it is a reproducible worked example
+rather than a validation of superiority over other methods.
 
 The results also highlight three practical strengths that matter for deployment
 governance. First, the constraint layer scales effectively: very large
@@ -1481,14 +1741,13 @@ practical: \cmofour produced multi-point Pareto sets, and maintained low runtime
 while offering explanation artefacts suitable for technical and governance-facing
 reviews.
 
-To support external validation, the full implementation---including all
-experiment scripts, result artefacts, and the Netflix scenario---is available
+To support external validation, the full implementation, including all
+experiment scripts, result artefacts, and the Netflix scenario, is available
 at:
 \begin{center}
 \url{https://github.com/florinolariuip/CloudMigrationFramework/tree/CMO_Netflix/cmo_journal_code}
 \end{center}
-The repository is currently set to private to preserve double-blind review
-integrity; the authors will grant access to any reviewer upon request.
+The repository is publicly available.
 The interface also uses Sankey diagrams to visualise cost and latency flows
 across components and providers, helping users trace how local configuration
 choices propagate to system-level outcomes.
@@ -1497,12 +1756,14 @@ The distinctive value of our approach is the explicit unification of four
 capabilities that are usually treated separately: exact constraint-based
 feasibility, expert knowledge integration, Pareto trade-off analysis, and
 structured explainability artefacts. This combination allows \cmo to deliver
-solutions that are not only optimisation-competitive, but also verifiable,
-auditable, and easier to justify in enterprise decision and governance processes.
+solutions that remain within feasible, explainable bounds by construction,
+and that are verifiable, auditable, and easier to justify in enterprise
+decision and governance processes, properties that are largely orthogonal to,
+and not guaranteed by, achieving the lowest cost or latency on a given run.
 
 Across all three settings, we keep a consistent experimental
-baseline---monthly budget capped at \$5\,000, end-to-end latency constrained to
-150\,ms, and provider diversity limited to at most three clouds---while also
+baseline (monthly budget capped at \$5\,000, end-to-end latency constrained to
+150\,ms, and provider diversity limited to at most three clouds), while also
 testing stricter latency thresholds in selected \cmothree runs. Together, these
 choices provide a controlled yet practical benchmark, showing that the framework
 remains effective from small-scale deployments to complex, enterprise-grade
@@ -1525,6 +1786,15 @@ preference elicitation and preference-learning mechanisms; and
 (iv)~validating the framework in industry case studies with real operational and
 pricing data. These extensions can help position \cmo as a practical, auditable
 optimisation assistant for enterprise migration governance.
+
+% =========================================================================
+\section*{Acknowledgment}
+This research is co-funded by the European Union, Marie Sk\l{}odowska-Curie
+Actions (MSCA), HORIZON-MSCA2021-SE-01 program, as part of the ``Elevating
+Higher Education public policies: an empowering SPRIng board'' (HESPRI)
+project. Views and opinions expressed are, however, those of the author(s)
+only and do not necessarily reflect those of the European Union. Neither the
+European Union nor the granting authority can be held responsible for them.
 
 % =========================================================================
 \bibliographystyle{IEEEtran}
@@ -1751,5 +2021,20 @@ Netflix Technology Blog, ``Netflix Tech Blog,'' [Online]. Available:
   https://netflixtechblog.com. Accessed: Mar.~22, 2026.
 
 \end{thebibliography}
+
+\begin{IEEEbiography}[{\includegraphics[width=1in,height=1.25in,clip,keepaspectratio]{figs/florin_olariu.png}}]{Florin Olariu}
+(Member, IEEE) is currently pursuing the Ph.D. degree with the Faculty of
+Computer Science, Alexandru Ioan Cuza University, Ia\c{s}i, Romania. His
+research interests include cloud-native architectures, multi-cloud migration
+planning, and explainable, constraint-aware decision-support systems for
+cloud infrastructure.
+\end{IEEEbiography}
+
+\begin{IEEEbiography}[{\includegraphics[width=1in,height=1.25in,clip,keepaspectratio]{figs/lenuta_alboaie.png}}]{Lenu\c{t}a Alboaie}
+(Senior Member, IEEE) is currently an Associate Professor with the Faculty of
+Computer Science, Alexandru Ioan Cuza University, Ia\c{s}i, Romania. Her
+research interests include distributed systems, cloud computing, and
+software architectures.
+\end{IEEEbiography}
 
 \end{document}

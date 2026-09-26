@@ -286,6 +286,8 @@ if cmov4_res:
         cmov4_top = sols.get('balanced') or sols.get('min_cost')
     elif isinstance(sols, list) and sols:
         cmov4_top = sols[0]
+if isinstance(cmov4_top, dict):
+    cmov4_top = Solution(**cmov4_top)
 
 # Baselines on 18-comp
 print("  Running baselines on 18-comp...")

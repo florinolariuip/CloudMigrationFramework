@@ -1,0 +1,254 @@
+{
+  "scenario": "Netflix Multi-Cloud Migration (13-component)",
+  "constraints": {
+    "budget": 5000,
+    "latency_ms": 100,
+    "max_providers": 3
+  },
+  "search_space": 1594323,
+  "feasible_count": 31,
+  "pruning_rate_pct": 100.0,
+  "pareto_size": 6,
+  "hypervolume": 3179.79,
+  "spacing": 45.3454,
+  "timing_ms": {
+    "csp": 9.0,
+    "rules": 3.1,
+    "pareto": 2.9,
+    "total": 15.0
+  },
+  "solutions": {
+    "min_cost": {
+      "cost": 374.54,
+      "latency": 21.08,
+      "providers": 3,
+      "provider_distribution": {
+        "Azure": 5,
+        "AWS": 4,
+        "GCP": 4
+      },
+      "score": 0.61,
+      "configuration": {
+        "api_gateway": "Azure API Management",
+        "identity_management": "AWS IAM",
+        "analytics": "GCP BigQuery",
+        "database": "Azure SQL",
+        "application_server": "AWS EC2",
+        "storage": "GCP Cloud Storage",
+        "cache": "GCP Memorystore",
+        "event_streaming": "Azure Event Hubs",
+        "cdn": "Azure CDN",
+        "load_balancer": "AWS ALB",
+        "monitoring": "AWS CloudWatch",
+        "containers": "Azure AKS",
+        "nosql_database": "GCP Firestore"
+      }
+    },
+    "balanced": {
+      "cost": 374.54,
+      "latency": 21.08,
+      "providers": 3,
+      "provider_distribution": {
+        "Azure": 5,
+        "AWS": 4,
+        "GCP": 4
+      },
+      "score": 0.61,
+      "configuration": {
+        "api_gateway": "Azure API Management",
+        "identity_management": "AWS IAM",
+        "analytics": "GCP BigQuery",
+        "database": "Azure SQL",
+        "application_server": "AWS EC2",
+        "storage": "GCP Cloud Storage",
+        "cache": "GCP Memorystore",
+        "event_streaming": "Azure Event Hubs",
+        "cdn": "Azure CDN",
+        "load_balancer": "AWS ALB",
+        "monitoring": "AWS CloudWatch",
+        "containers": "Azure AKS",
+        "nosql_database": "GCP Firestore"
+      }
+    },
+    "min_latency": {
+      "cost": 803.3,
+      "latency": 10.38,
+      "providers": 1,
+      "provider_distribution": {
+        "AWS": 13
+      },
+      "score": 0.33,
+      "configuration": {
+        "api_gateway": "AWS API Gateway",
+        "identity_management": "AWS IAM",
+        "analytics": "AWS QuickSight",
+        "database": "AWS RDS",
+        "application_server": "AWS EC2",
+        "storage": "AWS S3",
+        "cache": "AWS ElastiCache",
+        "event_streaming": "AWS Kinesis",
+        "cdn": "AWS CloudFront",
+        "load_balancer": "AWS ALB",
+        "monitoring": "AWS CloudWatch",
+        "containers": "AWS EKS",
+        "nosql_database": "AWS DynamoDB"
+      }
+    }
+  },
+  "all_pareto": [
+    {
+      "cost": 374.54,
+      "latency": 21.08,
+      "providers": 3,
+      "provider_distribution": {
+        "Azure": 5,
+        "AWS": 4,
+        "GCP": 4
+      },
+      "score": 0.61,
+      "configuration": {
+        "api_gateway": "Azure API Management",
+        "identity_management": "AWS IAM",
+        "analytics": "GCP BigQuery",
+        "database": "Azure SQL",
+        "application_server": "AWS EC2",
+        "storage": "GCP Cloud Storage",
+        "cache": "GCP Memorystore",
+        "event_streaming": "Azure Event Hubs",
+        "cdn": "Azure CDN",
+        "load_balancer": "AWS ALB",
+        "monitoring": "AWS CloudWatch",
+        "containers": "Azure AKS",
+        "nosql_database": "GCP Firestore"
+      }
+    },
+    {
+      "cost": 474.96,
+      "latency": 20.92,
+      "providers": 3,
+      "provider_distribution": {
+        "GCP": 4,
+        "AWS": 5,
+        "Azure": 4
+      },
+      "score": 0.57,
+      "configuration": {
+        "api_gateway": "GCP API Gateway",
+        "identity_management": "AWS IAM",
+        "analytics": "GCP BigQuery",
+        "database": "AWS RDS",
+        "application_server": "AWS EC2",
+        "storage": "GCP Cloud Storage",
+        "cache": "AWS ElastiCache",
+        "event_streaming": "Azure Event Hubs",
+        "cdn": "Azure CDN",
+        "load_balancer": "Azure Load Balancer",
+        "monitoring": "AWS CloudWatch",
+        "containers": "Azure AKS",
+        "nosql_database": "GCP Firestore"
+      }
+    },
+    {
+      "cost": 620.37,
+      "latency": 20.85,
+      "providers": 3,
+      "provider_distribution": {
+        "AWS": 6,
+        "GCP": 2,
+        "Azure": 5
+      },
+      "score": 0.52,
+      "configuration": {
+        "api_gateway": "AWS API Gateway",
+        "identity_management": "GCP IAM",
+        "analytics": "AWS QuickSight",
+        "database": "Azure SQL",
+        "application_server": "AWS EC2",
+        "storage": "AWS S3",
+        "cache": "Azure Cache",
+        "event_streaming": "AWS Kinesis",
+        "cdn": "Azure CDN",
+        "load_balancer": "GCP Load Balancer",
+        "monitoring": "Azure Monitor",
+        "containers": "Azure AKS",
+        "nosql_database": "AWS DynamoDB"
+      }
+    },
+    {
+      "cost": 625.79,
+      "latency": 20.69,
+      "providers": 3,
+      "provider_distribution": {
+        "GCP": 5,
+        "Azure": 6,
+        "AWS": 2
+      },
+      "score": 0.52,
+      "configuration": {
+        "api_gateway": "GCP API Gateway",
+        "identity_management": "Azure AD",
+        "analytics": "GCP BigQuery",
+        "database": "GCP SQL",
+        "application_server": "Azure VM",
+        "storage": "Azure Storage",
+        "cache": "GCP Memorystore",
+        "event_streaming": "Azure Event Hubs",
+        "cdn": "AWS CloudFront",
+        "load_balancer": "Azure Load Balancer",
+        "monitoring": "GCP Cloud Monitoring",
+        "containers": "Azure AKS",
+        "nosql_database": "AWS DynamoDB"
+      }
+    },
+    {
+      "cost": 718.89,
+      "latency": 20.46,
+      "providers": 3,
+      "provider_distribution": {
+        "AWS": 6,
+        "GCP": 3,
+        "Azure": 4
+      },
+      "score": 0.49,
+      "configuration": {
+        "api_gateway": "AWS API Gateway",
+        "identity_management": "AWS IAM",
+        "analytics": "GCP BigQuery",
+        "database": "Azure SQL",
+        "application_server": "Azure VM",
+        "storage": "Azure Storage",
+        "cache": "GCP Memorystore",
+        "event_streaming": "Azure Event Hubs",
+        "cdn": "GCP Cloud CDN",
+        "load_balancer": "AWS ALB",
+        "monitoring": "AWS CloudWatch",
+        "containers": "AWS EKS",
+        "nosql_database": "AWS DynamoDB"
+      }
+    },
+    {
+      "cost": 803.3,
+      "latency": 10.38,
+      "providers": 1,
+      "provider_distribution": {
+        "AWS": 13
+      },
+      "score": 0.33,
+      "configuration": {
+        "api_gateway": "AWS API Gateway",
+        "identity_management": "AWS IAM",
+        "analytics": "AWS QuickSight",
+        "database": "AWS RDS",
+        "application_server": "AWS EC2",
+        "storage": "AWS S3",
+        "cache": "AWS ElastiCache",
+        "event_streaming": "AWS Kinesis",
+        "cdn": "AWS CloudFront",
+        "load_balancer": "AWS ALB",
+        "monitoring": "AWS CloudWatch",
+        "containers": "AWS EKS",
+        "nosql_database": "AWS DynamoDB"
+      }
+    }
+  ]
+}

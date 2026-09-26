@@ -297,7 +297,7 @@ summary = {
     "all_pareto": [sol_to_dict(s) for s in sorted_pareto],
 }
 
-out_path = "/sessions/compassionate-intelligent-sagan/mnt/outputs/netflix_cmo_results.json"
+out_path = "experiments/results/netflix_cmov3_results.json"
 with open(out_path, "w") as f:
     json.dump(summary, f, indent=2)
 print(f"\n    Results saved to: {out_path}")

@@ -1,6 +1,6 @@
 algorithm,cost_cohens_d,cost_interpretation,latency_cohens_d,latency_interpretation,cmov4_better_cost,cmov4_better_latency
-GA,5.466570317279383,Large,0.9113210301930056,Large,False,False
-GreedyCost,402072715970586.25,Large,,Large,False,False
-GreedyLatency,66948306944362.59,Large,inf,Large,False,False
-Random,-2.9433431612654206,Large,-0.8563090009111672,Large,True,True
-WeightedSum,330967488006804.5,Large,173944476753651.34,Large,False,False
+GA,26.265102537931842,Large,0.6945913794606463,Medium,False,False
+GreedyCost,485189257827323.25,Large,0.0,Negligible,False,False
+GreedyLatency,-1.527260500086292e+16,Large,1391555814029214.2,Large,True,False
+Random,-4.832429576594018,Large,0.5488573621406592,Medium,True,False
+WeightedSum,-3501254174349033.5,Large,217430595942063.47,Large,True,False

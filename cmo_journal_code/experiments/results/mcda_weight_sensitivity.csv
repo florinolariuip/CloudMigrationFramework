@@ -1,0 +1,31 @@
+profile,weights,algorithm,mcda_score
+Balanced (default),"(0.3, 0.2, 0.2, 0.15, 0.1, 0.05)",CMOv4,0.6899
+Balanced (default),"(0.3, 0.2, 0.2, 0.15, 0.1, 0.05)",GA,0.7645
+Balanced (default),"(0.3, 0.2, 0.2, 0.15, 0.1, 0.05)",GreedyCost,0.7022
+Balanced (default),"(0.3, 0.2, 0.2, 0.15, 0.1, 0.05)",GreedyLatency,0.6327
+Balanced (default),"(0.3, 0.2, 0.2, 0.15, 0.1, 0.05)",WeightedSum,0.5478
+Balanced (default),"(0.3, 0.2, 0.2, 0.15, 0.1, 0.05)",Random,0.6566
+Cost-focused,"(0.55, 0.15, 0.1, 0.1, 0.05, 0.05)",CMOv4,0.7493
+Cost-focused,"(0.55, 0.15, 0.1, 0.1, 0.05, 0.05)",GA,0.8296
+Cost-focused,"(0.55, 0.15, 0.1, 0.1, 0.05, 0.05)",GreedyCost,0.7719
+Cost-focused,"(0.55, 0.15, 0.1, 0.1, 0.05, 0.05)",GreedyLatency,0.5245
+Cost-focused,"(0.55, 0.15, 0.1, 0.1, 0.05, 0.05)",WeightedSum,0.4649
+Cost-focused,"(0.55, 0.15, 0.1, 0.1, 0.05, 0.05)",Random,0.6822
+Performance-critical,"(0.15, 0.55, 0.1, 0.1, 0.05, 0.05)",CMOv4,0.3849
+Performance-critical,"(0.15, 0.55, 0.1, 0.1, 0.05, 0.05)",GA,0.6086
+Performance-critical,"(0.15, 0.55, 0.1, 0.1, 0.05, 0.05)",GreedyCost,0.391
+Performance-critical,"(0.15, 0.55, 0.1, 0.1, 0.05, 0.05)",GreedyLatency,0.6745
+Performance-critical,"(0.15, 0.55, 0.1, 0.1, 0.05, 0.05)",WeightedSum,0.3636
+Performance-critical,"(0.15, 0.55, 0.1, 0.1, 0.05, 0.05)",Random,0.3806
+Security-first,"(0.1, 0.1, 0.15, 0.45, 0.15, 0.05)",CMOv4,0.6477
+Security-first,"(0.1, 0.1, 0.15, 0.45, 0.15, 0.05)",GA,0.6572
+Security-first,"(0.1, 0.1, 0.15, 0.45, 0.15, 0.05)",GreedyCost,0.6519
+Security-first,"(0.1, 0.1, 0.15, 0.45, 0.15, 0.05)",GreedyLatency,0.6231
+Security-first,"(0.1, 0.1, 0.15, 0.45, 0.15, 0.05)",WeightedSum,0.6041
+Security-first,"(0.1, 0.1, 0.15, 0.45, 0.15, 0.05)",Random,0.6375
+Vendor-risk-averse,"(0.15, 0.1, 0.1, 0.1, 0.5, 0.05)",CMOv4,0.82
+Vendor-risk-averse,"(0.15, 0.1, 0.1, 0.1, 0.5, 0.05)",GA,0.7447
+Vendor-risk-averse,"(0.15, 0.1, 0.1, 0.1, 0.5, 0.05)",GreedyCost,0.8261
+Vendor-risk-averse,"(0.15, 0.1, 0.1, 0.1, 0.5, 0.05)",GreedyLatency,0.6788
+Vendor-risk-averse,"(0.15, 0.1, 0.1, 0.1, 0.5, 0.05)",WeightedSum,0.7489
+Vendor-risk-averse,"(0.15, 0.1, 0.1, 0.1, 0.5, 0.05)",Random,0.8033
