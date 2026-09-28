@@ -2,10 +2,9 @@
 
 \usepackage[T1]{fontenc}
 \usepackage[utf8]{inputenc}
-\usepackage{lmodern}
 \usepackage{geometry}
 \usepackage{url}
-\usepackage{microtype}
+\usepackage[expansion=false]{microtype}
 
 \geometry{
   top=2.5cm, bottom=2.5cm,
@@ -66,10 +65,16 @@ point-by-point response to every comment is provided in the accompanying
         is being compared.
   \item \textbf{Honest scope on interpretability claims.} Following
         Reviewer 1 (Comment 3), we no longer imply that auditability and
-        vendor-lock-in mitigation have been validated with users. The
-        Response to Reviewers explains why a task-based user study is out
-        of scope for this submission and lists it as concrete future work;
-        the manuscript itself makes no unsupported claim in this regard.
+        vendor-lock-in mitigation have been validated with users. We added
+        a concrete, verbatim worked example of the constraint-proof
+        artefact (Section V) and, drawing on Doshi-Velez and Kim's
+        established taxonomy of interpretability evaluation, we explain in
+        the Response to Reviewers why the present functionally-grounded
+        evidence is the appropriate bar for this revision and why a small,
+        non-expert pilot would not properly answer the application-grounded
+        question being asked; a properly resourced practitioner study is
+        scoped as concrete future work. The manuscript itself makes no
+        unsupported claim in this regard.
   \item \textbf{Baseline configuration details.} Following Reviewer 1
         (Comment 4), we removed an unexecuted, placeholder NSGA-II/MOEA-D
         comparison that had been included in error, and we now document
