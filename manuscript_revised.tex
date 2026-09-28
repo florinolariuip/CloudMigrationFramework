@@ -176,7 +176,7 @@ proofs, rule traces, decision paths, and visual artefacts such as cost and
 latency Sankey diagrams and automatically generated PDF reports. Fourth, it
 evaluates the approach empirically on synthetic yet realistic multi-cloud
 architectures with up to eighteen components, comparing \cmo against five
-baseline algorithms and two evolutionary multi-objective methods, and it reports
+baseline algorithms, including a tuned genetic algorithm, and it reports
 detailed performance, frontier quality, and explanation metrics, together with a
 statistical significance analysis over 30~independent runs and a validation and
 sensitivity study. A real-world case study on the Netflix streaming architecture
@@ -1580,12 +1580,13 @@ and used in governance processes, and they make it possible to check that
 rule thresholds and weights align with internal policies or risk appetites
 without re-deriving the recommendation from scratch. In contrast, GA's best
 solution is, from a user's perspective, simply the outcome of a black box,
-unless additional effort is invested in post-hoc explanation. We have not
-conducted a task-based user study measuring whether practitioners actually
-make better or faster decisions with these artefacts than without them; this
-is a genuine gap in the present evaluation, and we list it explicitly as
-future work in Section~\ref{sec:threats} rather than implying it has been
-tested.
+unless additional effort is invested in post-hoc explanation. This coverage
+figure is a functionally-grounded evaluation of the artefact in the sense
+of Doshi-Velez and Kim~\cite{doshi_rigorous}: it is a verifiable proxy rather
+than a demonstration that practitioners actually make better or faster
+decisions with these artefacts than without them. We discuss this
+distinction, and why we do not treat it as closed by a small non-expert
+pilot, in Section~\ref{sec:threats}.
 
 Fourth, the \textbf{hybrid approach more naturally integrates symbolic business
 knowledge}. Many best practices in multi-cloud architecture are qualitative and
@@ -1676,11 +1677,24 @@ sensitivity on those dimensions.
 Fifth, we have not conducted a task-based user study to test whether the
 explainability artefacts (constraint proofs, rule traces, decision paths)
 actually improve practitioners' decisions, trust, or speed relative to an
-unexplained recommendation. Section~\ref{sec:discussion} quantifies artefact
-\emph{coverage} (100\% of \cmo's outputs, 0\% of the baselines'), which is a
-verifiable property of the software, but coverage is not the same claim as
-demonstrated usefulness to a human decision-maker; the latter remains future
-work.
+unexplained recommendation. Following Doshi-Velez and Kim's~\cite{doshi_rigorous}
+taxonomy of interpretability evaluation -- functionally-grounded (formal
+proxies, no human subjects), human-grounded (lay subjects on simplified
+tasks), and application-grounded (domain experts on real end-tasks) -- the
+present paper offers a functionally-grounded evaluation: Section~\ref{sec:discussion}
+quantifies artefact coverage (100\% of \cmo's outputs, 0\% of the baselines')
+as a verifiable proxy, and Section~\ref{sec:explain} makes the artefact
+itself concretely inspectable (a verbatim worked example) rather than only
+described. Coverage is not the same claim as demonstrated usefulness to a
+human decision-maker. Whether these artefacts improve real migration
+decisions is properly an application-grounded question, which per the same
+taxonomy requires domain experts evaluating real or realistic high-stakes
+tasks; a brief study with non-specialist participants would constitute only
+a human-grounded evaluation, which Doshi-Velez and Kim note risks missing
+the essential requirements of the real-world task it approximates. We
+therefore treat a properly resourced, application-grounded practitioner
+study as future work rather than substituting a smaller human-grounded
+pilot that would not, on this framework, establish the claim in question.
 
 Sixth, while the \cmo codebase and experiment harness aim for reproducibility,
 the present paper relies on a specific set of CSV outputs. Re-running
