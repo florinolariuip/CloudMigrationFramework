@@ -636,6 +636,34 @@ compare this with the maximum allowed, while component coverage checks ensure
 that all required components have assigned services. These proofs can be seen as
 structured certificates that a solution is mathematically feasible.
 
+To make this concrete rather than abstract, we quote below the constraint
+proof that \cmo's explainability module emits, verbatim and unedited, for a
+feasible solution on the eighteen-component enterprise architecture under the
+same constraints used throughout Section~\ref{sec:experiments} (budget
+\$5{,}000/month, latency limit 150\,ms, maximum 3 providers). This particular
+solution (\$808.61/month, 20.50\,ms, 3 providers: 10 AWS, 7 GCP, 1 Azure) was
+generated fresh for this illustration rather than copied from
+Table~\ref{tab:mcda-baselines}; because pricing is fetched live at query
+time, its specific cost differs from the pricing-snapshot figures reported
+elsewhere in this paper, but the proof's structure and wording are exactly
+what the module emits for every solution discussed in this paper.
+
+\begin{itemize}
+  \item \textit{Maximum Budget}: Solution cost \$808.61 is within budget limit of \$5000 by \$4191.39.
+  \item \textit{Maximum Latency}: Solution latency 20.50ms is within limit of 150ms by 129.50ms.
+  \item \textit{Maximum Providers}: Solution uses 3 providers (GCP: 7, AWS: 10, Azure: 1), within limit of 3.
+  \item \textit{Component Coverage}: All required components assigned.
+\end{itemize}
+
+Each line above is generated automatically from the solution's own
+attributes by the function reproduced in Section~\ref{sec:csp}, not
+hand-written per case, so the same certificate format accompanies every
+recommendation \cmo returns throughout this paper. We present this as a
+concrete illustration of the artefact's content and format, not as empirical
+evidence that it improves a practitioner's decision; we return to that
+distinction, and to what would be needed to test it, in
+Section~\ref{sec:threats}.
+
 Rule traces are built directly from the expert rule engine's evaluation log.
 For each fired rule, the trace contains the rule name and category, the weight,
 the score contribution, and a short textual reasoning string, often combined
@@ -882,7 +910,7 @@ GA        & 4    & 427.74 & 16.94 & 1833.6 & 0 \\
 \end{tabular}
 \end{table}
 
-\subsection{Statistical Significance Analysis}
+\subsection{Statistical Significance and Fair MCDA Comparison}
 \label{sec:stats}
 
 Four of the five baselines (Greedy-Cost, Greedy-Latency, Weighted Sum, and
